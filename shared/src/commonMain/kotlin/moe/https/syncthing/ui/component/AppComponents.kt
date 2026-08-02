@@ -36,9 +36,9 @@ internal fun StatusCard(uiState: CoreUiState) {
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text("◎", color = uiState.state.displayColor())
+                    Text("●", color = uiState.state.displayColor())
                     Text("核心状态", style = MiuixTheme.textStyles.headline1)
                 }
                 Text(

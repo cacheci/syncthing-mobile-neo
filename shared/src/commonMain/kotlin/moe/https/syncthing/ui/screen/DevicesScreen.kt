@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -159,9 +161,11 @@ private fun DeviceCard(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(0.7f),
                 ) {
                     Text(
-                        text = if (device.connected) "●" else "○",
+                        text = "●",
                         color = if (!device.isLocal) statusColor else Color(0xFF2E7D32),
                         fontWeight = FontWeight.Medium,
                     )
@@ -176,7 +180,9 @@ private fun DeviceCard(
                     Text(
                         text = if (device.connected) "已连接" else "未连接",
                         color = statusColor,
+                        textAlign = TextAlign.End,
                         fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(0.3f),
                     )
                 }
             }

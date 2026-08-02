@@ -1,5 +1,6 @@
 package moe.https.syncthing.core
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -30,11 +31,68 @@ internal class SyncthingRestClient(
         )
     }
 
+    fun configuredDevices(): List<RestDevice> {
+        val array = requestArray("/rest/config/devices")
+        return buildList {
+            repeat(array.length()) { index ->
+                val json = array.optJSONObject(index) ?: return@repeat
+                val id = json.optString("deviceID").takeIf(String::isNotBlank) ?: return@repeat
+                val addresses = json.optJSONArray("addresses")?.let { addressArray ->
+                    buildList {
+                        repeat(addressArray.length()) { addressIndex ->
+                            addressArray.optString(addressIndex)
+                                .takeIf(String::isNotBlank)
+                                ?.let(::add)
+                        }
+                    }
+                }.orEmpty()
+                add(
+                    RestDevice(
+                        id = id,
+                        name = json.optString("name").takeIf(String::isNotBlank),
+                        addresses = addresses,
+                        paused = json.optBoolean("paused", false),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun connections(): Map<String, RestConnection> {
+        val json = request("/rest/system/connections")
+        val connections = json.optJSONObject("connections") ?: return emptyMap()
+        return buildMap {
+            val keys = connections.keys()
+            while (keys.hasNext()) {
+                val id = keys.next()
+                val connection = connections.optJSONObject(id) ?: continue
+                put(
+                    id,
+                    RestConnection(
+                        connected = connection.optBoolean("connected", false),
+                        address = connection.optString("address").takeIf(String::isNotBlank),
+                        clientVersion = connection.optString("clientVersion")
+                            .takeIf(String::isNotBlank),
+                        lastConnectionAt = connection.optString("at")
+                            .takeIf(String::isNotBlank),
+                    ),
+                )
+            }
+        }
+    }
+
     fun shutdown() {
         request("/rest/system/shutdown", method = "POST")
     }
 
     private fun request(path: String, method: String = "GET"): JSONObject {
+        val body = requestBody(path, method)
+        return if (body.isBlank()) JSONObject() else JSONObject(body)
+    }
+
+    private fun requestArray(path: String): JSONArray = JSONArray(requestBody(path))
+
+    private fun requestBody(path: String, method: String = "GET"): String {
         val connection = URL("$BASE_URL$path").openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = method
@@ -51,8 +109,7 @@ internal class SyncthingRestClient(
             if (responseCode !in 200..299) {
                 throw SyncthingRestException(responseCode)
             }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            if (body.isBlank()) JSONObject() else JSONObject(body)
+            connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
         }
@@ -63,6 +120,20 @@ internal class SyncthingRestClient(
         val allocatedBytes: Long?,
         val systemBytes: Long?,
         val goroutines: Int?,
+    )
+
+    data class RestDevice(
+        val id: String,
+        val name: String?,
+        val addresses: List<String>,
+        val paused: Boolean,
+    )
+
+    data class RestConnection(
+        val connected: Boolean,
+        val address: String?,
+        val clientVersion: String?,
+        val lastConnectionAt: String?,
     )
 
     companion object {

@@ -34,8 +34,7 @@ import java.util.concurrent.TimeUnit
 class CoreRuntime(
     context: Context,
     private val installer: CoreBinaryInstaller,
-)
-{
+) : DevicesController {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val processMutex = Mutex()
@@ -48,6 +47,24 @@ class CoreRuntime(
         ),
     )
     val snapshot: StateFlow<CoreSnapshot> = mutableSnapshot.asStateFlow()
+
+    override suspend fun loadDevices(): List<SyncthingDevice> = withContext(Dispatchers.IO) {
+        val connections = restClient.connections()
+        restClient.configuredDevices().map { device ->
+            val connection = connections[device.id]
+            SyncthingDevice(
+                id = device.id,
+                name = device.name,
+                addresses = device.addresses,
+                connected = connection?.connected == true,
+                connectionAddress = connection?.address,
+                clientVersion = connection?.clientVersion,
+                lastConnectionAt = connection?.lastConnectionAt,
+                paused = device.paused,
+                isLocal = device.name == "localhost"
+            )
+        }
+    }
 
     @Volatile
     private var process: Process? = null

@@ -9,3 +9,7 @@ interface CoreController {
 
     fun stop()
 }
+
+interface DevicesController {
+    suspend fun loadDevices(): List<SyncthingDevice>
+}

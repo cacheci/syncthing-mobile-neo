@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val devicesViewModel: DevicesViewModel by viewModels {
-        DevicesViewModel.factory()
+        DevicesViewModel.factory(applicationState.coreRuntime)
     }
 
     private val corePicker = registerForActivityResult(

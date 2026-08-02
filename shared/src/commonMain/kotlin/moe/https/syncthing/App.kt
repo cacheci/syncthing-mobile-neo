@@ -4,12 +4,14 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.ui.screen.CoreScreen
 import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.EmptyScreen
@@ -48,6 +50,12 @@ fun App(
             if (currentPage == AppPage.LOGS) {
                 logViewModel.onPageVisibilityChanged(false)
             }
+        }
+    }
+
+    LaunchedEffect(currentPage, coreUiState.state) {
+        if (currentPage == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
+            devicesViewModel.refresh()
         }
     }
 
@@ -98,6 +106,9 @@ fun App(
             when (currentPage) {
                 AppPage.DEVICES -> DevicesScreen(
                     uiState = devicesUiState,
+                    coreState = coreUiState.state,
+                    onRefresh = devicesViewModel::refresh,
+                    modifier = Modifier.padding(padding),
                 )
 
                 AppPage.FOLDERS,
@@ -127,7 +138,7 @@ fun App(
 }
 
 private enum class AppPage(val title: String) {
-    DEVICES("设备"),
+    DEVICES("连接"),
     FOLDERS("文件夹"),
     CORE("Syncthing"),
     LOGS("日志"),

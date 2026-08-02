@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import moe.https.syncthing.core.CoreLogSource
-import moe.https.syncthing.ui.model.CoreLogUiState
+import moe.https.syncthing.ui.model.LogUiState
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
@@ -26,7 +26,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun LogScreen(
-    uiState: CoreLogUiState,
+    uiState: LogUiState,
     onSourceSelected: (CoreLogSource) -> Unit,
     modifier: Modifier = Modifier,
 ) {

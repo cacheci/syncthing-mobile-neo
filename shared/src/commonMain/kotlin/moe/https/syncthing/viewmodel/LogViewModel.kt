@@ -17,13 +17,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.https.syncthing.core.CoreLogReader
 import moe.https.syncthing.core.CoreLogSource
-import moe.https.syncthing.ui.model.CoreLogUiState
+import moe.https.syncthing.ui.model.LogUiState
+import kotlin.time.Duration.Companion.milliseconds
 
-class CoreLogViewModel(
+class LogViewModel(
     private val reader: CoreLogReader,
 ) : ViewModel() {
-    private val mutableUiState = MutableStateFlow(CoreLogUiState())
-    val uiState: StateFlow<CoreLogUiState> = mutableUiState.asStateFlow()
+    private val mutableUiState = MutableStateFlow(LogUiState())
+    val uiState: StateFlow<LogUiState> = mutableUiState.asStateFlow()
 
     private val readMutex = Mutex()
     private var pollingJob: Job? = null
@@ -51,7 +52,7 @@ class CoreLogViewModel(
         pollingJob = viewModelScope.launch {
             while (isActive) {
                 load()
-                delay(REFRESH_INTERVAL_MILLIS)
+                delay(REFRESH_INTERVAL_MILLIS.milliseconds)
             }
         }
     }
@@ -93,7 +94,7 @@ class CoreLogViewModel(
 
         fun factory(reader: CoreLogReader): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                CoreLogViewModel(reader)
+                LogViewModel(reader)
             }
         }
     }

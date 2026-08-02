@@ -2,7 +2,7 @@ package moe.https.syncthing.ui.model
 
 import moe.https.syncthing.core.CoreLogSource
 
-data class CoreLogUiState(
+data class LogUiState(
     val source: CoreLogSource = CoreLogSource.SYNCTHING,
     val content: String = "",
     val refreshedAt: String? = null,

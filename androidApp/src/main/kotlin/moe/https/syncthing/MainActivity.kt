@@ -12,8 +12,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
 import moe.https.syncthing.ui.model.CoreUiEffect
-import moe.https.syncthing.viewmodel.CoreLogViewModel
+import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
+import moe.https.syncthing.viewmodel.DevicesViewModel
 
 class MainActivity : ComponentActivity() {
     private val applicationState: SyncthingApplication
@@ -23,8 +24,12 @@ class MainActivity : ComponentActivity() {
         CoreViewModel.factory(applicationState.coreController)
     }
 
-    private val logViewModel: CoreLogViewModel by viewModels {
-        CoreLogViewModel.factory(AndroidCoreLogReader(applicationContext))
+    private val logViewModel: LogViewModel by viewModels {
+        LogViewModel.factory(AndroidCoreLogReader(applicationContext))
+    }
+
+    private val devicesViewModel: DevicesViewModel by viewModels {
+        DevicesViewModel.factory()
     }
 
     private val corePicker = registerForActivityResult(
@@ -53,6 +58,7 @@ class MainActivity : ComponentActivity() {
             App(
                 coreViewModel = coreViewModel,
                 logViewModel = logViewModel,
+                devicesViewModel = devicesViewModel,
             )
         }
     }

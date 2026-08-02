@@ -11,14 +11,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import moe.https.syncthing.ui.screen.CoreScreen
+import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.EmptyScreen
 import moe.https.syncthing.ui.screen.LogScreen
-import moe.https.syncthing.viewmodel.CoreLogViewModel
+import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
+import moe.https.syncthing.viewmodel.DevicesViewModel
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Folder
@@ -33,11 +34,13 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
 @Composable
 fun App(
     coreViewModel: CoreViewModel,
-    logViewModel: CoreLogViewModel,
+    logViewModel: LogViewModel,
+    devicesViewModel: DevicesViewModel
 ) {
-    val uiState by coreViewModel.uiState.collectAsState()
+    val coreUiState by coreViewModel.uiState.collectAsState()
     val logUiState by logViewModel.uiState.collectAsState()
-    var currentPage by remember { mutableStateOf(AppPage.HOME) }
+    val devicesUiState by devicesViewModel.uiState.collectAsState()
+    var currentPage by remember { mutableStateOf(AppPage.CORE) }
 
     DisposableEffect(currentPage) {
         logViewModel.onPageVisibilityChanged(currentPage == AppPage.LOGS)
@@ -60,10 +63,10 @@ fun App(
             bottomBar = {
                 NavigationBar {
                     NavigationBarItem(
-                        selected = currentPage == AppPage.HOME,
-                        onClick = { currentPage = AppPage.HOME },
-                        icon = MiuixIcons.Home,
-                        label = "主页",
+                        selected = currentPage == AppPage.DEVICES,
+                        onClick = { currentPage = AppPage.DEVICES },
+                        icon = MiuixIcons.Link,
+                        label = "连接",
                     )
                     NavigationBarItem(
                         selected = currentPage == AppPage.FOLDERS,
@@ -74,7 +77,7 @@ fun App(
                     NavigationBarItem(
                         selected = currentPage == AppPage.CORE,
                         onClick = { currentPage = AppPage.CORE },
-                        icon = MiuixIcons.Link,
+                        icon = MiuixIcons.Home,
                         label = "核心",
                     )
                     NavigationBarItem(
@@ -93,15 +96,18 @@ fun App(
             },
         ) { padding ->
             when (currentPage) {
-                AppPage.HOME,
+                AppPage.DEVICES -> DevicesScreen(
+                    uiState = devicesUiState,
+                )
+
                 AppPage.FOLDERS,
                 AppPage.SETTINGS -> EmptyScreen(
                     modifier = Modifier.padding(padding),
                 )
 
                 AppPage.CORE -> CoreScreen(
-                    uiState = uiState,
-                    onStartAction = if (uiState.isStarted) {
+                    uiState = coreUiState,
+                    onStartAction = if (coreUiState.isStarted) {
                         coreViewModel::onStopClicked
                     } else {
                         coreViewModel::onStartClicked
@@ -121,7 +127,7 @@ fun App(
 }
 
 private enum class AppPage(val title: String) {
-    HOME("主页"),
+    DEVICES("设备"),
     FOLDERS("文件夹"),
     CORE("Syncthing"),
     LOGS("日志"),

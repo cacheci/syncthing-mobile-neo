@@ -48,22 +48,51 @@ class CoreRuntime(
     )
     val snapshot: StateFlow<CoreSnapshot> = mutableSnapshot.asStateFlow()
 
-    override suspend fun loadDevices(): List<SyncthingDevice> = withContext(Dispatchers.IO) {
+    override suspend fun loadDevices(): DevicesSnapshot = withContext(Dispatchers.IO) {
+        val status = restClient.status()
         val connections = restClient.connections()
-        restClient.configuredDevices().map { device ->
+        val discoveryCache = restClient.discoveryCache()
+        val devices = restClient.configuredDevices().map { device ->
             val connection = connections[device.id]
             SyncthingDevice(
                 id = device.id,
                 name = device.name,
                 addresses = device.addresses,
-                connected = connection?.connected == true,
+                connected = device.id == status.myId || connection?.connected == true,
                 connectionAddress = connection?.address,
                 clientVersion = connection?.clientVersion,
                 lastConnectionAt = connection?.lastConnectionAt,
                 paused = device.paused,
-                isLocal = device.name == "localhost"
+                isLocal = device.id == status.myId ||
+                    (status.myId == null && device.name == "localhost"),
+                discoveredAddresses = discoveryCache[device.id].orEmpty(),
             )
         }
+        DevicesSnapshot(
+            devices = devices,
+            localInfo = SyncthingLocalInfo(
+                discoveryEnabled = status.discoveryEnabled,
+                discoveryStatus = status.discoveryStatus.map { discoveryStatus ->
+                    SyncthingDiscoveryStatus(
+                        method = discoveryStatus.method,
+                        error = discoveryStatus.error,
+                    )
+                },
+                listenAddresses = status.listenAddresses,
+            ),
+        )
+    }
+
+    override suspend fun addDevice(
+        deviceId: String,
+        name: String,
+        addresses: List<String>,
+    ) = withContext(Dispatchers.IO) {
+        restClient.addDevice(
+            deviceId = deviceId,
+            name = name,
+            addresses = addresses,
+        )
     }
 
     @Volatile

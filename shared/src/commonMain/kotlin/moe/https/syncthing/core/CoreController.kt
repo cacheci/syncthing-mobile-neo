@@ -11,5 +11,11 @@ interface CoreController {
 }
 
 interface DevicesController {
-    suspend fun loadDevices(): List<SyncthingDevice>
+    suspend fun loadDevices(): DevicesSnapshot
+
+    suspend fun addDevice(
+        deviceId: String,
+        name: String,
+        addresses: List<String>,
+    )
 }

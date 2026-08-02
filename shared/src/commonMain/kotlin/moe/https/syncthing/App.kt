@@ -108,6 +108,7 @@ fun App(
                     uiState = devicesUiState,
                     coreState = coreUiState.state,
                     onRefresh = devicesViewModel::refresh,
+                    onAddDevice = devicesViewModel::addDevice,
                     modifier = Modifier.padding(padding),
                 )
 

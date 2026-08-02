@@ -28,7 +28,25 @@ internal class SyncthingRestClient(
             allocatedBytes = json.optLongOrNull("alloc"),
             systemBytes = json.optLongOrNull("sys"),
             goroutines = json.optIntOrNull("goroutines"),
+            myId = json.optString("myID").takeIf(String::isNotBlank),
+            discoveryEnabled = json.optBoolean("discoveryEnabled", false),
+            discoveryStatus = parseDiscoveryStatus(json.optJSONObject("discoveryStatus")),
+            listenAddresses = parseListenAddresses(json.optJSONObject("connectionServiceStatus")),
         )
+    }
+
+    fun discoveryCache(): Map<String, List<String>> {
+        val json = request("/rest/system/discovery")
+        return buildMap {
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val deviceId = keys.next()
+                val addresses = readStringArray(json.optJSONArray(deviceId))
+                if (addresses.isNotEmpty()) {
+                    put(deviceId, addresses)
+                }
+            }
+        }
     }
 
     fun configuredDevices(): List<RestDevice> {
@@ -81,6 +99,26 @@ internal class SyncthingRestClient(
         }
     }
 
+    fun addDevice(
+        deviceId: String,
+        name: String,
+        addresses: List<String>,
+    ) {
+        val device = request("/rest/config/defaults/device")
+        val addressArray = JSONArray()
+        addresses.forEach(addressArray::put)
+        device.put("deviceID", deviceId)
+        device.put("name", name.ifBlank { deviceId })
+        if (addresses.isNotEmpty()) {
+            device.put("addresses", addressArray)
+        }
+        requestBody(
+            path = "/rest/config/devices",
+            method = "POST",
+            body = device.toString(),
+        )
+    }
+
     fun shutdown() {
         request("/rest/system/shutdown", method = "POST")
     }
@@ -92,7 +130,11 @@ internal class SyncthingRestClient(
 
     private fun requestArray(path: String): JSONArray = JSONArray(requestBody(path))
 
-    private fun requestBody(path: String, method: String = "GET"): String {
+    private fun requestBody(
+        path: String,
+        method: String = "GET",
+        body: String? = null,
+    ): String {
         val connection = URL("$BASE_URL$path").openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = method
@@ -100,7 +142,15 @@ internal class SyncthingRestClient(
             connection.readTimeout = TIMEOUT_MILLIS
             connection.setRequestProperty("X-API-Key", apiKey)
             connection.setRequestProperty("Accept", "application/json")
-            if (method == "POST") {
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                val bodyBytes = body.toByteArray(Charsets.UTF_8)
+                connection.setFixedLengthStreamingMode(bodyBytes.size)
+                connection.outputStream.use { output ->
+                    output.write(bodyBytes)
+                }
+            } else if (method == "POST") {
                 connection.doOutput = true
                 connection.setFixedLengthStreamingMode(0)
             }
@@ -120,6 +170,15 @@ internal class SyncthingRestClient(
         val allocatedBytes: Long?,
         val systemBytes: Long?,
         val goroutines: Int?,
+        val myId: String?,
+        val discoveryEnabled: Boolean,
+        val discoveryStatus: List<RestDiscoveryStatus>,
+        val listenAddresses: List<String>,
+    )
+
+    data class RestDiscoveryStatus(
+        val method: String,
+        val error: String?,
     )
 
     data class RestDevice(
@@ -139,6 +198,53 @@ internal class SyncthingRestClient(
     companion object {
         private const val BASE_URL = "http://127.0.0.1:8384"
         private const val TIMEOUT_MILLIS = 1_500
+    }
+
+    private fun parseDiscoveryStatus(json: JSONObject?): List<RestDiscoveryStatus> {
+        if (json == null) return emptyList()
+        return buildList {
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val method = keys.next()
+                val status = json.optJSONObject(method)
+                val errorValue = status?.opt("error")
+                val error = if (errorValue == null || errorValue == JSONObject.NULL) {
+                    null
+                } else {
+                    errorValue.toString().takeIf(String::isNotBlank)
+                }
+                add(RestDiscoveryStatus(method = method, error = error))
+            }
+        }
+    }
+
+    private fun parseListenAddresses(json: JSONObject?): List<String> {
+        if (json == null) return emptyList()
+        return buildList {
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val serviceAddress = keys.next()
+                val service = json.optJSONObject(serviceAddress)
+                val addresses = if (service == null) {
+                    emptyList()
+                } else {
+                    readStringArray(service.optJSONArray("lanAddresses")) +
+                        readStringArray(service.optJSONArray("wanAddresses"))
+                }
+                (addresses.ifEmpty { listOf(serviceAddress) }).forEach(::add)
+            }
+        }.distinct()
+    }
+
+    private fun readStringArray(array: JSONArray?): List<String> {
+        if (array == null) return emptyList()
+        return buildList {
+            repeat(array.length()) { index ->
+                array.optString(index)
+                    .takeIf(String::isNotBlank)
+                    ?.let(::add)
+            }
+        }
     }
 }
 

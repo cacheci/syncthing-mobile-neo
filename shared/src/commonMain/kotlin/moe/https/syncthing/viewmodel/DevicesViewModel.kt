@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.https.syncthing.core.DevicesController
 import moe.https.syncthing.ui.model.DevicesUiState
+import moe.https.syncthing.ui.model.updateFrom
 
 class DevicesViewModel(
     private val controller: DevicesController,
@@ -30,11 +31,7 @@ class DevicesViewModel(
 
                 mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
                 try {
-                    val devices = controller.loadDevices()
-                    mutableUiState.value = DevicesUiState(
-                        devices = devices,
-                        hasLoaded = true,
-                    )
+                    mutableUiState.value = mutableUiState.value.updateFrom(controller.loadDevices())
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
@@ -42,6 +39,48 @@ class DevicesViewModel(
                         it.copy(
                             isLoading = false,
                             hasLoaded = true,
+                            errorMessage = error.message
+                                ?.takeIf(String::isNotBlank)
+                                ?: error.javaClass.simpleName,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun addDevice(
+        deviceId: String,
+        name: String,
+        addresses: String,
+    ) {
+        val normalizedId = deviceId.trim()
+        if (normalizedId.isBlank()) {
+            mutableUiState.update { it.copy(errorMessage = "设备 ID 不能为空") }
+            return
+        }
+
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                if (mutableUiState.value.isLoading) return@withLock
+
+                mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+                try {
+                    controller.addDevice(
+                        deviceId = normalizedId,
+                        name = name.trim(),
+                        addresses = addresses
+                            .split(',', '\n')
+                            .map(String::trim)
+                            .filter(String::isNotBlank),
+                    )
+                    mutableUiState.value = mutableUiState.value.updateFrom(controller.loadDevices())
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    mutableUiState.update {
+                        it.copy(
+                            isLoading = false,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
                                 ?: error.javaClass.simpleName,

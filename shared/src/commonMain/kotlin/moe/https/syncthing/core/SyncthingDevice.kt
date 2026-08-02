@@ -10,4 +10,21 @@ data class SyncthingDevice(
     val lastConnectionAt: String?,
     val paused: Boolean,
     val isLocal: Boolean,
+    val discoveredAddresses: List<String> = emptyList(),
+)
+
+data class SyncthingLocalInfo(
+    val discoveryEnabled: Boolean,
+    val discoveryStatus: List<SyncthingDiscoveryStatus>,
+    val listenAddresses: List<String>,
+)
+
+data class SyncthingDiscoveryStatus(
+    val method: String,
+    val error: String?,
+)
+
+data class DevicesSnapshot(
+    val devices: List<SyncthingDevice>,
+    val localInfo: SyncthingLocalInfo,
 )

@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -22,10 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingLocalInfo
@@ -41,11 +37,9 @@ internal fun DevicesScreen(
     uiState: DevicesUiState,
     coreState: CoreState,
     onRefresh: () -> Unit,
-    onAddDevice: (String, String, String) -> Unit,
+    onAddDevice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -74,7 +68,7 @@ internal fun DevicesScreen(
                 ActionText(
                     text = "添加设备",
                     enabled = coreState == CoreState.RUNNING && !uiState.isLoading,
-                    onClick = { showAddDialog = true },
+                    onClick = onAddDevice,
                 )
             }
         }
@@ -107,16 +101,6 @@ internal fun DevicesScreen(
         }
     }
 
-    if (showAddDialog) {
-        AddDeviceDialog(
-            isSubmitting = uiState.isLoading,
-            onDismiss = { showAddDialog = false },
-            onConfirm = { deviceId, name, addresses ->
-                onAddDevice(deviceId, name, addresses)
-                showAddDialog = false
-            },
-        )
-    }
 }
 
 @Composable
@@ -287,21 +271,25 @@ private fun SyncthingLocalInfo?.discoveryText(): String {
 }
 
 @Composable
-private fun AddDeviceDialog(
+internal fun AddDeviceScreen(
     isSubmitting: Boolean,
-    onDismiss: () -> Unit,
+    onCancel: () -> Unit,
     onConfirm: (String, String, String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var deviceId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var addresses by remember { mutableStateOf("") }
     val canSubmit = deviceId.trim().isNotBlank() && !isSubmitting
 
-    Dialog(onDismissRequest = { if (!isSubmitting) onDismiss() }) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+    ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -311,23 +299,18 @@ private fun AddDeviceDialog(
                     text = "添加设备",
                     style = MiuixTheme.textStyles.title4,
                 )
-                Text(
-                    text = "填写远程 Syncthing 设备信息。设备 ID 必须与对方设备显示的 ID 完全一致。",
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    style = MiuixTheme.textStyles.footnote2,
-                )
                 FormField(
                     label = "设备 ID *",
                     value = deviceId,
                     onValueChange = { deviceId = it },
                 )
                 FormField(
-                    label = "设备名称",
+                    label = "名称（可选）",
                     value = name,
                     onValueChange = { name = it },
                 )
                 FormField(
-                    label = "地址（可选，多个地址用逗号分隔）",
+                    label = "地址（可选，用逗号分隔）",
                     value = addresses,
                     onValueChange = { addresses = it },
                 )
@@ -339,7 +322,7 @@ private fun AddDeviceDialog(
                     ActionText(
                         text = "取消",
                         enabled = !isSubmitting,
-                        onClick = onDismiss,
+                        onClick = onCancel,
                     )
                     ActionText(
                         text = if (isSubmitting) "添加中…" else "添加",
@@ -362,13 +345,14 @@ private fun FormField(
         Text(
             text = label,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            style = MiuixTheme.textStyles.footnote2,
+            style = MiuixTheme.textStyles.main,
         )
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            textStyle = MiuixTheme.textStyles.main,
         )
         HorizontalDivider()
     }

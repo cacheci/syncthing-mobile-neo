@@ -1,5 +1,7 @@
 package moe.https.syncthing
 
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -49,20 +51,21 @@ fun App(
     val coreUiState by coreViewModel.uiState.collectAsState()
     val logUiState by logViewModel.uiState.collectAsState()
     val devicesUiState by devicesViewModel.uiState.collectAsState()
-    var currentPage by remember { mutableStateOf(AppPage.CORE) }
+    var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
+    var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
     val navController = rememberNavController()
 
-    DisposableEffect(currentPage) {
-        logViewModel.onPageVisibilityChanged(currentPage == AppPage.LOGS)
+    DisposableEffect(currentPageMain) {
+        logViewModel.onPageVisibilityChanged(currentPageMain == AppPage.LOGS)
         onDispose {
-            if (currentPage == AppPage.LOGS) {
+            if (currentPageMain == AppPage.LOGS) {
                 logViewModel.onPageVisibilityChanged(false)
             }
         }
     }
 
-    LaunchedEffect(currentPage, coreUiState.state) {
-        if (currentPage == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
+    LaunchedEffect(currentPageMain, coreUiState.state) {
+        if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
             devicesViewModel.refresh()
         }
     }
@@ -72,56 +75,83 @@ fun App(
     ) {
         NavHost(
             navController = navController,
-            startDestination = MAIN_ROUTE,
+            startDestination = MAIN_PAGE_ROUTE,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = SlideDirection.Start,
+                    animationSpec = tween(300),
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = SlideDirection.Start,
+                    animationSpec = tween(300),
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = SlideDirection.End,
+                    animationSpec = tween(300),
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = SlideDirection.End,
+                    animationSpec = tween(300),
+                )
+            },
         ) {
-            composable(MAIN_ROUTE) {
+            composable(MAIN_PAGE_ROUTE) {
                 Scaffold(
                     topBar = {
                         TopAppBar(
-                            title = currentPage.title,
+                            title = currentPageMain.title,
                         )
                     },
                     bottomBar = {
                         NavigationBar {
                             NavigationBarItem(
-                                selected = currentPage == AppPage.DEVICES,
-                                onClick = { currentPage = AppPage.DEVICES },
+                                selected = currentPageMain == AppPage.DEVICES,
+                                onClick = { currentPageMain = AppPage.DEVICES },
                                 icon = MiuixIcons.Link,
                                 label = "连接",
                             )
                             NavigationBarItem(
-                                selected = currentPage == AppPage.FOLDERS,
-                                onClick = { currentPage = AppPage.FOLDERS },
+                                selected = currentPageMain == AppPage.FOLDERS,
+                                onClick = { currentPageMain = AppPage.FOLDERS },
                                 icon = MiuixIcons.Folder,
                                 label = "文件夹",
                             )
                             NavigationBarItem(
-                                selected = currentPage == AppPage.CORE,
-                                onClick = { currentPage = AppPage.CORE },
+                                selected = currentPageMain == AppPage.CORE,
+                                onClick = { currentPageMain = AppPage.CORE },
                                 icon = MiuixIcons.Home,
                                 label = "核心",
                             )
                             NavigationBarItem(
-                                selected = currentPage == AppPage.LOGS,
-                                onClick = { currentPage = AppPage.LOGS },
+                                selected = currentPageMain == AppPage.LOGS,
+                                onClick = { currentPageMain = AppPage.LOGS },
                                 icon = MiuixIcons.Notes,
                                 label = "日志",
                             )
                             NavigationBarItem(
-                                selected = currentPage == AppPage.SETTINGS,
-                                onClick = { currentPage = AppPage.SETTINGS },
+                                selected = currentPageMain == AppPage.SETTINGS,
+                                onClick = { currentPageMain = AppPage.SETTINGS },
                                 icon = MiuixIcons.Settings,
                                 label = "设置",
                             )
                         }
                     },
                 ) { padding ->
-                    when (currentPage) {
+                    when (currentPageMain) {
                         AppPage.DEVICES -> DevicesScreen(
                             uiState = devicesUiState,
                             coreState = coreUiState.state,
                             onRefresh = devicesViewModel::refresh,
-                            onAddDevice = { navController.navigate(ADD_DEVICE_ROUTE) },
+                            onAddDevice = {
+                                currentPagePlain = AppSubPage.DEVICE_ADD
+                                navController.navigate(PLAIN_PAGE_ROUTE)
+                            },
                             modifier = Modifier.padding(padding),
                         )
 
@@ -150,15 +180,16 @@ fun App(
                 }
             }
 
-            composable(ADD_DEVICE_ROUTE) {
+            composable(PLAIN_PAGE_ROUTE) {
                 val navigateBack = {
                     navController.popBackStack()
                     Unit
                 }
+
                 Scaffold(
                     topBar = {
                         TopAppBar(
-                            title = "添加设备",
+                            title = currentPagePlain.title,
                             navigationIcon = {
                                 IconButton(onClick = navigateBack) {
                                     Icon(
@@ -170,23 +201,28 @@ fun App(
                         )
                     },
                 ) { padding ->
-                    AddDeviceScreen(
-                        isSubmitting = devicesUiState.isLoading,
-                        onCancel = navigateBack,
-                        onConfirm = { deviceId, name, addresses ->
-                            devicesViewModel.addDevice(deviceId, name, addresses)
-                            navigateBack()
-                        },
-                        modifier = Modifier.padding(padding),
-                    )
+                    when (currentPagePlain) {
+                        AppSubPage.DEBUG -> {}
+                        AppSubPage.DEVICE_ADD -> {
+                            AddDeviceScreen(
+                                isSubmitting = devicesUiState.isLoading,
+                                onCancel = navigateBack,
+                                onConfirm = { configuration ->
+                                    devicesViewModel.addDevice(configuration)
+                                    navigateBack()
+                                },
+                                modifier = Modifier.padding(padding),
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-private const val MAIN_ROUTE = "main"
-private const val ADD_DEVICE_ROUTE = "devices/add"
+private const val MAIN_PAGE_ROUTE = "main"
+private const val PLAIN_PAGE_ROUTE = "devices/add"
 
 private enum class AppPage(val title: String) {
     DEVICES("连接"),
@@ -194,4 +230,9 @@ private enum class AppPage(val title: String) {
     CORE("Syncthing"),
     LOGS("日志"),
     SETTINGS("设置"),
+}
+
+private enum class AppSubPage(val title: String, val parent: AppPage) {
+    DEBUG("DEBUG*", parent = AppPage.CORE),
+    DEVICE_ADD("添加设备", parent = AppPage.DEVICES)
 }

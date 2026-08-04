@@ -28,6 +28,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.miuix.ui)
             implementation(libs.miuix.icons)
+            implementation(libs.miuix.preference)
         }
     }
 }

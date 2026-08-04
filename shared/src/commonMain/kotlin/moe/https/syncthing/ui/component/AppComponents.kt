@@ -1,12 +1,15 @@
 package moe.https.syncthing.ui.component
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,27 +76,129 @@ internal fun RuntimeCard(uiState: CoreUiState) {
 }
 
 @Composable
-private fun ValueRow(label: String, value: String) {
+private fun ValueRow(
+    label: String,
+    value: String,
+    onClick: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.weight(0.4f)) {
-            Text(
-                text = label,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-        Spacer(modifier = Modifier.weight(0.1f))
-        Box(
-            modifier = Modifier.weight(0.5f),
-            contentAlignment = Alignment.CenterEnd,
+        Text(
+            text = label,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.weight(0.4f)
+        )
+        Text(
+            text = value,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.End,
+            modifier = Modifier
+                .weight(0.5f)
+                .clickable(
+                    enabled = onClick != null,
+                    onClick = { onClick?.invoke() },
+                ),
+        )
+    }
+}
+
+@Composable
+internal fun MultipleValueRow(
+    label: String,
+    values: List<String>,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.weight(0.35f),
+        )
+        Column(
+            modifier = Modifier
+                .weight(0.65f)
+                .clickable(
+                    enabled = onClick != null,
+                    onClick = { onClick?.invoke() },
+                ),
         ) {
-            Text(
-                text = value,
+            if (values.count() > 1) {
+                values.forEach { values ->
+                    Row {
+                        Text(
+                            text = "·",
+                            modifier = Modifier.weight(0.05f),
+                        )
+                        Text(
+                            text = values.toCharArray().joinToString("\u200B"),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(0.95f),
+                        )
+                    }
+                }
+            } else {
+                Row {
+                    Box(modifier = Modifier.weight(0.02f))
+                    Text(
+                        text = values[0],
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(0.98f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ImputableValueRow(
+    modifier: Modifier = Modifier,
+    label: String,
+    valueLabel: String,
+    value: String,
+    onValueChange: ((String) -> Unit),
+    singleLine: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(),
+) {
+    Row (
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(0.5f),
+            style = MiuixTheme.textStyles.main.copy(
                 fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.End,
             )
+        )
+        Box (
+            modifier = Modifier.weight(0.4f),
+        ) {
+            BasicTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = value,
+                textStyle = MiuixTheme.textStyles.main.copy(
+                    textAlign = TextAlign.End,
+                ),
+                onValueChange = onValueChange,
+                singleLine = singleLine,
+                keyboardOptions = keyboardOptions,
+            )
+            if (!value.isNotEmpty()) {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = valueLabel,
+                    textAlign = TextAlign.End,
+                    color = MiuixTheme.colorScheme.onSecondaryContainer,
+                )
+            }
         }
     }
 }

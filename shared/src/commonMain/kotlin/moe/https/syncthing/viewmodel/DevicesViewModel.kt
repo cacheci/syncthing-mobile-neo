@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.https.syncthing.core.DevicesController
+import moe.https.syncthing.core.NewDeviceConfiguration
 import moe.https.syncthing.ui.model.DevicesUiState
 import moe.https.syncthing.ui.model.updateFrom
 
@@ -49,14 +50,25 @@ class DevicesViewModel(
         }
     }
 
-    fun addDevice(
-        deviceId: String,
-        name: String,
-        addresses: String,
-    ) {
-        val normalizedId = deviceId.trim()
-        if (normalizedId.isBlank()) {
+    fun addDevice(configuration: NewDeviceConfiguration) {
+        val normalizedConfiguration = configuration.copy(
+            deviceId = configuration.deviceId.trim(),
+            name = configuration.name.trim(),
+            group = configuration.group.trim(),
+            addresses = configuration.addresses
+                .map(String::trim)
+                .filter(String::isNotBlank),
+        )
+        if (normalizedConfiguration.deviceId.isBlank()) {
             mutableUiState.update { it.copy(errorMessage = "设备 ID 不能为空") }
+            return
+        }
+        if (
+            normalizedConfiguration.numConnections < 0 ||
+            normalizedConfiguration.maxSendKiBPerSecond < 0 ||
+            normalizedConfiguration.maxReceiveKiBPerSecond < 0
+        ) {
+            mutableUiState.update { it.copy(errorMessage = "连接数和速率限制必须是非负整数") }
             return
         }
 
@@ -66,14 +78,7 @@ class DevicesViewModel(
 
                 mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
                 try {
-                    controller.addDevice(
-                        deviceId = normalizedId,
-                        name = name.trim(),
-                        addresses = addresses
-                            .split(',', '\n')
-                            .map(String::trim)
-                            .filter(String::isNotBlank),
-                    )
+                    controller.addDevice(normalizedConfiguration)
                     mutableUiState.value = mutableUiState.value.updateFrom(controller.loadDevices())
                 } catch (error: CancellationException) {
                     throw error

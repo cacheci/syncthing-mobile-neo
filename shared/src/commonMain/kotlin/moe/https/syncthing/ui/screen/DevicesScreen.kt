@@ -8,8 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,18 +20,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.core.NewDeviceConfiguration
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingLocalInfo
+import moe.https.syncthing.ui.component.ImputableValueRow
+import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.model.DevicesUiState
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
 @Composable
 internal fun DevicesScreen(
@@ -171,14 +183,14 @@ private fun DeviceCard(
                 }
             }
             HorizontalDivider()
-            DeviceValueRow("设备 ID", listOf(device.id))
+            MultipleValueRow("设备 ID", listOf(device.id))
 
             if (!device.isLocal){
-                DeviceValueRow("当前地址", listOf(device.connectionAddress ?: "—"))
-                DeviceValueRow("配置地址", listOf(device.addresses.joinToString("、").ifBlank { "—" }))
-                DeviceValueRow("客户端", listOf(device.clientVersion ?: "—"))
+                MultipleValueRow("当前地址", listOf(device.connectionAddress ?: "—"))
+                MultipleValueRow("配置地址", listOf(device.addresses.joinToString("、").ifBlank { "—" }))
+                MultipleValueRow("客户端", listOf(device.clientVersion ?: "—"))
                 device.lastConnectionAt?.let { lastConnectionAt ->
-                    DeviceValueRow("最后连接", listOf(lastConnectionAt))
+                    MultipleValueRow("最后连接", listOf(lastConnectionAt))
                 }
                 if (device.paused) {
                     Text(
@@ -188,14 +200,14 @@ private fun DeviceCard(
                     )
                 }
                 if (device.discoveredAddresses.isNotEmpty()) {
-                    DeviceValueRow(
+                    MultipleValueRow(
                         "发现地址",
                         device.discoveredAddresses,
                     )
                 }
             } else {
-                DeviceValueRow("设备发现", listOf(localInfo.discoveryText()))
-                DeviceValueRow(
+                MultipleValueRow("设备发现", listOf(localInfo.discoveryText()))
+                MultipleValueRow(
                     label = "监听地址",
                     values = if (localInfo?.listenAddresses.isNullOrEmpty()) {
                         listOf("—")
@@ -203,58 +215,6 @@ private fun DeviceCard(
                         localInfo.listenAddresses
                     },
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeviceValueRow(
-    label: String,
-    values: List<String>,
-    onClick: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(
-            text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            modifier = Modifier.weight(0.35f),
-        )
-        Column(
-            modifier = Modifier
-                .weight(0.65f)
-                .clickable(
-                    enabled = onClick != null,
-                    onClick = { onClick?.invoke() },
-                ),
-        ) {
-            if (values.count() > 1) {
-                values.forEach { values ->
-                    Row {
-                        Text(
-                            text = "·",
-                            modifier = Modifier.weight(0.05f),
-                        )
-                        Text(
-                            text = values.toCharArray().joinToString("\u200B"),
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(0.95f),
-                        )
-                    }
-                }
-            } else {
-                Row {
-                    Box(modifier = Modifier.weight(0.02f))
-                    Text(
-                        text = values[0],
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(0.98f),
-                    )
-                }
             }
         }
     }
@@ -274,87 +234,211 @@ private fun SyncthingLocalInfo?.discoveryText(): String {
 internal fun AddDeviceScreen(
     isSubmitting: Boolean,
     onCancel: () -> Unit,
-    onConfirm: (String, String, String) -> Unit,
+    onConfirm: (NewDeviceConfiguration) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var deviceId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
+    var group by remember { mutableStateOf("") }
     var addresses by remember { mutableStateOf("") }
-    val canSubmit = deviceId.trim().isNotBlank() && !isSubmitting
+    var introducer by remember { mutableStateOf(false) }
+    var autoAcceptFolders by remember { mutableStateOf(false) }
+    var compression by remember {
+        mutableStateOf(NewDeviceConfiguration.Compression.METADATA)
+    }
+    var numConnections by remember { mutableStateOf("") }
+    var maxSendKiBPerSecond by remember { mutableStateOf("") }
+    var maxReceiveKiBPerSecond by remember { mutableStateOf("") }
+    var untrusted by remember { mutableStateOf(false) }
+    val numericValuesValid = listOf(
+        numConnections,
+        maxSendKiBPerSecond,
+        maxReceiveKiBPerSecond,
+    ).all { value -> (value.toIntOrNull()?:0) >= 0 }
+    val canSubmit = deviceId.trim().isNotBlank() && numericValuesValid && !isSubmitting
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(vertical = 20.dp, horizontal = 10.dp),
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        SmallTitle(text = "设备")
+        Card (modifier = Modifier.padding(horizontal = 10.dp)) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(vertical = 6.dp),
             ) {
-                Text(
-                    text = "添加设备",
-                    style = MiuixTheme.textStyles.title4,
-                )
-                FormField(
-                    label = "设备 ID *",
+                ImputableValueRow(
                     value = deviceId,
                     onValueChange = { deviceId = it },
+                    label = "设备 ID",
+                    valueLabel = "必填",
+                    singleLine = false,
                 )
-                FormField(
-                    label = "名称（可选）",
+
+                ImputableValueRow(
                     value = name,
                     onValueChange = { name = it },
+                    label = "设备名",
+                    valueLabel = "选填",
+                    singleLine = true,
                 )
-                FormField(
-                    label = "地址（可选，用逗号分隔）",
+
+                ImputableValueRow(
+                    value = group,
+                    onValueChange = { group = it },
+                    label = "设备组",
+                    valueLabel = "选填",
+                    singleLine = true,
+                )
+            }
+        }
+
+        SmallTitle(text = "权限")
+        Card (modifier = Modifier.padding(horizontal = 10.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(vertical = 6.dp),
+            ) {
+                BasicComponent(
+                    title = "作为中介",
+                    summary = "将中介中的设备添加到我们的设备列表中，用于相互共享的文件夹。",
+                    enabled = !isSubmitting,
+                    role = Role.Switch,
+                    onClick = { introducer = !introducer },
+                    endActions = {
+                        Switch(
+                            checked = introducer,
+                            onCheckedChange = null,
+                            enabled = !isSubmitting,
+                        )
+                    },
+                )
+                BasicComponent(
+                    title = "自动接受",
+                    summary = "自动创建或共享此设备在默认路径上显示的文件夹。",
+                    enabled = !isSubmitting,
+                    role = Role.Switch,
+                    onClick = { autoAcceptFolders = !autoAcceptFolders },
+                    endActions = {
+                        Switch(
+                            checked = autoAcceptFolders,
+                            onCheckedChange = null,
+                            enabled = !isSubmitting,
+                        )
+                    },
+                )
+            }
+        }
+
+        SmallTitle(text = "连接")
+        Card (modifier = Modifier.padding(horizontal = 10.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(vertical = 6.dp),
+            ) {
+                ImputableValueRow(
                     value = addresses,
                     onValueChange = { addresses = it },
+                    label = "地址",
+                    valueLabel = "dynamic",
+                    singleLine = false,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ActionText(
-                        text = "取消",
-                        enabled = !isSubmitting,
-                        onClick = onCancel,
-                    )
-                    ActionText(
-                        text = if (isSubmitting) "添加中…" else "添加",
-                        enabled = canSubmit,
-                        onClick = { onConfirm(deviceId, name, addresses) },
+
+                ImputableValueRow(
+                    value = maxSendKiBPerSecond,
+                    onValueChange = { maxSendKiBPerSecond = it },
+                    label = "上传限速（KiB/s）",
+                    valueLabel = "无限制",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                ImputableValueRow(
+                    value = maxReceiveKiBPerSecond,
+                    onValueChange = { maxReceiveKiBPerSecond = it },
+                    label = "下载限速（KiB/s）",
+                    valueLabel = "无限制",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+
+                ImputableValueRow(
+                    value = numConnections,
+                    onValueChange = { numConnections = it },
+                    label = "连接数",
+                    valueLabel = "auto",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+
+                WindowDropdownPreference(
+                    title = "压缩",
+                    summary = "选择与此设备通信时使用的压缩方式。",
+                    items = listOf("所有", "仅元数据", "关闭"),
+                    selectedIndex = compression.ordinal,
+                    enabled = !isSubmitting,
+                    onSelectedIndexChange = { selectedIndex ->
+                        compression = NewDeviceConfiguration.Compression.entries[selectedIndex]
+                    },
+                )
+
+                BasicComponent(
+                    title = "不受信任",
+                    summary = "禁止与此设备共享未加密数据；共享文件夹必须配置加密密码。",
+                    enabled = !isSubmitting,
+                    role = Role.Switch,
+                    onClick = { untrusted = !untrusted },
+                    endActions = {
+                        Switch(
+                            checked = untrusted,
+                            onCheckedChange = null,
+                            enabled = !isSubmitting,
+                        )
+                    },
+                )
+
+                if (!numericValuesValid) {
+                    Text(
+                        modifier = Modifier.padding(16.dp),
+                        text = "连接数和速率限制必须是非负整数。",
+                        color = MiuixTheme.colorScheme.error,
+                        style = MiuixTheme.textStyles.main,
                     )
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun FormField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(
-            text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            style = MiuixTheme.textStyles.main,
-        )
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = MiuixTheme.textStyles.main,
-        )
-        HorizontalDivider()
+        Box (
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            TextButton(
+                text = "添加",
+                enabled = canSubmit,
+                onClick = {
+                    onConfirm(
+                        NewDeviceConfiguration(
+                            deviceId = deviceId,
+                            name = name,
+                            group = group,
+                            addresses = addresses
+                                .split(',', '\n')
+                                .map(String::trim)
+                                .filter(String::isNotBlank),
+                            introducer = introducer,
+                            autoAcceptFolders = autoAcceptFolders,
+                            compression = compression,
+                            numConnections = numConnections.toIntOrNull() ?: 0,
+                            maxSendKiBPerSecond = maxSendKiBPerSecond.toIntOrNull() ?: 0,
+                            maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toIntOrNull() ?: 0,
+                            untrusted = untrusted,
+                        ),
+                    )
+                },
+            )
+        }
     }
 }
 

@@ -13,9 +13,5 @@ interface CoreController {
 interface DevicesController {
     suspend fun loadDevices(): DevicesSnapshot
 
-    suspend fun addDevice(
-        deviceId: String,
-        name: String,
-        addresses: List<String>,
-    )
+    suspend fun addDevice(configuration: NewDeviceConfiguration)
 }

@@ -99,17 +99,28 @@ internal class SyncthingRestClient(
         }
     }
 
-    fun addDevice(
-        deviceId: String,
-        name: String,
-        addresses: List<String>,
-    ) {
+    fun addDevice(configuration: NewDeviceConfiguration) {
         val device = request("/rest/config/defaults/device")
         val addressArray = JSONArray()
-        addresses.forEach(addressArray::put)
-        device.put("deviceID", deviceId)
-        device.put("name", name.ifBlank { deviceId })
-        if (addresses.isNotEmpty()) {
+        configuration.addresses.forEach(addressArray::put)
+        device.put("deviceID", configuration.deviceId)
+        device.put("name", configuration.name.ifBlank { configuration.deviceId })
+        device.put("group", configuration.group)
+        device.put("introducer", configuration.introducer)
+        device.put("autoAcceptFolders", configuration.autoAcceptFolders)
+        device.put(
+            "compression",
+            when (configuration.compression) {
+                NewDeviceConfiguration.Compression.ALL -> "always"
+                NewDeviceConfiguration.Compression.METADATA -> "metadata"
+                NewDeviceConfiguration.Compression.OFF -> "never"
+            },
+        )
+        device.put("numConnections", configuration.numConnections)
+        device.put("maxSendKbps", configuration.maxSendKiBPerSecond)
+        device.put("maxRecvKbps", configuration.maxReceiveKiBPerSecond)
+        device.put("untrusted", configuration.untrusted)
+        if (configuration.addresses.isNotEmpty()) {
             device.put("addresses", addressArray)
         }
         requestBody(

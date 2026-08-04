@@ -84,15 +84,9 @@ class CoreRuntime(
     }
 
     override suspend fun addDevice(
-        deviceId: String,
-        name: String,
-        addresses: List<String>,
+        configuration: NewDeviceConfiguration,
     ) = withContext(Dispatchers.IO) {
-        restClient.addDevice(
-            deviceId = deviceId,
-            name = name,
-            addresses = addresses,
-        )
+        restClient.addDevice(configuration)
     }
 
     @Volatile

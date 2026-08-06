@@ -2,7 +2,9 @@ package moe.https.syncthing
 
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -13,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -25,13 +29,18 @@ import moe.https.syncthing.ui.screen.LogScreen
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
@@ -54,6 +63,7 @@ fun App(
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
     val navController = rememberNavController()
+    val mainScrollBehavior = MiuixScrollBehavior()
 
     DisposableEffect(currentPageMain) {
         logViewModel.onPageVisibilityChanged(currentPageMain == AppPage.LOGS)
@@ -63,6 +73,12 @@ fun App(
             }
         }
     }
+
+    /*
+    // 切换页面时把大标题重置为展开状态
+    LaunchedEffect(currentPageMain) {
+        mainScrollBehavior.state.heightOffset = 0f
+    }*/
 
     LaunchedEffect(currentPageMain, coreUiState.state) {
         if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
@@ -106,6 +122,24 @@ fun App(
                     topBar = {
                         TopAppBar(
                             title = currentPageMain.title,
+                            largeTitle = currentPageMain.title,
+                            scrollBehavior = if ( currentPageMain != AppPage.LOGS) mainScrollBehavior else null,
+                            actions = {
+                                if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
+                                    IconButton(
+                                        onClick = {
+                                            currentPagePlain = AppSubPage.DEVICE_ADD
+                                            navController.navigate(PLAIN_PAGE_ROUTE)
+                                        },
+                                        content = {
+                                            Icon(
+                                                contentDescription = "添加设备",
+                                                imageVector = MiuixIcons.Add
+                                            )
+                                        },
+                                    )
+                                }
+                            },
                         )
                     },
                     bottomBar = {
@@ -143,39 +177,35 @@ fun App(
                         }
                     },
                 ) { padding ->
-                    when (currentPageMain) {
-                        AppPage.DEVICES -> DevicesScreen(
-                            uiState = devicesUiState,
-                            coreState = coreUiState.state,
-                            onRefresh = devicesViewModel::refresh,
-                            onAddDevice = {
-                                currentPagePlain = AppSubPage.DEVICE_ADD
-                                navController.navigate(PLAIN_PAGE_ROUTE)
-                            },
-                            modifier = Modifier.padding(padding),
-                        )
+                    Box(
+                        modifier = Modifier
+                            .padding(padding)
+                            .nestedScroll(mainScrollBehavior.nestedScrollConnection),
+                    ) {
+                        when (currentPageMain) {
+                            AppPage.DEVICES -> DevicesScreen(
+                                uiState = devicesUiState,
+                                coreState = coreUiState.state,
+                            )
 
-                        AppPage.FOLDERS,
-                        AppPage.SETTINGS -> EmptyScreen(
-                            modifier = Modifier.padding(padding),
-                        )
+                            AppPage.FOLDERS,
+                            AppPage.SETTINGS -> EmptyScreen()
 
-                        AppPage.CORE -> CoreScreen(
-                            uiState = coreUiState,
-                            onStartAction = if (coreUiState.isStarted) {
-                                coreViewModel::onStopClicked
-                            } else {
-                                coreViewModel::onStartClicked
-                            },
-                            onImportCore = coreViewModel::onImportCoreClicked,
-                            modifier = Modifier.padding(padding),
-                        )
+                            AppPage.CORE -> CoreScreen(
+                                uiState = coreUiState,
+                                onStartAction = if (coreUiState.isStarted) {
+                                    coreViewModel::onStopClicked
+                                } else {
+                                    coreViewModel::onStartClicked
+                                },
+                                onImportCore = coreViewModel::onImportCoreClicked,
+                            )
 
-                        AppPage.LOGS -> LogScreen(
-                            uiState = logUiState,
-                            onSourceSelected = logViewModel::onSourceSelected,
-                            modifier = Modifier.padding(padding),
-                        )
+                            AppPage.LOGS -> LogScreen(
+                                uiState = logUiState,
+                                onSourceSelected = logViewModel::onSourceSelected,
+                            )
+                        }
                     }
                 }
             }

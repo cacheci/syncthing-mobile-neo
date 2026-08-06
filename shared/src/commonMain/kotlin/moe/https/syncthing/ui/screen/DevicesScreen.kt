@@ -1,14 +1,11 @@
 package moe.https.syncthing.ui.screen
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -40,7 +37,6 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
@@ -48,8 +44,6 @@ import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 internal fun DevicesScreen(
     uiState: DevicesUiState,
     coreState: CoreState,
-    onRefresh: () -> Unit,
-    onAddDevice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -59,32 +53,6 @@ internal fun DevicesScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "设备连接",
-                style = MiuixTheme.textStyles.title4,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                ActionText(
-                    text = "刷新",
-                    enabled = coreState == CoreState.RUNNING && !uiState.isLoading,
-                    onClick = onRefresh,
-                )
-                ActionText(
-                    text = "添加设备",
-                    enabled = coreState == CoreState.RUNNING && !uiState.isLoading,
-                    onClick = onAddDevice,
-                )
-            }
-        }
-
         if (coreState != CoreState.RUNNING) {
             MessageCard(
                 title = "核心未运行",
@@ -113,25 +81,6 @@ internal fun DevicesScreen(
         }
     }
 
-}
-
-@Composable
-private fun ActionText(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Text(
-        text = text,
-        color = if (enabled) {
-            MiuixTheme.colorScheme.primary
-        } else {
-            MiuixTheme.colorScheme.onSurfaceVariantSummary
-        },
-        modifier = Modifier
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-    )
 }
 
 @Composable
@@ -263,7 +212,10 @@ internal fun AddDeviceScreen(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 20.dp, horizontal = 10.dp),
     ) {
-        SmallTitle(text = "设备")
+        SmallTitle(
+            text = "设备",
+            modifier = Modifier.padding(top=10.dp),
+        )
         Card (modifier = Modifier.padding(horizontal = 10.dp)) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -295,7 +247,10 @@ internal fun AddDeviceScreen(
             }
         }
 
-        SmallTitle(text = "权限")
+        SmallTitle(
+            text = "权限",
+            modifier = Modifier.padding(top=10.dp),
+        )
         Card (modifier = Modifier.padding(horizontal = 10.dp)) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -332,7 +287,10 @@ internal fun AddDeviceScreen(
             }
         }
 
-        SmallTitle(text = "连接")
+        SmallTitle(
+            text = "连接",
+            modifier = Modifier.padding(top=10.dp),
+        )
         Card (modifier = Modifier.padding(horizontal = 10.dp)) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -409,36 +367,33 @@ internal fun AddDeviceScreen(
             }
         }
 
-        Box (
+        TextButton(
+            text = "添加",
+            enabled = canSubmit,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp)
-        ) {
-            TextButton(
-                text = "添加",
-                enabled = canSubmit,
-                onClick = {
-                    onConfirm(
-                        NewDeviceConfiguration(
-                            deviceId = deviceId,
-                            name = name,
-                            group = group,
-                            addresses = addresses
-                                .split(',', '\n')
-                                .map(String::trim)
-                                .filter(String::isNotBlank),
-                            introducer = introducer,
-                            autoAcceptFolders = autoAcceptFolders,
-                            compression = compression,
-                            numConnections = numConnections.toIntOrNull() ?: 0,
-                            maxSendKiBPerSecond = maxSendKiBPerSecond.toIntOrNull() ?: 0,
-                            maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toIntOrNull() ?: 0,
-                            untrusted = untrusted,
-                        ),
-                    )
-                },
-            )
-        }
+                .padding(horizontal = 10.dp, vertical = 16.dp)
+                .fillMaxWidth(),
+            onClick = {
+                onConfirm(
+                    NewDeviceConfiguration(
+                        deviceId = deviceId,
+                        name = name,
+                        group = group,
+                        addresses = addresses
+                            .split(',', '\n')
+                            .map(String::trim)
+                            .filter(String::isNotBlank),
+                        introducer = introducer,
+                        autoAcceptFolders = autoAcceptFolders,
+                        compression = compression,
+                        numConnections = numConnections.toIntOrNull() ?: 0,
+                        maxSendKiBPerSecond = maxSendKiBPerSecond.toIntOrNull() ?: 0,
+                        maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toIntOrNull() ?: 0,
+                        untrusted = untrusted,
+                    ),
+                )
+            },
+        )
     }
 }
 

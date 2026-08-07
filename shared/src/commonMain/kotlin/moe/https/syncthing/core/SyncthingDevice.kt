@@ -13,6 +13,14 @@ data class SyncthingDevice(
     val paused: Boolean,
     val isLocal: Boolean,
     val discoveredAddresses: List<String> = emptyList(),
+    val group: String = "",
+    val introducer: Boolean = false,
+    val autoAcceptFolders: Boolean = false,
+    val compression: NewDeviceConfiguration.Compression = NewDeviceConfiguration.Compression.METADATA,
+    val numConnections: Int = 0,
+    val maxSendKiBPerSecond: Int = 0,
+    val maxReceiveKiBPerSecond: Int = 0,
+    val untrusted: Boolean = false,
 )
 
 data class NewDeviceConfiguration(

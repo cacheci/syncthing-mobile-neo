@@ -71,6 +71,18 @@ internal class SyncthingRestClient(
                         name = json.optString("name").takeIf(String::isNotBlank),
                         addresses = addresses,
                         paused = json.optBoolean("paused", false),
+                        group = json.optString("group"),
+                        introducer = json.optBoolean("introducer", false),
+                        autoAcceptFolders = json.optBoolean("autoAcceptFolders", false),
+                        compression = when (json.optString("compression")) {
+                            "always" -> NewDeviceConfiguration.Compression.ALL
+                            "never" -> NewDeviceConfiguration.Compression.OFF
+                            else -> NewDeviceConfiguration.Compression.METADATA
+                        },
+                        numConnections = json.optInt("numConnections", 0),
+                        maxSendKiBPerSecond = json.optInt("maxSendKbps", 0),
+                        maxReceiveKiBPerSecond = json.optInt("maxRecvKbps", 0),
+                        untrusted = json.optBoolean("untrusted", false),
                     ),
                 )
             }
@@ -136,6 +148,27 @@ internal class SyncthingRestClient(
             method = "POST",
             body = device.toString(),
         )
+    }
+
+    fun updateDevice(configuration: NewDeviceConfiguration) {
+        val device = request("/rest/config/devices/${configuration.deviceId}")
+        val addresses = JSONArray()
+        configuration.addresses.forEach(addresses::put)
+        device.put("name", configuration.name.ifBlank { configuration.deviceId })
+        device.put("group", configuration.group)
+        device.put("addresses", addresses)
+        device.put("introducer", configuration.introducer)
+        device.put("autoAcceptFolders", configuration.autoAcceptFolders)
+        device.put("compression", when (configuration.compression) {
+            NewDeviceConfiguration.Compression.ALL -> "always"
+            NewDeviceConfiguration.Compression.METADATA -> "metadata"
+            NewDeviceConfiguration.Compression.OFF -> "never"
+        })
+        device.put("numConnections", configuration.numConnections)
+        device.put("maxSendKbps", configuration.maxSendKiBPerSecond)
+        device.put("maxRecvKbps", configuration.maxReceiveKiBPerSecond)
+        device.put("untrusted", configuration.untrusted)
+        requestBody("/rest/config/devices/${configuration.deviceId}", method = "PUT", body = device.toString())
     }
 
     fun shutdown() {
@@ -210,6 +243,14 @@ internal class SyncthingRestClient(
         val name: String?,
         val addresses: List<String>,
         val paused: Boolean,
+        val group: String,
+        val introducer: Boolean,
+        val autoAcceptFolders: Boolean,
+        val compression: NewDeviceConfiguration.Compression,
+        val numConnections: Int,
+        val maxSendKiBPerSecond: Int,
+        val maxReceiveKiBPerSecond: Int,
+        val untrusted: Boolean,
     )
 
     data class RestConnection(

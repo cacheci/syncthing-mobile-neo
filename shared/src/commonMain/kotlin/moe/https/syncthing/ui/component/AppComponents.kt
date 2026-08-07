@@ -172,6 +172,7 @@ internal fun ImputableValueRow(
     value: String,
     onValueChange: ((String) -> Unit),
     singleLine: Boolean = true,
+    allowEdit: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(),
 ) {
     Row (
@@ -193,10 +194,12 @@ internal fun ImputableValueRow(
                 value = value,
                 textStyle = MiuixTheme.textStyles.main.copy(
                     textAlign = TextAlign.End,
+                    color = if (allowEdit) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
                 ),
                 onValueChange = onValueChange,
                 singleLine = singleLine,
                 keyboardOptions = keyboardOptions,
+                enabled = allowEdit,
             )
             if (!value.isNotEmpty()) {
                 Text(

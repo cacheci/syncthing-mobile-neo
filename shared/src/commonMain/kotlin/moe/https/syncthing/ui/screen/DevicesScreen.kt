@@ -75,6 +75,7 @@ internal fun DevicesScreen(
     coreState: CoreState,
     topAppBarScrollBehavior: ScrollBehavior,
     onRefresh: () -> Unit,
+    onEditDevice: (SyncthingDevice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
 
@@ -117,7 +118,7 @@ internal fun DevicesScreen(
                 )
             } else {
                 uiState.devices.forEach { device ->
-                    if (device.name == "localhost") LocalDeviceCard(device, uiState.localInfo) else RemoteDeviceCard(device)
+                    if (device.name == "localhost") LocalDeviceCard(device, uiState.localInfo) else RemoteDeviceCard(device, onEditDevice)
                 }
             }
         }
@@ -128,6 +129,7 @@ internal fun DevicesScreen(
 @Composable
 private fun RemoteDeviceCard(
     device: SyncthingDevice,
+    onEditDevice: (SyncthingDevice) -> Unit,
 ) {
     var holdDown by rememberSaveable { mutableStateOf(false) }
     var showShareOverlay by rememberSaveable { mutableStateOf(false) }
@@ -151,7 +153,7 @@ private fun RemoteDeviceCard(
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .combinedClickable(
-                        onLongClick = {  },
+                        onLongClick = { onEditDevice(device) },
                         onClick = { foldContentStatus = !foldContentStatus },
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -543,22 +545,23 @@ private fun countToColouredString( status: List<SyncthingListenAddress>? ): Pair
 @Composable
 internal fun AddDeviceScreen(
     isSubmitting: Boolean,
+    existingDevice: SyncthingDevice? = null,
     onConfirm: (NewDeviceConfiguration) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var deviceId by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var group by remember { mutableStateOf("") }
-    var addresses by remember { mutableStateOf("") }
-    var introducer by remember { mutableStateOf(false) }
-    var autoAcceptFolders by remember { mutableStateOf(false) }
+    var deviceId by remember(existingDevice) { mutableStateOf(existingDevice?.id.orEmpty()) }
+    var name by remember(existingDevice) { mutableStateOf(existingDevice?.name.orEmpty()) }
+    var group by remember(existingDevice) { mutableStateOf(existingDevice?.group.orEmpty()) }
+    var addresses by remember(existingDevice) { mutableStateOf(existingDevice?.addresses?.joinToString(",").orEmpty()) }
+    var introducer by remember(existingDevice) { mutableStateOf(existingDevice?.introducer ?: false) }
+    var autoAcceptFolders by remember(existingDevice) { mutableStateOf(existingDevice?.autoAcceptFolders ?: false) }
     var compression by remember {
-        mutableStateOf(NewDeviceConfiguration.Compression.METADATA)
+        mutableStateOf(existingDevice?.compression ?: NewDeviceConfiguration.Compression.METADATA)
     }
-    var numConnections by remember { mutableStateOf("") }
-    var maxSendKiBPerSecond by remember { mutableStateOf("") }
-    var maxReceiveKiBPerSecond by remember { mutableStateOf("") }
-    var untrusted by remember { mutableStateOf(false) }
+    var numConnections by remember(existingDevice) { mutableStateOf(existingDevice?.numConnections?.toString().orEmpty()) }
+    var maxSendKiBPerSecond by remember(existingDevice) { mutableStateOf(existingDevice?.maxSendKiBPerSecond?.toString().orEmpty()) }
+    var maxReceiveKiBPerSecond by remember(existingDevice) { mutableStateOf(existingDevice?.maxReceiveKiBPerSecond?.toString().orEmpty()) }
+    var untrusted by remember(existingDevice) { mutableStateOf(existingDevice?.untrusted ?: false) }
     val numericValuesValid = listOf(
         numConnections,
         maxSendKiBPerSecond,
@@ -584,6 +587,7 @@ internal fun AddDeviceScreen(
                     label = "设备 ID",
                     valueLabel = "必填",
                     singleLine = false,
+                    allowEdit = existingDevice == null
                 )
 
                 ImputableValueRow(
@@ -718,7 +722,7 @@ internal fun AddDeviceScreen(
         }
 
         TextButton(
-            text = "添加",
+            text = if (existingDevice == null) "添加" else "保存",
             enabled = canSubmit,
             modifier = Modifier
                 .padding(horizontal = 10.dp, vertical = 16.dp)

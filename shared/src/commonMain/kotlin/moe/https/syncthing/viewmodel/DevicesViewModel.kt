@@ -51,6 +51,14 @@ class DevicesViewModel(
     }
 
     fun addDevice(configuration: NewDeviceConfiguration) {
+        saveDevice(configuration, false)
+    }
+
+    fun updateDevice(configuration: NewDeviceConfiguration) {
+        saveDevice(configuration, true)
+    }
+
+    private fun saveDevice(configuration: NewDeviceConfiguration, updating: Boolean) {
         val normalizedConfiguration = configuration.copy(
             deviceId = configuration.deviceId.trim(),
             name = configuration.name.trim(),
@@ -78,7 +86,8 @@ class DevicesViewModel(
 
                 mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
                 try {
-                    controller.addDevice(normalizedConfiguration)
+                    if (updating) controller.updateDevice(normalizedConfiguration)
+                    else controller.addDevice(normalizedConfiguration)
                     mutableUiState.value = mutableUiState.value.updateFrom(controller.loadDevices())
                 } catch (error: CancellationException) {
                     throw error

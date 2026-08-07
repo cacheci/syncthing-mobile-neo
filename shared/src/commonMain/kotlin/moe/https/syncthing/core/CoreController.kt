@@ -14,4 +14,5 @@ interface DevicesController {
     suspend fun loadDevices(): DevicesSnapshot
 
     suspend fun addDevice(configuration: NewDeviceConfiguration)
+    suspend fun updateDevice(configuration: NewDeviceConfiguration)
 }

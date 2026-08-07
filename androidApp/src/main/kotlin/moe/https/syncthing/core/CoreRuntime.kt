@@ -66,6 +66,14 @@ class CoreRuntime(
                 isLocal = device.id == status.myId ||
                     (status.myId == null && device.name == "localhost"),
                 discoveredAddresses = discoveryCache[device.id].orEmpty(),
+                group = device.group,
+                introducer = device.introducer,
+                autoAcceptFolders = device.autoAcceptFolders,
+                compression = device.compression,
+                numConnections = device.numConnections,
+                maxSendKiBPerSecond = device.maxSendKiBPerSecond,
+                maxReceiveKiBPerSecond = device.maxReceiveKiBPerSecond,
+                untrusted = device.untrusted,
             )
         }
         DevicesSnapshot(
@@ -92,6 +100,10 @@ class CoreRuntime(
         configuration: NewDeviceConfiguration,
     ) = withContext(Dispatchers.IO) {
         restClient.addDevice(configuration)
+    }
+
+    override suspend fun updateDevice(configuration: NewDeviceConfiguration) = withContext(Dispatchers.IO) {
+        restClient.updateDevice(configuration)
     }
 
     @Volatile

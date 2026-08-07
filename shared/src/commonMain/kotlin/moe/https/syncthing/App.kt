@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AddDeviceScreen
 import moe.https.syncthing.ui.screen.CoreScreen
@@ -58,6 +59,7 @@ fun App(
     val devicesUiState by devicesViewModel.uiState.collectAsState()
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
+    var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     val navController = rememberNavController()
     val mainScrollBehavior = MiuixScrollBehavior()
 
@@ -184,6 +186,11 @@ fun App(
                                 coreState = coreUiState.state,
                                 topAppBarScrollBehavior = mainScrollBehavior,
                                 onRefresh = devicesViewModel::refresh,
+                                onEditDevice = { device ->
+                                    editingDevice = device
+                                    currentPagePlain = AppSubPage.DEVICE_ADD
+                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                                },
                             )
 
                             AppPage.FOLDERS,
@@ -234,8 +241,11 @@ fun App(
                         AppSubPage.DEVICE_ADD -> {
                             AddDeviceScreen(
                                 isSubmitting = devicesUiState.isLoading,
+                                existingDevice = editingDevice,
                                 onConfirm = { configuration ->
-                                    devicesViewModel.addDevice(configuration)
+                                    if (editingDevice == null) devicesViewModel.addDevice(configuration)
+                                    else devicesViewModel.updateDevice(configuration)
+                                    editingDevice = null
                                     navigateBack()
                                 },
                                 modifier = Modifier.padding(padding),
@@ -261,5 +271,5 @@ private enum class AppPage(val title: String) {
 
 private enum class AppSubPage(val title: String) {
     DEBUG("DEBUG*"),
-    DEVICE_ADD("添加设备")
+    DEVICE_ADD("设备")
 }

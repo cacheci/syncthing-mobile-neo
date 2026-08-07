@@ -2,7 +2,6 @@ package moe.https.syncthing
 
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -16,11 +15,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AddDeviceScreen
 import moe.https.syncthing.ui.screen.CoreScreen
 import moe.https.syncthing.ui.screen.DevicesScreen
@@ -29,15 +28,12 @@ import moe.https.syncthing.ui.screen.LogScreen
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
@@ -73,12 +69,6 @@ fun App(
             }
         }
     }
-
-    /*
-    // 切换页面时把大标题重置为展开状态
-    LaunchedEffect(currentPageMain) {
-        mainScrollBehavior.state.heightOffset = 0f
-    }*/
 
     LaunchedEffect(currentPageMain, coreUiState.state) {
         if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
@@ -120,10 +110,14 @@ fun App(
             composable(MAIN_PAGE_ROUTE) {
                 Scaffold(
                     topBar = {
-                        TopAppBar(
+                        AdaptiveTopAppBar(
                             title = currentPageMain.title,
-                            largeTitle = currentPageMain.title,
-                            scrollBehavior = if ( currentPageMain != AppPage.LOGS) mainScrollBehavior else null,
+                            showTopAppBar = true,
+                            scrollBehavior = if (currentPageMain != AppPage.LOGS) {
+                                mainScrollBehavior
+                            } else {
+                                MiuixScrollBehavior()
+                            },
                             actions = {
                                 if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
                                     IconButton(
@@ -140,6 +134,8 @@ fun App(
                                     )
                                 }
                             },
+                            // isWideScreen = isWideScreen,
+                            isWideScreen = false,
                         )
                     },
                     bottomBar = {
@@ -186,6 +182,8 @@ fun App(
                             AppPage.DEVICES -> DevicesScreen(
                                 uiState = devicesUiState,
                                 coreState = coreUiState.state,
+                                topAppBarScrollBehavior = mainScrollBehavior,
+                                onRefresh = devicesViewModel::refresh,
                             )
 
                             AppPage.FOLDERS,
@@ -236,7 +234,6 @@ fun App(
                         AppSubPage.DEVICE_ADD -> {
                             AddDeviceScreen(
                                 isSubmitting = devicesUiState.isLoading,
-                                onCancel = navigateBack,
                                 onConfirm = { configuration ->
                                     devicesViewModel.addDevice(configuration)
                                     navigateBack()
@@ -262,7 +259,7 @@ private enum class AppPage(val title: String) {
     SETTINGS("设置"),
 }
 
-private enum class AppSubPage(val title: String, val parent: AppPage) {
-    DEBUG("DEBUG*", parent = AppPage.CORE),
-    DEVICE_ADD("添加设备", parent = AppPage.DEVICES)
+private enum class AppSubPage(val title: String) {
+    DEBUG("DEBUG*"),
+    DEVICE_ADD("添加设备")
 }

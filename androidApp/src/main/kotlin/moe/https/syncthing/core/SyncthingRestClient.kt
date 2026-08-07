@@ -5,6 +5,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.LocalDateTime
 
 internal class SyncthingRestClient(
     private val apiKey: String,
@@ -92,7 +93,14 @@ internal class SyncthingRestClient(
                         clientVersion = connection.optString("clientVersion")
                             .takeIf(String::isNotBlank),
                         lastConnectionAt = connection.optString("at")
-                            .takeIf(String::isNotBlank),
+                            .takeIf { it.isNotBlank() }
+                            ?.let { raw ->
+                                runCatching { LocalDateTime.parse(raw) }.getOrNull()
+                            }
+                            ?.takeIf { localDateTime ->
+                                localDateTime.year > 1970
+                            }
+                        ,
                     ),
                 )
             }
@@ -184,11 +192,16 @@ internal class SyncthingRestClient(
         val myId: String?,
         val discoveryEnabled: Boolean,
         val discoveryStatus: List<RestDiscoveryStatus>,
-        val listenAddresses: List<String>,
+        val listenAddresses: List<RestListenAddress>,
     )
 
     data class RestDiscoveryStatus(
         val method: String,
+        val error: String?,
+    )
+
+    data class RestListenAddress(
+        val address: String,
         val error: String?,
     )
 
@@ -203,7 +216,7 @@ internal class SyncthingRestClient(
         val connected: Boolean,
         val address: String?,
         val clientVersion: String?,
-        val lastConnectionAt: String?,
+        val lastConnectionAt: LocalDateTime?,
     )
 
     companion object {
@@ -229,7 +242,7 @@ internal class SyncthingRestClient(
         }
     }
 
-    private fun parseListenAddresses(json: JSONObject?): List<String> {
+    private fun parseListenAddresses(json: JSONObject?): List<RestListenAddress> {
         if (json == null) return emptyList()
         return buildList {
             val keys = json.keys()
@@ -242,7 +255,14 @@ internal class SyncthingRestClient(
                     readStringArray(service.optJSONArray("lanAddresses")) +
                         readStringArray(service.optJSONArray("wanAddresses"))
                 }
-                (addresses.ifEmpty { listOf(serviceAddress) }).forEach(::add)
+                val errorValue = service?.opt("error")
+                val error = if (errorValue == null || errorValue == JSONObject.NULL) {
+                    null
+                } else {
+                    errorValue.toString().takeIf(String::isNotBlank)
+                }
+                (addresses.ifEmpty { listOf(serviceAddress) })
+                    .forEach { add(RestListenAddress(it, error)) }
             }
         }.distinct()
     }

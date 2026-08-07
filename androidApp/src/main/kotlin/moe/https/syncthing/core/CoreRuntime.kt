@@ -78,7 +78,12 @@ class CoreRuntime(
                         error = discoveryStatus.error,
                     )
                 },
-                listenAddresses = status.listenAddresses,
+                listenAddresses = status.listenAddresses.map { listenAddress ->
+                    SyncthingListenAddress(
+                        address = listenAddress.address,
+                        error = listenAddress.error,
+                    )
+                },
             ),
         )
     }

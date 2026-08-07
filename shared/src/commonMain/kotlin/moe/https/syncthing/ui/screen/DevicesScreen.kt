@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.visible
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
@@ -118,7 +117,7 @@ internal fun DevicesScreen(
                 )
             } else {
                 uiState.devices.forEach { device ->
-                    if (device.name == "localhost") LocalDeviceCard(device, uiState.localInfo) else RemoteDeviceCard(device, onEditDevice)
+                    if (device.isLocal) LocalDeviceCard(device, uiState.localInfo) else RemoteDeviceCard(device, onEditDevice)
                 }
             }
         }
@@ -340,7 +339,7 @@ private fun LocalDeviceCard(
                         color = Color(0xFF2E7D32),
                     )
                     Text(
-                        text = "localhost",
+                        text = "本机",
                         style = MiuixTheme.textStyles.headline1,
                     )
                 }
@@ -544,10 +543,10 @@ private fun countToColouredString( status: List<SyncthingListenAddress>? ): Pair
 
 @Composable
 internal fun AddDeviceScreen(
+    modifier: Modifier = Modifier,
     isSubmitting: Boolean,
     existingDevice: SyncthingDevice? = null,
     onConfirm: (NewDeviceConfiguration) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     var deviceId by remember(existingDevice) { mutableStateOf(existingDevice?.id.orEmpty()) }
     var name by remember(existingDevice) { mutableStateOf(existingDevice?.name.orEmpty()) }

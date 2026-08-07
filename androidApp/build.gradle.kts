@@ -12,12 +12,13 @@ android {
 
     defaultConfig {
         applicationId = "moe.https.syncthing"
-        minSdk = 26
+        minSdk = 28
         targetSdk = 28
         versionCode = 1
         versionName = "0.1.0"
 
         ndk {
+            //noinspection ChromeOsAbiSupport
             abiFilters += "arm64-v8a"
         }
     }
@@ -49,6 +50,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.google.material)
-    implementation(compose.ui)
-    debugImplementation(compose.uiTooling)
+    implementation(libs.ui)
+    debugImplementation(libs.ui.tooling)
 }

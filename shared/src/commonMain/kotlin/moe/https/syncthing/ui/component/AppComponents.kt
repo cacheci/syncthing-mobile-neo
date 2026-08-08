@@ -11,25 +11,45 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.util.displayName
 import moe.https.syncthing.ui.util.formatBytes
 import moe.https.syncthing.ui.util.formatDuration
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun StatusCard(uiState: CoreUiState) {
+internal fun StatusCard(
+    uiState: CoreUiState,
+    developerModeEnabled: Boolean,
+    onModifyDeveloperMode: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+) {
+    var developerModeClickTimes by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -52,7 +72,26 @@ internal fun StatusCard(uiState: CoreUiState) {
                 )
             }
             HorizontalDivider()
-            ValueRow("核心版本", uiState.version ?: "未导入")
+            MultipleValueRow(
+                label = "核心版本",
+                values = listOf(uiState.version ?: "未导入"),
+                onClick = {
+                    if (!developerModeEnabled) {
+                        developerModeClickTimes += 1
+                        if (developerModeClickTimes >= 10) {
+                            onModifyDeveloperMode()
+                            developerModeClickTimes = 0
+                            scope.launch {
+                                snackbarHostState.showSnackbar("已开启开发者模式")
+                            }
+                        }
+                    } else {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("您已处于开发者模式")
+                        }
+                    }
+                }
+            )
             ValueRow("支持架构", "arm64-v8a")
         }
     }
@@ -174,6 +213,7 @@ internal fun ImputableValueRow(
     singleLine: Boolean = true,
     allowEdit: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(),
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     Row (
         modifier = modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -199,6 +239,7 @@ internal fun ImputableValueRow(
                 onValueChange = onValueChange,
                 singleLine = singleLine,
                 keyboardOptions = keyboardOptions,
+                visualTransformation = visualTransformation,
                 enabled = allowEdit,
             )
             if (!value.isNotEmpty()) {
@@ -211,6 +252,71 @@ internal fun ImputableValueRow(
             }
         }
     }
+}
+
+@Composable
+internal fun InfoSwitchCard(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    SmallTitle(
+        text = title,
+        modifier = Modifier.padding(top = 10.dp),
+    )
+    Card(modifier = Modifier.padding(horizontal = 10.dp)) {
+        Column(content = { content() })
+    }
+}
+
+@Composable
+internal fun MessageCard(
+    title: String,
+    message: String,
+    isError: Boolean = false,
+) {
+    Card(
+        modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp).fillMaxWidth(),
+        colors = if (isError) {
+            CardDefaults.defaultColors(
+                color = MiuixTheme.colorScheme.errorContainer,
+                contentColor = MiuixTheme.colorScheme.onErrorContainer,
+            )
+        } else {
+            CardDefaults.defaultColors()
+        },
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(text = title, style = MiuixTheme.textStyles.title4)
+            Text(text = message, color = MiuixTheme.colorScheme.onSecondaryContainer)
+        }
+    }
+}
+
+@Composable
+internal fun InfoSwitch(
+    title: String,
+    summary: String ?= null,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        enabled = enabled,
+        role = Role.Switch,
+        onClick = { onCheckedChange(!checked) },
+        endActions = {
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                enabled = enabled,
+            )
+        },
+    )
 }
 
 @Composable

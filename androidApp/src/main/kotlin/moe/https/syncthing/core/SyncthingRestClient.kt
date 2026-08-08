@@ -9,6 +9,7 @@ import java.time.LocalDateTime
 
 internal class SyncthingRestClient(
     private val apiKey: String,
+    private val baseUrl: () -> String = { DEFAULT_BASE_URL },
 ) {
     fun ping(): Boolean = runCatching {
         pingChecked()
@@ -171,6 +172,148 @@ internal class SyncthingRestClient(
         requestBody("/rest/config/devices/${configuration.deviceId}", method = "PUT", body = device.toString())
     }
 
+    fun setting(
+        guiPortConflictBehavior: SettingConfiguration.GuiPortConflictBehavior,
+        localDeviceId: String,
+    ): SettingConfiguration {
+        val options = request("/rest/config/options")
+        val gui = request("/rest/config/gui")
+        val localDevice = request("/rest/config/devices/$localDeviceId")
+        val minHomeDiskFree = options.optJSONObject("minHomeDiskFree")
+        val (guiListenAddress, guiPort) = parseGuiAddress(gui.optString("address"))
+        val guiPasswordConfigured = gui.optString("password").isNotBlank()
+
+        return SettingConfiguration(
+            deviceName = localDevice.optString("name").ifBlank { "Syncthing" },
+            minHomeDiskFree = minHomeDiskFree?.optDouble("value", 1.0) ?: 1.0,
+            minHomeDiskFreeUnit = SettingConfiguration.DiskSpaceUnit.entries
+                .firstOrNull { it.apiValue == minHomeDiskFree?.optString("unit") }
+                ?: SettingConfiguration.DiskSpaceUnit.PERCENT,
+            usageReportingEnabled = options.optInt("urAccepted", 0) > 0,
+            usageReportingVersion = maxOf(
+                options.optInt("urAccepted", 0),
+                options.optInt("urSeen", 0),
+                1,
+            ),
+            guiListenAddress = guiListenAddress,
+            guiPort = guiPort,
+            guiPortConflictBehavior = guiPortConflictBehavior,
+            guiAuthenticationEnabled = gui.optString("user").isNotBlank() || guiPasswordConfigured,
+            guiUser = gui.optString("user"),
+            guiPasswordConfigured = guiPasswordConfigured,
+            guiTheme = SettingConfiguration.GuiTheme.entries
+                .firstOrNull { it.apiValue == gui.optString("theme") }
+                ?: SettingConfiguration.GuiTheme.DEFAULT,
+            listenAddresses = readStringArray(options.optJSONArray("listenAddresses")),
+            maxSendKiBPerSecond = options.optInt("maxSendKbps", 0),
+            maxReceiveKiBPerSecond = options.optInt("maxRecvKbps", 0),
+            reconnectionIntervalSeconds = options.optInt("reconnectionIntervalS", 60),
+            limitBandwidthInLan = options.optBoolean("limitBandwidthInLan", false),
+            globalDiscoveryEnabled = options.optBoolean("globalAnnounceEnabled", true),
+            globalDiscoveryServers = readStringArray(options.optJSONArray("globalAnnounceServers")),
+            localDiscoveryEnabled = options.optBoolean("localAnnounceEnabled", true),
+            localDiscoveryPort = options.optInt("localAnnouncePort", 21027),
+            localDiscoveryMulticastAddress = options.optString(
+                "localAnnounceMCAddr",
+                "[ff12::8384]:21027",
+            ),
+            announceLanAddresses = options.optBoolean("announceLANAddresses", true),
+            natEnabled = options.optBoolean("natEnabled", true),
+            relaysEnabled = options.optBoolean("relaysEnabled", true),
+            alwaysLocalNetworks = readStringArray(options.optJSONArray("alwaysLocalNets")),
+            connectionLimitEnough = options.optInt("connectionLimitEnough", 0),
+            connectionLimitMax = options.optInt("connectionLimitMax", 0),
+            allowGuiListenNonLocal = options.optBoolean("allowGuiListenNonLocal", false)
+        )
+    }
+
+    fun updateSetting(
+        configuration: SettingConfiguration,
+        localDeviceId: String,
+    ): SettingSaveResult {
+        val options = request("/rest/config/options")
+            .put(
+                "minHomeDiskFree",
+                JSONObject()
+                    .put("value", configuration.minHomeDiskFree)
+                    .put("unit", configuration.minHomeDiskFreeUnit.apiValue),
+            )
+            .put(
+                "urAccepted",
+                if (configuration.usageReportingEnabled) {
+                    maxOf(configuration.usageReportingVersion, 1)
+                } else {
+                    -1
+                },
+            )
+            .put("listenAddresses", configuration.listenAddresses.toJsonArray())
+            .put("maxSendKbps", configuration.maxSendKiBPerSecond)
+            .put("maxRecvKbps", configuration.maxReceiveKiBPerSecond)
+            .put("reconnectionIntervalS", configuration.reconnectionIntervalSeconds)
+            .put("limitBandwidthInLan", configuration.limitBandwidthInLan)
+            .put("globalAnnounceEnabled", configuration.globalDiscoveryEnabled)
+            .put("globalAnnounceServers", configuration.globalDiscoveryServers.toJsonArray())
+            .put("localAnnounceEnabled", configuration.localDiscoveryEnabled)
+            .put("localAnnouncePort", configuration.localDiscoveryPort)
+            .put("localAnnounceMCAddr", configuration.localDiscoveryMulticastAddress)
+            .put("announceLANAddresses", configuration.announceLanAddresses)
+            .put("natEnabled", configuration.natEnabled)
+            .put("relaysEnabled", configuration.relaysEnabled)
+            .put("alwaysLocalNets", configuration.alwaysLocalNetworks.toJsonArray())
+            .put("connectionLimitEnough", configuration.connectionLimitEnough)
+            .put("connectionLimitMax", configuration.connectionLimitMax)
+
+        val gui = request("/rest/config/gui")
+        val localDevice = request("/rest/config/devices/$localDeviceId")
+            .put("name", configuration.deviceName)
+        val currentGuiAddress = gui.optString("address")
+        val currentGuiUser = gui.optString("user")
+        val currentGuiTheme = gui.optString("theme")
+        val currentGuiPasswordConfigured = gui.optString("password").isNotBlank()
+        val desiredGuiAddress = formatGuiAddress(configuration.guiListenAddress, configuration.guiPort)
+        val desiredGuiUser = if (configuration.guiAuthenticationEnabled) configuration.guiUser else ""
+        val guiChanged = currentGuiAddress != desiredGuiAddress ||
+            currentGuiUser != desiredGuiUser ||
+            currentGuiTheme != configuration.guiTheme.apiValue ||
+            currentGuiPasswordConfigured != configuration.guiAuthenticationEnabled ||
+            configuration.newGuiPassword.isNotBlank()
+        gui
+            .put("address", desiredGuiAddress)
+            .put(
+                "user",
+                desiredGuiUser,
+            )
+            .put("theme", configuration.guiTheme.apiValue)
+        when {
+            !configuration.guiAuthenticationEnabled -> gui.put("password", "")
+            configuration.newGuiPassword.isNotBlank() -> {
+                gui.put("password", configuration.newGuiPassword)
+            }
+        }
+
+        requestBody(
+            path = "/rest/config/options",
+            method = "PUT",
+            body = options.toString(),
+        )
+        val optionsRestartRequired = request("/rest/config/restart-required")
+            .optBoolean("requiresRestart", false)
+        requestBody(
+            path = "/rest/config/gui",
+            method = "PUT",
+            body = gui.toString(),
+        )
+        requestBody(
+            path = "/rest/config/devices/$localDeviceId",
+            method = "PUT",
+            body = localDevice.toString(),
+        )
+        return SettingSaveResult(
+            restartRequired = optionsRestartRequired || guiChanged,
+            accessMode = SettingAccessMode.REST,
+        )
+    }
+
     fun shutdown() {
         request("/rest/system/shutdown", method = "POST")
     }
@@ -187,7 +330,7 @@ internal class SyncthingRestClient(
         method: String = "GET",
         body: String? = null,
     ): String {
-        val connection = URL("$BASE_URL$path").openConnection() as HttpURLConnection
+        val connection = URL("${baseUrl()}$path").openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = method
             connection.connectTimeout = TIMEOUT_MILLIS
@@ -261,7 +404,7 @@ internal class SyncthingRestClient(
     )
 
     companion object {
-        private const val BASE_URL = "http://127.0.0.1:8384"
+        private const val DEFAULT_BASE_URL = "http://127.0.0.1:8384"
         private const val TIMEOUT_MILLIS = 1_500
     }
 
@@ -318,6 +461,33 @@ internal class SyncthingRestClient(
             }
         }
     }
+
+    private fun parseGuiAddress(address: String): Pair<String, Int> {
+        val normalizedAddress = address.trim().ifBlank { "127.0.0.1:8384" }
+        if (normalizedAddress.startsWith("[")) {
+            val closingBracket = normalizedAddress.indexOf(']')
+            val port = normalizedAddress
+                .substringAfter("]:", "")
+                .toIntOrNull()
+                ?: 8384
+            if (closingBracket > 1) {
+                return normalizedAddress.substring(1, closingBracket) to port
+            }
+        }
+        val separatorIndex = normalizedAddress.lastIndexOf(':')
+        if (separatorIndex > 0) {
+            val port = normalizedAddress.substring(separatorIndex + 1).toIntOrNull()
+            if (port != null) {
+                return normalizedAddress.substring(0, separatorIndex) to port
+            }
+        }
+        return normalizedAddress to 8384
+    }
+
+    private fun formatGuiAddress(address: String, port: Int): String {
+        val normalizedAddress = address.trim().removePrefix("[").removeSuffix("]")
+        return if (':' in normalizedAddress) "[$normalizedAddress]:$port" else "$normalizedAddress:$port"
+    }
 }
 
 internal class SyncthingRestException(
@@ -329,3 +499,7 @@ private fun JSONObject.optLongOrNull(name: String): Long? =
 
 private fun JSONObject.optIntOrNull(name: String): Int? =
     if (has(name) && !isNull(name)) optInt(name) else null
+
+private fun List<String>.toJsonArray(): JSONArray = JSONArray().also { array ->
+    forEach(array::put)
+}

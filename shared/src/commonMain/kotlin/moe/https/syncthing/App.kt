@@ -12,35 +12,46 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
+import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AddDeviceScreen
 import moe.https.syncthing.ui.screen.CoreScreen
 import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.EmptyScreen
 import moe.https.syncthing.ui.screen.LogScreen
+import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
+import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.CloudFill
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Settings
@@ -52,16 +63,24 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
 fun App(
     coreViewModel: CoreViewModel,
     logViewModel: LogViewModel,
-    devicesViewModel: DevicesViewModel
+    devicesViewModel: DevicesViewModel,
+    settingViewModel: SettingViewModel,
+    developerModeEnabled: Boolean,
+    onModifyDeveloperMode: () -> Unit,
+    protocolStack: ProtocolStack,
+    onProtocolStackChange: (ProtocolStack) -> Unit,
 ) {
     val coreUiState by coreViewModel.uiState.collectAsState()
     val logUiState by logViewModel.uiState.collectAsState()
     val devicesUiState by devicesViewModel.uiState.collectAsState()
+    val settingUiState by settingViewModel.uiState.collectAsState()
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
     val mainScrollBehavior = MiuixScrollBehavior()
+    val scope = rememberCoroutineScope()
 
     DisposableEffect(currentPageMain) {
         logViewModel.onPageVisibilityChanged(currentPageMain == AppPage.LOGS)
@@ -73,8 +92,14 @@ fun App(
     }
 
     LaunchedEffect(currentPageMain, coreUiState.state) {
+        if (coreUiState.state != CoreState.RUNNING) {
+            settingViewModel.onCoreUnavailable()
+        }
         if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
             devicesViewModel.refresh()
+        }
+        if (currentPageMain == AppPage.SETTINGS) {
+            settingViewModel.refresh()
         }
     }
 
@@ -136,7 +161,6 @@ fun App(
                                     )
                                 }
                             },
-                            // isWideScreen = isWideScreen,
                             isWideScreen = false,
                         )
                     },
@@ -146,33 +170,45 @@ fun App(
                                 selected = currentPageMain == AppPage.DEVICES,
                                 onClick = { currentPageMain = AppPage.DEVICES },
                                 icon = MiuixIcons.Link,
-                                label = "连接",
+                                label = AppPage.DEVICES.title,
                             )
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.FOLDERS,
                                 onClick = { currentPageMain = AppPage.FOLDERS },
                                 icon = MiuixIcons.Folder,
-                                label = "文件夹",
+                                label = AppPage.FOLDERS.title,
                             )
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.CORE,
                                 onClick = { currentPageMain = AppPage.CORE },
                                 icon = MiuixIcons.Home,
-                                label = "核心",
+                                label = AppPage.CORE.title,
                             )
-                            NavigationBarItem(
-                                selected = currentPageMain == AppPage.LOGS,
-                                onClick = { currentPageMain = AppPage.LOGS },
-                                icon = MiuixIcons.Notes,
-                                label = "日志",
-                            )
+                            if ( developerModeEnabled ) {
+                                NavigationBarItem(
+                                    selected = currentPageMain == AppPage.LOGS,
+                                    onClick = { currentPageMain = AppPage.LOGS },
+                                    icon = MiuixIcons.Notes,
+                                    label = AppPage.LOGS.title,
+                                )
+                            } else {
+                                NavigationBarItem(
+                                    selected = currentPageMain == AppPage.WEBUI,
+                                    onClick = { currentPageMain = AppPage.WEBUI },
+                                    icon = MiuixIcons.HorizontalSplit,
+                                    label = AppPage.WEBUI.title,
+                                )
+                            }
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.SETTINGS,
                                 onClick = { currentPageMain = AppPage.SETTINGS },
                                 icon = MiuixIcons.Settings,
-                                label = "设置",
+                                label = AppPage.SETTINGS.title,
                             )
                         }
+                    },
+                    snackbarHost = {
+                        SnackbarHost(state = snackbarHostState)
                     },
                 ) { padding ->
                     Box(
@@ -193,8 +229,32 @@ fun App(
                                 },
                             )
 
-                            AppPage.FOLDERS,
-                            AppPage.SETTINGS -> EmptyScreen()
+                            AppPage.SETTINGS -> SettingScreen(
+                                uiState = settingUiState,
+                                onFormChange = settingViewModel::updateForm,
+                                onSave = {
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        settingViewModel.save()
+                                    }
+                                    if ( !settingUiState.errorMessage.isNullOrBlank() ) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("保存失败：" + settingUiState.errorMessage )
+                                        }
+                                    } else if ( !settingUiState.successMessage.isNullOrBlank() ) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("保存成功：" + settingUiState.successMessage )
+                                        }
+                                    } else {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("保存失败，原因未知" )
+                                        }
+                                    }
+                                },
+                                developerModeEnabled = developerModeEnabled,
+                                onModifyDeveloperMode = onModifyDeveloperMode,
+                                protocolStack = protocolStack,
+                                onProtocolStackChange = onProtocolStackChange,
+                            )
 
                             AppPage.CORE -> CoreScreen(
                                 uiState = coreUiState,
@@ -204,12 +264,17 @@ fun App(
                                     coreViewModel::onStartClicked
                                 },
                                 onImportCore = coreViewModel::onImportCoreClicked,
+                                snackbarHostState = snackbarHostState,
+                                developerModeEnabled = developerModeEnabled,
+                                onModifyDeveloperMode = onModifyDeveloperMode,
                             )
 
                             AppPage.LOGS -> LogScreen(
                                 uiState = logUiState,
                                 onSourceSelected = logViewModel::onSourceSelected,
                             )
+
+                            else -> EmptyScreen()
                         }
                     }
                 }
@@ -265,6 +330,7 @@ private enum class AppPage(val title: String) {
     DEVICES("连接"),
     FOLDERS("文件夹"),
     CORE("Syncthing"),
+    WEBUI("WebUI"),
     LOGS("日志"),
     SETTINGS("设置"),
 }

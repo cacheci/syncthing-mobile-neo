@@ -33,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -49,17 +48,16 @@ import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_only
 import moe.https.syncthing.ui.component.ImputableValueRow
+import moe.https.syncthing.ui.component.InfoSwitch
+import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.model.DevicesUiState
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
@@ -441,7 +439,6 @@ private fun LocalDeviceCard(
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = Color(0xFF2E7D32))
                                 Text(item.address)
-                                Text(item.address)
                             }
                         }
                     }
@@ -574,12 +571,9 @@ internal fun AddDeviceScreen(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 20.dp, horizontal = 10.dp),
     ) {
-        SmallTitle(
-            text = "设备",
-            modifier = Modifier.padding(top=10.dp),
-        )
-        Card (modifier = Modifier.padding(horizontal = 10.dp)) {
-            Column {
+        InfoSwitchCard(
+            title = "设备",
+            content = {
                 ImputableValueRow(
                     value = deviceId,
                     onValueChange = { deviceId = it },
@@ -605,65 +599,38 @@ internal fun AddDeviceScreen(
                     singleLine = true,
                 )
             }
-        }
-
-        SmallTitle(
-            text = "权限",
-            modifier = Modifier.padding(top=10.dp),
         )
-        Card (modifier = Modifier.padding(horizontal = 10.dp)) {
-            Column {
-                BasicComponent(
+
+        InfoSwitchCard(
+            title = "权限",
+            content = {
+                InfoSwitch(
                     title = "作为中介",
                     summary = "将中介中的设备添加到我们的设备列表中，用于相互共享的文件夹。",
                     enabled = !isSubmitting,
-                    role = Role.Switch,
-                    onClick = { introducer = !introducer },
-                    endActions = {
-                        Switch(
-                            checked = introducer,
-                            onCheckedChange = null,
-                            enabled = !isSubmitting,
-                        )
-                    },
+                    onCheckedChange = { introducer = !introducer },
+                    checked = introducer,
                 )
-                BasicComponent(
+                InfoSwitch(
                     title = "自动接受",
                     summary = "自动创建或共享此设备在默认路径上显示的文件夹。",
                     enabled = !isSubmitting,
-                    role = Role.Switch,
-                    onClick = { autoAcceptFolders = !autoAcceptFolders },
-                    endActions = {
-                        Switch(
-                            checked = autoAcceptFolders,
-                            onCheckedChange = null,
-                            enabled = !isSubmitting,
-                        )
-                    },
+                    onCheckedChange = { autoAcceptFolders = !autoAcceptFolders },
+                    checked = autoAcceptFolders,
                 )
-                BasicComponent(
+                InfoSwitch(
                     title = "不受信任",
                     summary = "禁止与此设备共享未加密数据；共享文件夹必须配置加密密码。",
                     enabled = !isSubmitting,
-                    role = Role.Switch,
-                    onClick = { untrusted = !untrusted },
-                    endActions = {
-                        Switch(
-                            checked = untrusted,
-                            onCheckedChange = null,
-                            enabled = !isSubmitting,
-                        )
-                    },
+                    onCheckedChange = { untrusted = !untrusted },
+                    checked = untrusted,
                 )
             }
-        }
-
-        SmallTitle(
-            text = "连接",
-            modifier = Modifier.padding(top=10.dp),
         )
-        Card (modifier = Modifier.padding(horizontal = 10.dp)) {
-            Column {
+
+        InfoSwitchCard(
+            title = "连接",
+            content = {
                 ImputableValueRow(
                     value = addresses,
                     onValueChange = { addresses = it },
@@ -709,7 +676,7 @@ internal fun AddDeviceScreen(
                     },
                 )
             }
-        }
+        )
 
         if (!numericValuesValid) {
             Text(
@@ -747,32 +714,5 @@ internal fun AddDeviceScreen(
                 )
             },
         )
-    }
-}
-
-@Composable
-private fun MessageCard(
-    title: String,
-    message: String,
-    isError: Boolean = false,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = if (isError) {
-            CardDefaults.defaultColors(
-                color = MiuixTheme.colorScheme.errorContainer,
-                contentColor = MiuixTheme.colorScheme.onErrorContainer,
-            )
-        } else {
-            CardDefaults.defaultColors()
-        },
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(text = title, style = MiuixTheme.textStyles.title4)
-            Text(text = message, color = MiuixTheme.colorScheme.onSecondaryContainer)
-        }
     }
 }

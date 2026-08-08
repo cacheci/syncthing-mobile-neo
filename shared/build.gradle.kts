@@ -23,9 +23,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(libs.androidx.lifecycle.viewmodel)
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.ui)
+            implementation(libs.runtime)
+            implementation(libs.foundation)
+            implementation(libs.ui.v1103)
             implementation(libs.compose.components.resources)
             implementation(libs.androidx.navigation.compose)
             implementation(libs.kotlinx.coroutines.core)

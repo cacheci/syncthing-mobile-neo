@@ -16,3 +16,9 @@ interface DevicesController {
     suspend fun addDevice(configuration: NewDeviceConfiguration)
     suspend fun updateDevice(configuration: NewDeviceConfiguration)
 }
+
+interface SettingController {
+    suspend fun loadSetting(): SettingSnapshot
+
+    suspend fun saveSetting(configuration: SettingConfiguration): SettingSaveResult
+}

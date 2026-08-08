@@ -6,15 +6,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
+import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.model.CoreUiEffect
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
+import moe.https.syncthing.viewmodel.SettingViewModel
 
 class MainActivity : ComponentActivity() {
     private val applicationState: SyncthingApplication
@@ -30,6 +36,10 @@ class MainActivity : ComponentActivity() {
 
     private val devicesViewModel: DevicesViewModel by viewModels {
         DevicesViewModel.factory(applicationState.coreRuntime)
+    }
+
+    private val settingViewModel: SettingViewModel by viewModels {
+        SettingViewModel.factory(applicationState.coreRuntime)
     }
 
     private val corePicker = registerForActivityResult(
@@ -55,10 +65,29 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
+            val storage = applicationState.appSettingsStorage
+            var developerModeEnabled by remember {
+                mutableStateOf(storage.appDeveloperMode)
+            }
+            var protocolStack by remember {
+                mutableStateOf(storage.appProtocolStack)
+            }
+
             App(
                 coreViewModel = coreViewModel,
                 logViewModel = logViewModel,
                 devicesViewModel = devicesViewModel,
+                settingViewModel = settingViewModel,
+                developerModeEnabled = developerModeEnabled,
+                onModifyDeveloperMode = {
+                    storage.appDeveloperMode = !developerModeEnabled
+                    developerModeEnabled = storage.appDeveloperMode
+                },
+                protocolStack = protocolStack,
+                onProtocolStackChange = { selectedStack: ProtocolStack ->
+                    storage.appProtocolStack = selectedStack
+                    protocolStack = storage.appProtocolStack
+                },
             )
         }
     }

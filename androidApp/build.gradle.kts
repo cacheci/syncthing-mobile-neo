@@ -51,5 +51,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.google.material)
     implementation(libs.ui)
+    implementation(libs.bcrypt)
+    implementation(libs.mmkv)
     debugImplementation(libs.ui.tooling)
 }

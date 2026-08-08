@@ -23,6 +23,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 internal fun LogScreen(
@@ -34,7 +35,7 @@ internal fun LogScreen(
     val horizontalScrollState = rememberScrollState()
 
     LaunchedEffect(uiState.content) {
-        delay(50)
+        delay(50.milliseconds)
         verticalScrollState.scrollTo(verticalScrollState.maxValue)
     }
 

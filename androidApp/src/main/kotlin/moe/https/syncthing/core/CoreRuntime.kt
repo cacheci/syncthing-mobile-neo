@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
+import com.tencent.mmkv.MMKV
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -16,11 +17,15 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import moe.https.syncthing.storage.AppSettingPrivateStorage
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
 import java.net.ConnectException
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NoRouteToHostException
+import java.net.ServerSocket
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -30,15 +35,27 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import androidx.core.content.edit
+import kotlin.time.Duration.Companion.milliseconds
 
 class CoreRuntime(
     context: Context,
     private val installer: CoreBinaryInstaller,
-) : DevicesController {
+    private val appSettingsStorage: AppSettingPrivateStorage,
+) : DevicesController, SettingController {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    private val appSettings = requireNotNull(MMKV.mmkvWithID(APP_SETTINGS_ID))
     private val processMutex = Mutex()
-    private val restClient = SyncthingRestClient(loadOrCreateApiKey())
+    private val homeDirectory = File(applicationContext.filesDir, SYNCTHING_HOME_DIRECTORY)
+    private val configFile = SyncthingConfigFile(File(homeDirectory, CONFIG_FILE_NAME))
+    @Volatile
+    private var activeGuiHost = appSettingsStorage.appProtocolStack.guiListenAddress
+    @Volatile
+    private var activeGuiPort = initialGuiPort()
+    private val restClient = SyncthingRestClient(loadOrCreateApiKey()) {
+        formatGuiBaseUrl(activeGuiHost, activeGuiPort)
+    }
 
     private val mutableSnapshot = MutableStateFlow(
         CoreSnapshot(
@@ -50,6 +67,7 @@ class CoreRuntime(
 
     override suspend fun loadDevices(): DevicesSnapshot = withContext(Dispatchers.IO) {
         val status = restClient.status()
+        rememberLocalDeviceId(status.myId)
         val connections = restClient.connections()
         val discoveryCache = restClient.discoveryCache()
         val devices = restClient.configuredDevices().map { device ->
@@ -106,6 +124,90 @@ class CoreRuntime(
         restClient.updateDevice(configuration)
     }
 
+    override suspend fun loadSetting(): SettingSnapshot = withContext(Dispatchers.IO) {
+        val portConflictBehavior = loadGuiPortConflictBehavior()
+        val snapshot = when {
+            restClient.ping() -> {
+                val localDeviceId = requireLocalDeviceId()
+                SettingSnapshot(
+                    configuration = restClient.setting(portConflictBehavior, localDeviceId),
+                    accessMode = SettingAccessMode.REST,
+                )
+            }
+            process?.isAlive == true || currentPid() != null -> {
+                throw IOException("Syncthing 核心进程仍在运行，REST 接口就绪后才能修改设置")
+            }
+            configFile.exists -> SettingSnapshot(
+                configuration = configFile.read(portConflictBehavior, rememberedLocalDeviceId()),
+                accessMode = SettingAccessMode.CONFIG_FILE,
+            )
+            else -> SettingSnapshot(
+                configuration = startupSetting(portConflictBehavior),
+                accessMode = SettingAccessMode.STARTUP_ONLY,
+            )
+        }
+        snapshot.copy(
+            configuration = snapshot.configuration.copy(
+                guiListenAddress = appSettingsStorage.appProtocolStack.guiListenAddress,
+                allowGuiListenNonLocal = appSettings.decodeBool(
+                    KEY_ALLOW_GUI_LISTEN_NON_LOCAL,
+                    false,
+                ),
+            ),
+        )
+    }
+
+    override suspend fun saveSetting(
+        configuration: SettingConfiguration,
+    ): SettingSaveResult = withContext(Dispatchers.IO) {
+        processMutex.withLock {
+            val effectiveConfiguration = configuration.copy(
+                guiListenAddress = appSettingsStorage.appProtocolStack.guiListenAddress,
+            )
+            val previousGuiPort = activeGuiPort
+            val previousPortConflictBehavior = loadGuiPortConflictBehavior()
+            val savedResult = when {
+                restClient.ping() -> {
+                    val localDeviceId = requireLocalDeviceId()
+                    restClient.updateSetting(effectiveConfiguration, localDeviceId)
+                }
+                process?.isAlive == true || currentPid() != null -> {
+                    throw IOException("Syncthing 核心进程仍在运行，不能同时写入配置文件")
+                }
+                configFile.exists -> {
+                    configFile.write(effectiveConfiguration, rememberedLocalDeviceId())
+                    SettingSaveResult(
+                        restartRequired = true,
+                        accessMode = SettingAccessMode.CONFIG_FILE,
+                    )
+                }
+                else -> SettingSaveResult(
+                    restartRequired = true,
+                    accessMode = SettingAccessMode.STARTUP_ONLY,
+                )
+            }
+            val result = savedResult.copy(
+                restartRequired = savedResult.restartRequired ||
+                    effectiveConfiguration.guiPortConflictBehavior != previousPortConflictBehavior,
+            )
+            saveStartupSetting(effectiveConfiguration)
+            if (
+                result.accessMode == SettingAccessMode.REST &&
+                effectiveConfiguration.guiPort != previousGuiPort
+            ) {
+                activeGuiPort = effectiveConfiguration.guiPort
+                if (restClient.ping()) {
+                    preferences.edit { putInt(KEY_ACTIVE_GUI_PORT, activeGuiPort) }
+                } else {
+                    activeGuiPort = previousGuiPort
+                }
+            } else {
+                activeGuiPort = previousGuiPort
+            }
+            result
+        }
+    }
+
     @Volatile
     private var process: Process? = null
 
@@ -120,6 +222,7 @@ class CoreRuntime(
                     )
                 }
                 .getOrNull()
+            rememberLocalDeviceId(status?.myId)
             mutableSnapshot.update {
                 it.copy(
                     state = CoreState.RUNNING,
@@ -216,7 +319,7 @@ class CoreRuntime(
         val launchedProcess = processMutex.withLock {
             process?.takeIf { it.isAlive } ?: launchProcess().also { process = it }
         }
-        logInfo("核心进程已创建，开始连接 REST API：$REST_API_ADDRESS")
+        logInfo("核心进程已创建，开始连接 REST API：${restApiAddress()}")
 
         mutableSnapshot.update {
             it.copy(
@@ -253,12 +356,12 @@ class CoreRuntime(
         }
 
         mutableSnapshot.update { it.copy(state = CoreState.RUNNING, lastError = null) }
-        logInfo("核心 REST 接口已就绪：$REST_API_ADDRESS")
+        logInfo("核心 REST 接口已就绪：${restApiAddress()}")
         currentPid()
         monitorSession(launchedProcess)
         val exitCode = launchedProcess.exitCodeOrNull()
         process = null
-        preferences.edit().remove(KEY_PID).apply()
+        preferences.edit { remove(KEY_PID) }
 
         if (mutableSnapshot.value.state != CoreState.STOPPING) {
             fail(
@@ -297,7 +400,7 @@ class CoreRuntime(
         } else {
             for (attempt in 0 until STOP_POLL_COUNT) {
                 if (!restClient.ping()) break
-                delay(STOP_POLL_INTERVAL_MILLIS)
+                delay(STOP_POLL_INTERVAL_MILLIS.milliseconds)
             }
             if (restClient.ping()) {
                 killRememberedProcessIfOwned()
@@ -305,7 +408,7 @@ class CoreRuntime(
         }
 
         process = null
-        preferences.edit().remove(KEY_PID).apply()
+        preferences.edit { remove(KEY_PID) }
         mutableSnapshot.value = CoreSnapshot(
             state = if (installer.binaryFile.isFile) CoreState.STOPPED else CoreState.NOT_INSTALLED,
             version = installer.installedVersion,
@@ -336,25 +439,35 @@ class CoreRuntime(
     }
 
     private fun launchProcess(): Process {
-        val home = File(applicationContext.filesDir, "syncthing-home").apply { mkdirs() }
+        val home = homeDirectory.apply { mkdirs() }
         val logs = File(applicationContext.filesDir, "logs").apply { mkdirs() }
         val apiKey = preferences.getString(KEY_API_KEY, null)
             ?: throw IOException("REST API 密钥不存在")
+        val portConflictBehavior = loadGuiPortConflictBehavior()
+        val configuredGuiAddress = configuredGuiAddress(portConflictBehavior)
+        val guiAddress = resolveLaunchGuiAddress(configuredGuiAddress, portConflictBehavior)
+        activeGuiHost = parseGuiHost(guiAddress)
+        activeGuiPort = parseGuiPort(guiAddress)
+        preferences.edit { putInt(KEY_ACTIVE_GUI_PORT, activeGuiPort) }
 
-        return ProcessBuilder(
+        val arguments = mutableListOf(
             installer.binaryFile.absolutePath,
             "serve",
             "--home=${home.absolutePath}",
-            "--gui-address=127.0.0.1:8384",
+            "--gui-address=$guiAddress",
             "--gui-apikey=$apiKey",
             "--no-browser",
-            "--no-port-probing",
             "--no-restart",
             "--no-upgrade",
             "--log-file=${File(logs, "syncthing.log").absolutePath}",
             "--log-max-size=1048576",
             "--log-max-old-files=1",
-        ).apply {
+        )
+        if (portConflictBehavior == SettingConfiguration.GuiPortConflictBehavior.FAIL) {
+            arguments += "--no-port-probing"
+        }
+
+        return ProcessBuilder(arguments).apply {
             environment()["HOME"] = applicationContext.filesDir.absolutePath
             environment()["STNOUPGRADE"] = "1"
             redirectErrorStream(true)
@@ -391,7 +504,7 @@ class CoreRuntime(
                 )
             }
             lastSignature = signature
-            delay(API_READY_POLL_INTERVAL_MILLIS)
+            delay(API_READY_POLL_INTERVAL_MILLIS.milliseconds)
         }
 
         val elapsed = SystemClock.elapsedRealtime() - startedAt
@@ -411,6 +524,7 @@ class CoreRuntime(
 
             runCatching { restClient.status() }
                 .onSuccess { status ->
+                    rememberLocalDeviceId(status.myId)
                     if (consecutiveFailures > 0) {
                         logInfo("REST 状态连接已恢复，此前连续失败 $consecutiveFailures 次")
                     }
@@ -444,7 +558,7 @@ class CoreRuntime(
                     lastSignature = signature
                 }
             if (process == null && consecutiveFailures > 0) break
-            delay(STATUS_POLL_INTERVAL_MILLIS)
+            delay(STATUS_POLL_INTERVAL_MILLIS.milliseconds)
         }
     }
 
@@ -454,7 +568,7 @@ class CoreRuntime(
             return rememberedPid
         }
         return findCorePid()?.also { pid ->
-            preferences.edit().putLong(KEY_PID, pid).apply()
+            preferences.edit { putLong(KEY_PID, pid) }
         }
     }
 
@@ -495,7 +609,7 @@ class CoreRuntime(
     private fun loadOrCreateApiKey(): String {
         preferences.getString(KEY_API_KEY, null)?.let { return it }
         val key = UUID.randomUUID().toString().replace("-", "")
-        preferences.edit().putString(KEY_API_KEY, key).commit()
+        preferences.edit(commit = true) { putString(KEY_API_KEY, key) }
         return key
     }
 
@@ -550,7 +664,7 @@ class CoreRuntime(
             else -> "REST API 请求失败"
         }
         val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
-        return "$category，异常=${error.javaClass.simpleName}，详情=${redact(detail)}，地址=$REST_API_ADDRESS"
+        return "$category，异常=${error.javaClass.simpleName}，详情=${redact(detail)}，地址=${restApiAddress()}"
     }
 
     private fun connectionErrorSignature(error: Throwable): String = when (error) {
@@ -686,10 +800,20 @@ class CoreRuntime(
 
     companion object {
         private const val TAG = "SyncthingCore"
-        private const val REST_API_ADDRESS = "http://127.0.0.1:8384"
+        private const val DEFAULT_GUI_ADDRESS = "127.0.0.1:8384"
+        private const val DEFAULT_GUI_PORT = 8384
+        private const val SYNCTHING_HOME_DIRECTORY = "syncthing-home"
+        private const val CONFIG_FILE_NAME = "config.xml"
         private const val PREFERENCES = "core_runtime"
+        private const val APP_SETTINGS_ID = "app_settings"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_PID = "pid"
+        private const val KEY_GUI_ADDRESS = "gui_address"
+        private const val KEY_ACTIVE_GUI_PORT = "active_gui_port"
+        private const val KEY_GUI_PORT_CONFLICT_BEHAVIOR = "gui_port_conflict_behavior"
+        private const val KEY_LOCAL_DEVICE_ID = "local_device_id"
+        private const val KEY_ALLOW_GUI_LISTEN_NON_LOCAL = "allow_gui_listen_non_local"
+        private const val GUI_PORT_PROBE_LIMIT = 100
         private const val API_READY_POLL_COUNT = 30
         private const val API_READY_POLL_INTERVAL_MILLIS = 500L
         private const val CONNECTION_RETRY_LOG_INTERVAL = 10
@@ -709,6 +833,142 @@ class CoreRuntime(
         private const val MAX_CORE_DIAGNOSTICS = 12
         private val CONTROLLER_LOG_LOCK = Any()
     }
+
+    private fun formatGuiAddress(address: String, port: Int): String {
+        val normalizedAddress = address.trim().removePrefix("[").removeSuffix("]")
+        return if (':' in normalizedAddress) "[$normalizedAddress]:$port" else "$normalizedAddress:$port"
+    }
+
+    private fun formatGuiBaseUrl(address: String, port: Int): String {
+        val normalizedAddress = address.trim().removePrefix("[").removeSuffix("]")
+        val urlHost = if (':' in normalizedAddress) "[$normalizedAddress]" else normalizedAddress
+        return "http://$urlHost:$port"
+    }
+
+    private fun parseGuiPort(address: String): Int = address
+        .substringAfterLast(':', DEFAULT_GUI_PORT.toString())
+        .toIntOrNull()
+        ?.takeIf { it in 1..65535 }
+        ?: DEFAULT_GUI_PORT
+
+    private fun parseGuiHost(address: String): String {
+        val normalizedAddress = address.trim()
+        if (normalizedAddress.startsWith("[")) {
+            val closingBracket = normalizedAddress.indexOf(']')
+            if (closingBracket > 1) return normalizedAddress.substring(1, closingBracket)
+        }
+        val separatorIndex = normalizedAddress.lastIndexOf(':')
+        return if (separatorIndex > 0) normalizedAddress.substring(0, separatorIndex) else "127.0.0.1"
+    }
+
+    private fun resolveLaunchGuiAddress(
+        configuredAddress: String,
+        behavior: SettingConfiguration.GuiPortConflictBehavior,
+    ): String {
+        if (behavior == SettingConfiguration.GuiPortConflictBehavior.FAIL) return configuredAddress
+        val host = parseGuiHost(configuredAddress)
+        val configuredPort = parseGuiPort(configuredAddress)
+        val lastPort = minOf(65535, configuredPort + GUI_PORT_PROBE_LIMIT)
+        val selectedPort = (configuredPort..lastPort).firstOrNull { port ->
+            isPortAvailable(host, port)
+        } ?: throw IOException("GUI 端口 $configuredPort 及其后 $GUI_PORT_PROBE_LIMIT 个端口均不可用")
+        if (selectedPort != configuredPort) {
+            logWarning("GUI 端口 $configuredPort 已被占用，本次启动临时改用 $selectedPort")
+        }
+        return formatGuiAddress(host, selectedPort)
+    }
+
+    private fun isPortAvailable(host: String, port: Int): Boolean = runCatching {
+        val bindAddress = InetAddress.getByName(host)
+        ServerSocket().use { socket ->
+            socket.reuseAddress = true
+            socket.bind(InetSocketAddress(bindAddress, port))
+        }
+    }.isSuccess
+
+    private fun loadGuiPortConflictBehavior(): SettingConfiguration.GuiPortConflictBehavior =
+        preferences.getString(KEY_GUI_PORT_CONFLICT_BEHAVIOR, null)
+            ?.let { storedValue ->
+                SettingConfiguration.GuiPortConflictBehavior.entries
+                    .firstOrNull { it.name == storedValue }
+            }
+            ?: SettingConfiguration.GuiPortConflictBehavior.FAIL
+
+    private fun startupSetting(
+        portConflictBehavior: SettingConfiguration.GuiPortConflictBehavior,
+    ): SettingConfiguration {
+        val guiAddress = preferences.getString(KEY_GUI_ADDRESS, null)
+            ?.takeIf(String::isNotBlank)
+            ?: DEFAULT_GUI_ADDRESS
+        return SettingConfiguration.startupDefaults(
+            guiListenAddress = appSettingsStorage.appProtocolStack.guiListenAddress,
+            guiPort = parseGuiPort(guiAddress),
+            guiPortConflictBehavior = portConflictBehavior,
+        )
+    }
+
+    private fun configuredGuiAddress(
+        portConflictBehavior: SettingConfiguration.GuiPortConflictBehavior,
+    ): String {
+        val configuredPort = if (configFile.exists) {
+            runCatching {
+                configFile.read(portConflictBehavior, rememberedLocalDeviceId()).let { configuration ->
+                    configuration.guiPort
+                }
+            }.getOrElse {
+                preferences.getString(KEY_GUI_ADDRESS, null)
+                    ?.takeIf(String::isNotBlank)
+                    ?.let(::parseGuiPort)
+                    ?: DEFAULT_GUI_PORT
+            }
+        } else {
+            preferences.getString(KEY_GUI_ADDRESS, null)
+                ?.takeIf(String::isNotBlank)
+                ?.let(::parseGuiPort)
+                ?: DEFAULT_GUI_PORT
+        }
+        return formatGuiAddress(
+            appSettingsStorage.appProtocolStack.guiListenAddress,
+            configuredPort,
+        )
+    }
+
+    private fun initialGuiPort(): Int {
+        val configuredAddress = configuredGuiAddress(loadGuiPortConflictBehavior())
+        return preferences.getInt(KEY_ACTIVE_GUI_PORT, parseGuiPort(configuredAddress))
+    }
+
+    private fun saveStartupSetting(configuration: SettingConfiguration) {
+        preferences.edit {
+            putString(
+                KEY_GUI_ADDRESS,
+                formatGuiAddress(configuration.guiListenAddress, configuration.guiPort),
+            )
+                .putString(
+                    KEY_GUI_PORT_CONFLICT_BEHAVIOR,
+                    configuration.guiPortConflictBehavior.name,
+                )
+        }
+        appSettings.encode(
+            KEY_ALLOW_GUI_LISTEN_NON_LOCAL,
+            configuration.allowGuiListenNonLocal,
+        )
+    }
+
+    private fun rememberedLocalDeviceId(): String? =
+        preferences.getString(KEY_LOCAL_DEVICE_ID, null)?.takeIf(String::isNotBlank)
+
+    private fun rememberLocalDeviceId(deviceId: String?) {
+        deviceId?.takeIf(String::isNotBlank)?.let { id ->
+            preferences.edit { putString(KEY_LOCAL_DEVICE_ID, id) }
+        }
+    }
+
+    private fun requireLocalDeviceId(): String = restClient.status().myId
+        ?.also(::rememberLocalDeviceId)
+        ?: throw IOException("Syncthing REST 状态中缺少本机设备 ID")
+
+    private fun restApiAddress(): String = "http://localhost:$activeGuiPort"
 }
 
 private fun Process.exitCodeOrNull(): Int? =

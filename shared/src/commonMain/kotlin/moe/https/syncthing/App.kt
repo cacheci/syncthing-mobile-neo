@@ -22,14 +22,17 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
+import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
 import moe.https.syncthing.ui.screen.CoreScreen
 import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.EmptyScreen
+import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
 import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.viewmodel.LogViewModel
@@ -54,6 +57,8 @@ import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -65,6 +70,7 @@ fun App(
     logViewModel: LogViewModel,
     devicesViewModel: DevicesViewModel,
     settingViewModel: SettingViewModel,
+    versionName: String,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
     protocolStack: ProtocolStack,
@@ -91,15 +97,36 @@ fun App(
         }
     }
 
-    LaunchedEffect(currentPageMain, coreUiState.state) {
+    LaunchedEffect(
+        currentPageMain,
+        coreUiState.state,
+        settingUiState.errorMessage,
+        settingUiState.successMessage,
+    ) {
         if (coreUiState.state != CoreState.RUNNING) {
             settingViewModel.onCoreUnavailable()
         }
-        if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
-            devicesViewModel.refresh()
+        when {
+            (currentPageMain == AppPage.DEVICES) -> {
+                if (coreUiState.state == CoreState.RUNNING) { devicesViewModel.refresh() }
+            }
+
+            (currentPageMain == AppPage.SETTINGS) -> {
+                settingViewModel.refresh()
+            }
         }
-        if (currentPageMain == AppPage.SETTINGS) {
-            settingViewModel.refresh()
+        when {
+            !settingUiState.errorMessage.isNullOrBlank() -> {
+                snackbarHostState.showSnackbar(
+                    "保存失败：${settingUiState.errorMessage}",
+                )
+            }
+
+            !settingUiState.successMessage.isNullOrBlank() -> {
+                snackbarHostState.showSnackbar(
+                    "保存成功：${settingUiState.successMessage}",
+                )
+            }
         }
     }
 
@@ -158,6 +185,19 @@ fun App(
                                                 imageVector = MiuixIcons.Add
                                             )
                                         },
+                                    )
+                                }
+                                if ( currentPageMain == AppPage.SETTINGS ) {
+                                    IconButton(
+                                        onClick = settingViewModel::save,
+                                        enabled = settingUiState.isFormValid && !settingUiState.isSaving,
+                                        content = {
+                                            Icon(
+                                                contentDescription = "保存",
+                                                imageVector = MiuixIcons.Send,
+                                                tint = if (settingUiState.isFormValid && !settingUiState.isSaving) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
                                     )
                                 }
                             },
@@ -232,28 +272,18 @@ fun App(
                             AppPage.SETTINGS -> SettingScreen(
                                 uiState = settingUiState,
                                 onFormChange = settingViewModel::updateForm,
-                                onSave = {
-                                    CoroutineScope(Dispatchers.Main).launch {
-                                        settingViewModel.save()
-                                    }
-                                    if ( !settingUiState.errorMessage.isNullOrBlank() ) {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("保存失败：" + settingUiState.errorMessage )
-                                        }
-                                    } else if ( !settingUiState.successMessage.isNullOrBlank() ) {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("保存成功：" + settingUiState.successMessage )
-                                        }
-                                    } else {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("保存失败，原因未知" )
-                                        }
-                                    }
-                                },
                                 developerModeEnabled = developerModeEnabled,
                                 onModifyDeveloperMode = onModifyDeveloperMode,
                                 protocolStack = protocolStack,
                                 onProtocolStackChange = onProtocolStackChange,
+                                onChangeToAbout = {
+                                    currentPagePlain = AppSubPage.ABOUT
+                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                                },
+                                onChangeToLicence = {
+                                    currentPagePlain = AppSubPage.LICENCE
+                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                                }
                             )
 
                             AppPage.CORE -> CoreScreen(
@@ -316,6 +346,17 @@ fun App(
                                 modifier = Modifier.padding(padding),
                             )
                         }
+                        AppSubPage.ABOUT -> {
+                            AboutScreen(
+                                versionName = versionName,
+                                modifier = Modifier.padding(padding),
+                            )
+                        }
+                        AppSubPage.LICENCE -> {
+                            LicenceScreen(
+                                modifier = Modifier.padding(padding)
+                            )
+                        }
                     }
                 }
             }
@@ -337,5 +378,7 @@ private enum class AppPage(val title: String) {
 
 private enum class AppSubPage(val title: String) {
     DEBUG("DEBUG*"),
-    DEVICE_ADD("设备")
+    DEVICE_ADD("设备"),
+    ABOUT("关于"),
+    LICENCE("开源许可")
 }

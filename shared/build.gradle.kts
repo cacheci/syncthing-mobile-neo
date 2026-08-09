@@ -25,7 +25,7 @@ kotlin {
             api(libs.androidx.lifecycle.viewmodel)
             implementation(libs.runtime)
             implementation(libs.foundation)
-            implementation(libs.ui.v1103)
+            implementation(libs.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.androidx.navigation.compose)
             implementation(libs.kotlinx.coroutines.core)

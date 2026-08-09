@@ -1,12 +1,12 @@
 [versions]
-agp = "9.2.1"
+agp = "9.3.1"
 foundation = "1.11.1"
-kotlin = "2.3.20"
-compose-multiplatform = "1.10.3"
-coroutines = "1.10.2"
-activity-compose = "1.12.4"
-material = "1.13.0"
-lifecycle = "2.10.0"
+kotlin = "2.4.10"
+compose-multiplatform = "1.11.1"
+coroutines = "1.11.0"
+activity-compose = "1.13.0"
+material = "1.14.0"
+lifecycle = "2.11.0"
 navigation = "2.9.2"
 miuix = "0.9.3"
 qrose = "1.1.2"
@@ -14,7 +14,7 @@ runtime = "1.11.1"
 ui = "1.11.1"
 bcrypt = "0.10.2"
 mmkv = "2.4.1"
-ui-version = "1.10.3"
+ui-version = "1.11.1"
 
 [libraries]
 foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "foundation" }
@@ -35,7 +35,6 @@ ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "ui" }
 ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "ui" }
 bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
 mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
-ui-v1103 = { module = "org.jetbrains.compose.ui:ui", version.ref = "ui-version" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
                 logViewModel = logViewModel,
                 devicesViewModel = devicesViewModel,
                 settingViewModel = settingViewModel,
+                versionName = BuildConfig.VERSION_NAME,
                 developerModeEnabled = developerModeEnabled,
                 onModifyDeveloperMode = {
                     storage.appDeveloperMode = !developerModeEnabled

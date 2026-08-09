@@ -46,7 +46,7 @@ import moe.https.syncthing.core.SyncthingDiscoveryStatus
 import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.generated.resources.Res
-import moe.https.syncthing.generated.resources.logo_only
+import moe.https.syncthing.generated.resources.logo_qr
 import moe.https.syncthing.ui.component.ImputableValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
@@ -261,7 +261,7 @@ private fun RemoteDeviceCard(
                         modifier = Modifier.padding(10.dp).size(120.dp),
                         painter = rememberQrCodePainter(
                             data = device.id,
-                            logoPainter = painterResource(Res.drawable.logo_only),
+                            logoPainter = painterResource(Res.drawable.logo_qr),
                             logoSize = 0.2f,
                         ),
                         contentDescription = device.id,
@@ -279,7 +279,7 @@ private fun RemoteDeviceCard(
                     TextButton(
                         modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
                         text = "复制",
-                        onClick = {},
+                        onClick = {}, // TODO: copy it to clip
                     )
                     TextButton(
                         modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
@@ -389,7 +389,14 @@ private fun LocalDeviceCard(
                 LazyColumn (
                     modifier = Modifier.padding(vertical = 16.dp)
                 ) {
-                    items( localInfo?.discoveryStatus ?: emptyList() ) { item ->
+                    items(
+                        localInfo?.discoveryStatus ?: listOf(
+                            SyncthingDiscoveryStatus(
+                                method = "无启用的设备发现",
+                                error = "将仅连接到手动设置地址的设备。",
+                            )
+                        )
+                    ) { item ->
                         if (item.error != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = MiuixTheme.colorScheme.error)
@@ -426,7 +433,14 @@ private fun LocalDeviceCard(
                 LazyColumn (
                     modifier = Modifier.padding(vertical = 16.dp)
                 ) {
-                    items( localInfo?.listenAddresses ?: emptyList() ) { item ->
+                    items(
+                        localInfo?.listenAddresses ?: listOf (
+                            SyncthingListenAddress(
+                                address = "无启用的监听地址",
+                                error = "将仅能主动连接到其他设备。"
+                            )
+                        )
+                    ) { item ->
                         if (item.error != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = MiuixTheme.colorScheme.error)
@@ -476,7 +490,7 @@ private fun LocalDeviceCard(
                         modifier = Modifier.padding(10.dp).size(120.dp),
                         painter = rememberQrCodePainter(
                             data = device.id,
-                            logoPainter = painterResource(Res.drawable.logo_only),
+                            logoPainter = painterResource(Res.drawable.logo_qr),
                             logoSize = 0.2f,
                         ),
                         contentDescription = device.id,
@@ -494,7 +508,7 @@ private fun LocalDeviceCard(
                     TextButton(
                         modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
                         text = "复制",
-                        onClick = {},
+                        onClick = {}, // TODO: copy it to clip
                     )
                     TextButton(
                         modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
@@ -569,7 +583,7 @@ internal fun AddDeviceScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(vertical = 20.dp, horizontal = 10.dp),
+            .padding(vertical = 20.dp, horizontal = 20.dp),
     ) {
         InfoSwitchCard(
             title = "设备",

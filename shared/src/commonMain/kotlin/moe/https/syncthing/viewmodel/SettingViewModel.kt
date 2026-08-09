@@ -13,11 +13,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.delay
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.core.SettingController
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
+import kotlin.time.Duration.Companion.milliseconds
 
 class SettingViewModel(
     private val controller: SettingController,
@@ -95,7 +97,7 @@ class SettingViewModel(
         }
     }
 
-    suspend fun save() {
+    fun save() {
         val state = mutableUiState.value
         val setting = state.setting
         val formState = state.formState
@@ -146,6 +148,7 @@ class SettingViewModel(
                         newGuiPassword = "",
                     )
                     val savedFormState = savedConfiguration.toFormState()
+                    delay(1000.milliseconds)
                     mutableUiState.update {
                         it.copy(
                             setting = savedConfiguration,
@@ -323,12 +326,12 @@ private fun SettingConfiguration.startupValidationError(): String? = when {
 
 private fun moe.https.syncthing.core.SettingSaveResult.successMessage(): String = when (accessMode) {
     SettingAccessMode.REST -> if (restartRequired) {
-        "设置已保存，部分更改将在重启 Syncthing 核心后生效。"
+        "设置已保存，部分更改将在重启后生效。"
     } else {
         "设置已保存。"
     }
-    SettingAccessMode.CONFIG_FILE -> "配置文件已更新，将在下次启动核心时生效。"
-    SettingAccessMode.STARTUP_ONLY -> "启动参数已保存，将在首次启动核心时使用。"
+    SettingAccessMode.CONFIG_FILE -> "配置文件已更新，将在启动时生效。"
+    SettingAccessMode.STARTUP_ONLY -> "启动参数已保存，将在首次启动时使用。"
 }
 
 private fun List<String>.normalizedValues(): List<String> = map(String::trim)

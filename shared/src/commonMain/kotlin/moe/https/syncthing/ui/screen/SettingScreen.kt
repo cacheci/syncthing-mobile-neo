@@ -6,7 +6,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,7 +30,6 @@ import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
@@ -41,28 +39,37 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun SettingScreen(
     uiState: SettingUiState,
     onFormChange: (SettingFormState) -> Unit,
-    onSave: () -> Unit,
     modifier: Modifier = Modifier,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
     protocolStack: ProtocolStack,
     onProtocolStackChange: (ProtocolStack) -> Unit,
+    onChangeToAbout: () -> Unit,
+    onChangeToLicence: () -> Unit,
 ) {
     var developerModeVisible by remember { mutableStateOf(developerModeEnabled) }
+    val settingAvailable = uiState.setting != null &&
+        uiState.formState != null &&
+        uiState.accessMode != null
+    val displayedSetting = uiState.setting ?: SettingConfiguration.startupDefaults(
+        guiListenAddress = protocolStack.guiListenAddress,
+    )
+    val displayedFormState = uiState.formState ?: SettingFormState()
+    val displayedAccessMode = uiState.accessMode ?: SettingAccessMode.STARTUP_ONLY
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(vertical = 20.dp, horizontal = 10.dp),
+            .padding(20.dp),
     ) {
         when {
-            uiState.isLoading && uiState.setting == null -> MessageCard(
+            uiState.isLoading && !settingAvailable -> MessageCard(
                 title = "正在读取设置",
                 message = "正在读取核心状态与本地配置文件…",
             )
 
-            uiState.errorMessage != null && uiState.setting == null -> MessageCard(
+            uiState.errorMessage != null && !settingAvailable -> MessageCard(
                 title = "读取失败",
                 message = uiState.errorMessage,
                 isError = true,
@@ -70,40 +77,58 @@ internal fun SettingScreen(
 
             uiState.hasLoaded && uiState.setting == null -> MessageCard(
                 title = "暂无设置",
-                message = "Syncthing 没有返回可用的设备设置。",
+                message = "没有可用的设置项。",
                 isError = true,
             )
 
-            uiState.accessMode == null -> MessageCard(
-                title = "无可用的设置方法",
-                message = "Syncthing 没有返回可用的设备设置。",
+            uiState.hasLoaded && !settingAvailable -> MessageCard(
+                title = "设置不可用",
+                message = "没有可用的设置方式。",
                 isError = true,
             )
 
-            uiState.setting != null && uiState.formState != null -> {
+            !settingAvailable -> MessageCard(
+                title = "设置尚未加载",
+                message = "正在等待读取核心状态与本地配置文件。",
+            )
 
+            else -> {
                 MessageCard(
-                    title = uiState.accessMode.title,
+                    title = displayedAccessMode.title,
                     message = if ( uiState.restartRequired && uiState.successMessage == null ) {
                         "设置已保存，将在下次启动核心后生效。"
-                    } else uiState.accessMode.caption
-                )
-
-                SettingForm(
-                    setting = uiState.setting,
-                    formState = uiState.formState,
-                    accessMode = uiState.accessMode,
-                    isSaving = uiState.isSaving,
-                    isFormValid = uiState.isFormValid,
-                    onFormChange = onFormChange,
-                    onSave = onSave,
-                    developerModeEnabled = developerModeEnabled,
-                    onModifyDeveloperMode = onModifyDeveloperMode,
-                    developerModeVisible = developerModeVisible,
-                    protocolStack = protocolStack,
-                    onProtocolStackChange = onProtocolStackChange,
+                    } else displayedAccessMode.caption
                 )
             }
+        }
+
+        SettingForm(
+            setting = displayedSetting,
+            formState = displayedFormState,
+            accessMode = displayedAccessMode,
+            isSaving = uiState.isSaving,
+            isFormValid = uiState.isFormValid,
+            onFormChange = onFormChange,
+            developerModeEnabled = developerModeEnabled,
+            onModifyDeveloperMode = onModifyDeveloperMode,
+            developerModeVisible = developerModeVisible,
+            protocolStack = protocolStack,
+            onProtocolStackChange = onProtocolStackChange,
+            settingAvailable = settingAvailable,
+        )
+
+        InfoSwitchCard( title = "关于" ) {
+            ArrowPreference(
+                title = "关于",
+                summary = "关于此 App",
+                onClick = { onChangeToAbout() },
+            )
+
+            ArrowPreference(
+                title = "开源许可",
+                summary = "使用到的第三方开源项目",
+                onClick = { onChangeToLicence() },
+            )
         }
     }
 }
@@ -117,30 +142,38 @@ private fun SettingForm(
     isSaving: Boolean,
     isFormValid: Boolean,
     onFormChange: (SettingFormState) -> Unit,
-    onSave: () -> Unit,
     developerModeEnabled: Boolean,
     developerModeVisible: Boolean,
     onModifyDeveloperMode: () -> Unit,
     protocolStack: ProtocolStack,
     onProtocolStackChange: (ProtocolStack) -> Unit,
+    settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
-    val fullSettingsEnabled = !startupOnly && !isSaving
-    val canSave = isFormValid && !isSaving
+    val startupSettingEnabled = settingAvailable && !isSaving
+    val fullSettingEnabled = startupSettingEnabled && !startupOnly
 
-    if (!startupOnly) InfoSwitchCard(title = "常规") {
+    if (settingAvailable && !isFormValid) {
+        Text(
+            text = "部分设置项设定了无效值。",
+            color = MiuixTheme.colorScheme.error,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+
+    InfoSwitchCard(title = "常规") {
         ImputableValueRow(
             value = formState.deviceName,
             onValueChange = { onFormChange(formState.copy(deviceName = it)) },
             label = "设备名",
             valueLabel = "必填",
-            allowEdit = fullSettingsEnabled,
+            allowEdit = fullSettingEnabled,
         )
         InfoSwitch(
             title = "匿名使用报告",
             summary = "允许 Syncthing 发送匿名使用报告。",
             checked = formState.usageReportingEnabled,
-            enabled = fullSettingsEnabled,
+            enabled = fullSettingEnabled,
             onCheckedChange = { onFormChange(formState.copy(usageReportingEnabled = it)) },
         )
         if (developerModeVisible) {
@@ -154,10 +187,11 @@ private fun SettingForm(
         }
     }
 
-    if (!startupOnly) InfoSwitchCard(title = "磁盘与存储") {
+    InfoSwitchCard(title = "磁盘与存储") {
         ArrowPreference(
             title = "存储权限",
-            onClick = {},
+            onClick = null,
+            enabled = false,
         )
 
         TextWithOptionField(
@@ -172,7 +206,7 @@ private fun SettingForm(
                 .padding(bottom = 12.dp),
             items = SettingConfiguration.DiskSpaceUnit.entries.map { it.displayName },
             selectedIndex = formState.minHomeDiskFreeUnit.ordinal,
-            enabled = fullSettingsEnabled,
+            enabled = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             onSelectedIndexChange = { index ->
                 onFormChange(
@@ -190,14 +224,14 @@ private fun SettingForm(
             onValueChange = { onFormChange(formState.copy(guiPort = it)) },
             label = "端口",
             valueLabel = "8384",
-            allowEdit = !isSaving,
+            allowEdit = startupSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
         WindowDropdownPreference(
             title = "端口自增",
             items = SettingConfiguration.GuiPortConflictBehavior.entries.map { it.displayName },
             selectedIndex = formState.guiPortConflictBehavior.ordinal,
-            enabled = !isSaving,
+            enabled = startupSettingEnabled,
             onSelectedIndexChange = { index ->
                 onFormChange(
                     formState.copy(
@@ -206,126 +240,17 @@ private fun SettingForm(
                 )
             },
         )
-        if (!startupOnly) {
-            InfoSwitch(
-                title = "身份验证",
-                summary = "使用用户名和密码登录 WebUI。",
-                checked = formState.guiAuthenticationEnabled,
-                enabled = fullSettingsEnabled,
-                onCheckedChange = { onFormChange(formState.copy(guiAuthenticationEnabled = it)) },
-            )
 
-            AnimatedVisibility(
-                visible = formState.guiAuthenticationEnabled,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300)
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 300)
-                ),
-            ) {
-                Column {
-                    ImputableValueRow(
-                        value = formState.guiUser,
-                        onValueChange = { onFormChange(formState.copy(guiUser = it)) },
-                        label = "身份验证用户",
-                        valueLabel = "必填",
-                        allowEdit = fullSettingsEnabled,
-                    )
-                    ImputableValueRow(
-                        value = formState.newGuiPassword,
-                        onValueChange = { onFormChange(formState.copy(newGuiPassword = it)) },
-                        label = "身份验证密码",
-                        valueLabel = if (setting.guiPasswordConfigured) "***" else "必填",
-                        allowEdit = fullSettingsEnabled,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        visualTransformation = PasswordVisualTransformation(),
-                    )
-                }
-            }
-
-            WindowDropdownPreference(
-                title = "WebUI 主题",
-                items = SettingConfiguration.GuiTheme.entries.map { it.displayName },
-                selectedIndex = formState.guiTheme.ordinal,
-                enabled = fullSettingsEnabled,
-                onSelectedIndexChange = { index ->
-                    onFormChange(
-                        formState.copy(guiTheme = SettingConfiguration.GuiTheme.entries[index]),
-                    )
-                },
-            )
-        }
-    }
-
-    if (!startupOnly) InfoSwitchCard(title = "连接") {
-        OverlayDropdownPreference(
-            title = "协议栈",
-            summary = "连接使用的协议栈",
-            items = ProtocolStack.entries.map { it.displayName },
-            selectedIndex = protocolStack.ordinal,
-            enabled = !isSaving,
-            onSelectedIndexChange = { index ->
-                val selectedStack = ProtocolStack.entries[index]
-                onProtocolStackChange(selectedStack)
-                onFormChange(
-                    formState.copy(guiListenAddress = selectedStack.guiListenAddress),
-                )
-            },
-            onExpandedChange = {},
-        )
-        ImputableValueRow(
-            value = formState.listenAddresses,
-            onValueChange = { onFormChange(formState.copy(listenAddresses = it)) },
-            label = "监听地址",
-            valueLabel = "default",
-            singleLine = false,
-            allowEdit = fullSettingsEnabled,
-        )
-        ImputableValueRow(
-            value = formState.maxSendKiBPerSecond,
-            onValueChange = { onFormChange(formState.copy(maxSendKiBPerSecond = it)) },
-            label = "上传限速（KiB/s）",
-            valueLabel = "无限制",
-            allowEdit = fullSettingsEnabled,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-        ImputableValueRow(
-            value = formState.maxReceiveKiBPerSecond,
-            onValueChange = { onFormChange(formState.copy(maxReceiveKiBPerSecond = it)) },
-            label = "下载限速（KiB/s）",
-            valueLabel = "无限制",
-            allowEdit = fullSettingsEnabled,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-        ImputableValueRow(
-            value = formState.reconnectionIntervalSeconds,
-            onValueChange = { onFormChange(formState.copy(reconnectionIntervalSeconds = it)) },
-            label = "重连间隔（s）",
-            valueLabel = "20",
-            allowEdit = fullSettingsEnabled,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
         InfoSwitch(
-            title = "局域网限速",
-            summary = "对局域网设备启用限速",
-            checked = formState.limitBandwidthInLan,
-            enabled = fullSettingsEnabled,
-            onCheckedChange = { onFormChange(formState.copy(limitBandwidthInLan = it)) },
-        )
-    }
-
-    if (!startupOnly) InfoSwitchCard(title = "设备发现") {
-        InfoSwitch(
-            title = "广域网设备发现",
-            summary = "通过发现服务器查找其他设备。",
-            checked = formState.globalDiscoveryEnabled,
-            enabled = fullSettingsEnabled,
-            onCheckedChange = { onFormChange(formState.copy(globalDiscoveryEnabled = it)) },
+            title = "身份验证",
+            summary = "使用用户名和密码登录 WebUI。",
+            checked = formState.guiAuthenticationEnabled,
+            enabled = fullSettingEnabled,
+            onCheckedChange = { onFormChange(formState.copy(guiAuthenticationEnabled = it)) },
         )
 
         AnimatedVisibility(
-            visible = formState.globalDiscoveryEnabled,
+            visible = !settingAvailable || formState.guiAuthenticationEnabled,
             enter = expandVertically(
                 animationSpec = tween(durationMillis = 300)
             ),
@@ -335,20 +260,129 @@ private fun SettingForm(
         ) {
             Column {
                 ImputableValueRow(
+                    value = formState.guiUser,
+                    onValueChange = { onFormChange(formState.copy(guiUser = it)) },
+                    label = "身份验证用户",
+                    valueLabel = "必填",
+                    allowEdit = fullSettingEnabled,
+                )
+                ImputableValueRow(
+                    value = formState.newGuiPassword,
+                    onValueChange = { onFormChange(formState.copy(newGuiPassword = it)) },
+                    label = "身份验证密码",
+                    valueLabel = if (setting.guiPasswordConfigured) "***" else "必填",
+                    allowEdit = fullSettingEnabled,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+            }
+        }
+
+        WindowDropdownPreference(
+            title = "WebUI 主题",
+            items = SettingConfiguration.GuiTheme.entries.map { it.displayName },
+            selectedIndex = formState.guiTheme.ordinal,
+            enabled = fullSettingEnabled,
+            onSelectedIndexChange = { index ->
+                onFormChange(
+                    formState.copy(guiTheme = SettingConfiguration.GuiTheme.entries[index]),
+                )
+            },
+        )
+    }
+
+    InfoSwitchCard(title = "连接") {
+        OverlayDropdownPreference(
+            title = "协议栈",
+            summary = "连接使用的协议栈",
+            items = ProtocolStack.entries.map { it.displayName },
+            selectedIndex = protocolStack.ordinal,
+            enabled = startupSettingEnabled,
+            onSelectedIndexChange = { index ->
+                val selectedStack = ProtocolStack.entries[index]
+                onProtocolStackChange(selectedStack)
+                onFormChange(
+                    formState.copy(guiListenAddress = selectedStack.guiListenAddress),
+                )
+            },
+            onExpandedChange = {},
+        )
+        // TODO: 监听/relay等遵守协议栈
+        ImputableValueRow(
+            value = formState.listenAddresses,
+            onValueChange = { onFormChange(formState.copy(listenAddresses = it)) },
+            label = "监听地址",
+            valueLabel = "default",
+            singleLine = false,
+            allowEdit = fullSettingEnabled,
+        )
+        ImputableValueRow(
+            value = formState.maxSendKiBPerSecond,
+            onValueChange = { onFormChange(formState.copy(maxSendKiBPerSecond = it)) },
+            label = "上传限速（KiB/s）",
+            valueLabel = "无限制",
+            allowEdit = fullSettingEnabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+        ImputableValueRow(
+            value = formState.maxReceiveKiBPerSecond,
+            onValueChange = { onFormChange(formState.copy(maxReceiveKiBPerSecond = it)) },
+            label = "下载限速（KiB/s）",
+            valueLabel = "无限制",
+            allowEdit = fullSettingEnabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+        ImputableValueRow(
+            value = formState.reconnectionIntervalSeconds,
+            onValueChange = { onFormChange(formState.copy(reconnectionIntervalSeconds = it)) },
+            label = "重连间隔（s）",
+            valueLabel = "20",
+            allowEdit = fullSettingEnabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+        InfoSwitch(
+            title = "局域网限速",
+            summary = "对局域网设备启用限速",
+            checked = formState.limitBandwidthInLan,
+            enabled = fullSettingEnabled,
+            onCheckedChange = { onFormChange(formState.copy(limitBandwidthInLan = it)) },
+        )
+    }
+
+    InfoSwitchCard(title = "设备发现") {
+        InfoSwitch(
+            title = "广域网设备发现",
+            summary = "通过发现服务器查找其他设备。",
+            checked = formState.globalDiscoveryEnabled,
+            enabled = fullSettingEnabled,
+            onCheckedChange = { onFormChange(formState.copy(globalDiscoveryEnabled = it)) },
+        )
+
+        AnimatedVisibility(
+            visible = !settingAvailable || formState.globalDiscoveryEnabled,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300)
+            ),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300)
+            ),
+        ) {
+            Column {
+                InfoSwitch(
+                    title = "公布局域网地址",
+                    summary = "向发现服务器公布局域网地址。",
+                    checked = formState.announceLanAddresses,
+                    enabled = fullSettingEnabled,
+                    onCheckedChange = { onFormChange(formState.copy(announceLanAddresses = it)) },
+                )
+
+                ImputableValueRow(
                     value = formState.globalDiscoveryServers,
                     onValueChange = { onFormChange(formState.copy(globalDiscoveryServers = it)) },
                     label = "广域网发现服务器",
                     valueLabel = "default",
                     singleLine = false,
-                    allowEdit = fullSettingsEnabled,
-                )
-
-                InfoSwitch(
-                    title = "公布局域网地址",
-                    summary = "向发现服务器公布局域网地址。",
-                    checked = formState.announceLanAddresses,
-                    enabled = fullSettingsEnabled,
-                    onCheckedChange = { onFormChange(formState.copy(announceLanAddresses = it)) },
+                    allowEdit = fullSettingEnabled,
                 )
             }
         }
@@ -357,12 +391,12 @@ private fun SettingForm(
             title = "局域网设备发现",
             summary = "通过组播查找其他设备。",
             checked = formState.localDiscoveryEnabled,
-            enabled = fullSettingsEnabled,
+            enabled = fullSettingEnabled,
             onCheckedChange = { onFormChange(formState.copy(localDiscoveryEnabled = it)) },
         )
 
         AnimatedVisibility(
-            visible = formState.localDiscoveryEnabled,
+            visible = !settingAvailable || formState.localDiscoveryEnabled,
             enter = expandVertically(
                 animationSpec = tween(durationMillis = 300)
             ),
@@ -376,7 +410,7 @@ private fun SettingForm(
                     onValueChange = { onFormChange(formState.copy(localDiscoveryPort = it)) },
                     label = "IPv4 组播监听端口",
                     valueLabel = "21027",
-                    allowEdit = fullSettingsEnabled,
+                    allowEdit = fullSettingEnabled,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
                 ImputableValueRow(
@@ -387,25 +421,25 @@ private fun SettingForm(
                     label = "IPv6 组播地址",
                     valueLabel = "[ff12::8384]:21027",
                     singleLine = false,
-                    allowEdit = fullSettingsEnabled,
+                    allowEdit = fullSettingEnabled,
                 )
             }
         }
     }
 
-    if (!startupOnly) InfoSwitchCard(title = "网络") {
+    InfoSwitchCard(title = "网络") {
         InfoSwitch(
             title = "NAT 穿透",
             summary = "尝试通过路由器自动映射设备连接端口。",
             checked = formState.natEnabled,
-            enabled = fullSettingsEnabled,
+            enabled = fullSettingEnabled,
             onCheckedChange = { onFormChange(formState.copy(natEnabled = it)) },
         )
         InfoSwitch(
             title = "使用中继",
             summary = "直接连接不可用时，允许通过 Syncthing 中继建立连接。",
             checked = formState.relaysEnabled,
-            enabled = fullSettingsEnabled,
+            enabled = fullSettingEnabled,
             onCheckedChange = { onFormChange(formState.copy(relaysEnabled = it)) },
         )
         ImputableValueRow(
@@ -414,14 +448,14 @@ private fun SettingForm(
             label = "额外局域网网段",
             valueLabel = "CIDR，每行一个",
             singleLine = false,
-            allowEdit = fullSettingsEnabled,
+            allowEdit = fullSettingEnabled,
         )
         ImputableValueRow(
             value = formState.connectionLimitMax,
             onValueChange = { onFormChange(formState.copy(connectionLimitMax = it)) },
             label = "最大连接数",
             valueLabel = "0 为不限",
-            allowEdit = fullSettingsEnabled,
+            allowEdit = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
     }
@@ -429,42 +463,23 @@ private fun SettingForm(
     InfoSwitchCard(title = "后台运行") {
         ArrowPreference(
             title = "当连接到网络...",
-            onClick = {},
+            onClick = null,
+            enabled = false,
         )
         ArrowPreference(
             title = "当电池状态...",
-            onClick = {},
+            onClick = null,
+            enabled = false,
         )
         ArrowPreference(
             title = "特定时间段...",
-            onClick = {},
+            onClick = null,
+            enabled = false,
+        )
+        ArrowPreference(
+            title = "后台运行权限",
+            onClick = null,
+            enabled = false,
         )
     }
-
-    if (!isFormValid) {
-        Text(
-            text = "部分设置项设定了无效值。",
-            color = MiuixTheme.colorScheme.error,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
-
-    Text(
-        text = if (startupOnly) {
-            "部分设置不可用，首次启动核心后即可修改其余设置。"
-        } else {
-            "WebUI 监听变化后需要重启核心。\n注意：若监听的地址不可达或 WebUI 关闭，则无法使用相关功能。"
-        },
-        color = MiuixTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-    )
-
-    TextButton(
-        text = "保存设置",
-        enabled = canSave,
-        modifier = Modifier
-            .padding(horizontal = 10.dp, vertical = 16.dp)
-            .fillMaxWidth(),
-        onClick = onSave,
-    )
 }

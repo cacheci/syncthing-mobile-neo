@@ -263,7 +263,7 @@ internal fun InfoSwitchCard(
         text = title,
         modifier = Modifier.padding(top = 10.dp),
     )
-    Card(modifier = Modifier.padding(horizontal = 10.dp)) {
+    Card {
         Column(content = { content() })
     }
 }
@@ -275,7 +275,7 @@ internal fun MessageCard(
     isError: Boolean = false,
 ) {
     Card(
-        modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp).fillMaxWidth(),
+        modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth(),
         colors = if (isError) {
             CardDefaults.defaultColors(
                 color = MiuixTheme.colorScheme.errorContainer,

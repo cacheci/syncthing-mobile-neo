@@ -65,6 +65,8 @@ class CoreRuntime(
     )
     val snapshot: StateFlow<CoreSnapshot> = mutableSnapshot.asStateFlow()
 
+    fun guiUrl(): String = formatGuiBaseUrl(activeGuiHost, activeGuiPort)
+
     override suspend fun loadDevices(): DevicesSnapshot = withContext(Dispatchers.IO) {
         val status = restClient.status()
         rememberLocalDeviceId(status.myId)
@@ -912,9 +914,7 @@ class CoreRuntime(
     ): String {
         val configuredPort = if (configFile.exists) {
             runCatching {
-                configFile.read(portConflictBehavior, rememberedLocalDeviceId()).let { configuration ->
-                    configuration.guiPort
-                }
+                configFile.read(portConflictBehavior, rememberedLocalDeviceId()).guiPort
             }.getOrElse {
                 preferences.getString(KEY_GUI_ADDRESS, null)
                     ?.takeIf(String::isNotBlank)

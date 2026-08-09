@@ -89,6 +89,15 @@ class MainActivity : ComponentActivity() {
                     storage.appProtocolStack = selectedStack
                     protocolStack = storage.appProtocolStack
                 },
+                webUiUrlProvider = applicationState.coreRuntime::guiUrl,
+                webView = { url, reloadToken, onScroll, modifier ->
+                    AndroidSystemWebView(
+                        url = url,
+                        reloadToken = reloadToken,
+                        onScroll = onScroll,
+                        modifier = modifier,
+                    )
+                },
             )
         }
     }

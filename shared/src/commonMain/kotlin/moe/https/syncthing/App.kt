@@ -10,6 +10,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -19,10 +20,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.storage.ProtocolStack
@@ -35,6 +32,7 @@ import moe.https.syncthing.ui.screen.EmptyScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
 import moe.https.syncthing.ui.screen.SettingScreen
+import moe.https.syncthing.ui.screen.WebviewScreen
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
@@ -48,16 +46,16 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.CloudFill
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Notes
-import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -75,6 +73,13 @@ fun App(
     onModifyDeveloperMode: () -> Unit,
     protocolStack: ProtocolStack,
     onProtocolStackChange: (ProtocolStack) -> Unit,
+    webUiUrlProvider: () -> String,
+    webView: @Composable (
+        url: String,
+        reloadToken: Int,
+        onScroll: (deltaY: Float, isAtTop: Boolean) -> Unit,
+        modifier: Modifier,
+    ) -> Unit,
 ) {
     val coreUiState by coreViewModel.uiState.collectAsState()
     val logUiState by logViewModel.uiState.collectAsState()
@@ -83,6 +88,7 @@ fun App(
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
+    var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
     val mainScrollBehavior = MiuixScrollBehavior()
@@ -200,6 +206,20 @@ fun App(
                                         }
                                     )
                                 }
+                                if (
+                                    currentPageMain == AppPage.WEBUI &&
+                                    coreUiState.state == CoreState.RUNNING
+                                ) {
+                                    IconButton(
+                                        onClick = { webUiReloadToken += 1 },
+                                        content = {
+                                            Icon(
+                                                contentDescription = "刷新",
+                                                imageVector = MiuixIcons.Refresh,
+                                            )
+                                        },
+                                    )
+                                }
                             },
                             isWideScreen = false,
                         )
@@ -302,6 +322,18 @@ fun App(
                             AppPage.LOGS -> LogScreen(
                                 uiState = logUiState,
                                 onSourceSelected = logViewModel::onSourceSelected,
+                            )
+
+                            AppPage.WEBUI -> WebviewScreen(
+                                coreState = coreUiState.state,
+                                topAppBarScrollBehavior = mainScrollBehavior,
+                                webUiUrl = if (coreUiState.state == CoreState.RUNNING) {
+                                    webUiUrlProvider()
+                                } else {
+                                    null
+                                },
+                                reloadToken = webUiReloadToken,
+                                webView = webView,
                             )
 
                             else -> EmptyScreen()

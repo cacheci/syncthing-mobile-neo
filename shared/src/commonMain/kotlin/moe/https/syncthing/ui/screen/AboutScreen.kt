@@ -102,50 +102,130 @@ internal fun LicenceScreen(
 ) {
     val uriHandler = LocalUriHandler.current
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
             start = 16.dp,
             top = 40.dp,
             end = 16.dp,
             bottom = 20.dp,
         ),
     ) {
-        AboutCard (
-            title = "Syncthing",
-            summary = "MPL-2.0 Licence",
-            endText = "GitHub",
-            onClick = { uriHandler.openUri("https://github.com/syncthing/syncthing") },
-        )
+        item {
+            AboutCard(
+                title = "Syncthing",
+                summary = "MPL-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/syncthing/syncthing") },
+            )
+        }
 
-        HorizontalDivider( modifier = Modifier.padding(vertical = 20.dp) )
+        item {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 20.dp))
+        }
 
-        AboutCard (
-            title = "MiuiX",
-            summary = "Apache-2.0 License",
-            endText = "GitHub",
-            onClick = { uriHandler.openUri("https://github.com/compose-miuix-ui/miuix") },
-        )
+        item {
+            AboutCard(
+                title = "Kotlin",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/JetBrains/kotlin") },
+            )
+        }
 
-        AboutCard (
-            title = "MMKV",
-            summary = "BSD 3-Clause License",
-            endText = "GitHub",
-            onClick = { uriHandler.openUri("https://github.com/tencent/MMKV") },
-        )
+        item {
+            AboutCard(
+                title = "kotlinx.coroutines",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/Kotlin/kotlinx.coroutines") },
+            )
+        }
 
-        AboutCard (
-            title = "bcrypt",
-            summary = "Apache-2.0 License",
-            endText = "GitHub",
-            onClick = { uriHandler.openUri("https://github.com/patrickfav/bcrypt") },
-        )
+        item {
+            AboutCard(
+                title = "Compose Multiplatform",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/JetBrains/compose-multiplatform") },
+            )
+        }
 
-        AboutCard(
-            title = "QRose",
-            summary = "MIT License",
-            endText = "GitHub",
-            onClick = { uriHandler.openUri("https://github.com/alexzhirkevich/qrose") },
-        )
+        item {
+            AboutCard(
+                title = "AndroidX",
+                summary = "Apache-2.0 · Activity / Lifecycle",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/androidx/androidx") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "Navigation Compose",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/JetBrains/compose-multiplatform") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "Material Components for Android",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = {
+                    uriHandler.openUri(
+                        "https://github.com/material-components/material-components-android",
+                    )
+                },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "Miuix",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/compose-miuix-ui/miuix") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "bcrypt",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/patrickfav/bcrypt") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "Bytes Java",
+                summary = "Apache-2.0 · bcrypt 运行时依赖",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/patrickfav/bytes-java") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "MMKV",
+                summary = "BSD-3-Clause",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/tencent/MMKV") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "QRose",
+                summary = "MIT",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/alexzhirkevich/qrose") },
+            )
+        }
     }
 }
 

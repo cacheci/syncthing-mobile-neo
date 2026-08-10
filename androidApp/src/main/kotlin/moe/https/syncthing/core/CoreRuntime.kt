@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
-import com.tencent.mmkv.MMKV
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -18,6 +17,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.https.syncthing.storage.AppSettingPrivateStorage
+import moe.https.syncthing.storage.ProtocolStack
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
@@ -45,12 +45,11 @@ class CoreRuntime(
 ) : DevicesController, FoldersController, SettingController {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-    private val appSettings = requireNotNull(MMKV.mmkvWithID(APP_SETTINGS_ID))
     private val processMutex = Mutex()
     private val homeDirectory = File(applicationContext.filesDir, SYNCTHING_HOME_DIRECTORY)
     private val configFile = SyncthingConfigFile(File(homeDirectory, CONFIG_FILE_NAME))
     @Volatile
-    private var activeGuiHost = appSettingsStorage.appProtocolStack.guiListenAddress
+    private var activeGuiHost = loadProtocolStack().guiListenAddress
     @Volatile
     private var activeGuiPort = initialGuiPort()
     private val restClient = SyncthingRestClient(
@@ -199,11 +198,7 @@ class CoreRuntime(
         }
         snapshot.copy(
             configuration = snapshot.configuration.copy(
-                guiListenAddress = appSettingsStorage.appProtocolStack.guiListenAddress,
-                allowGuiListenNonLocal = appSettings.decodeBool(
-                    KEY_ALLOW_GUI_LISTEN_NON_LOCAL,
-                    false,
-                ),
+                guiListenAddress = loadProtocolStack().guiListenAddress,
             ),
         )
     }
@@ -213,7 +208,7 @@ class CoreRuntime(
     ): SettingSaveResult = withContext(Dispatchers.IO) {
         processMutex.withLock {
             val effectiveConfiguration = configuration.copy(
-                guiListenAddress = appSettingsStorage.appProtocolStack.guiListenAddress,
+                guiListenAddress = loadProtocolStack().guiListenAddress,
             )
             val previousGuiPort = activeGuiPort
             val previousPortConflictBehavior = loadGuiPortConflictBehavior()
@@ -495,7 +490,10 @@ class CoreRuntime(
         val apiKey = preferences.getString(KEY_API_KEY, null)
             ?: throw IOException("REST API 密钥不存在")
         val portConflictBehavior = loadGuiPortConflictBehavior()
-        val configuredGuiAddress = configuredGuiAddress(portConflictBehavior)
+        val configuredGuiAddress = formatGuiAddress(
+            loadProtocolStack().guiListenAddress,
+            configuredGuiPort(portConflictBehavior),
+        )
         val guiAddress = resolveLaunchGuiAddress(configuredGuiAddress, portConflictBehavior)
         activeGuiHost = parseGuiHost(guiAddress)
         activeGuiPort = parseGuiPort(guiAddress)
@@ -851,19 +849,16 @@ class CoreRuntime(
 
     companion object {
         private const val TAG = "SyncthingCore"
-        private const val DEFAULT_GUI_ADDRESS = "127.0.0.1:8384"
         private const val DEFAULT_GUI_PORT = 8384
         private const val SYNCTHING_HOME_DIRECTORY = "syncthing-home"
         private const val CONFIG_FILE_NAME = "config.xml"
         private const val PREFERENCES = "core_runtime"
-        private const val APP_SETTINGS_ID = "app_settings"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_PID = "pid"
-        private const val KEY_GUI_ADDRESS = "gui_address"
+        private const val KEY_GUI_PORT = "gui_port"
         private const val KEY_ACTIVE_GUI_PORT = "active_gui_port"
         private const val KEY_GUI_PORT_CONFLICT_BEHAVIOR = "gui_port_conflict_behavior"
         private const val KEY_LOCAL_DEVICE_ID = "local_device_id"
-        private const val KEY_ALLOW_GUI_LISTEN_NON_LOCAL = "allow_gui_listen_non_local"
         private const val GUI_PORT_PROBE_LIMIT = 100
         private const val API_READY_POLL_COUNT = 30
         private const val API_READY_POLL_INTERVAL_MILLIS = 500L
@@ -947,62 +942,45 @@ class CoreRuntime(
 
     private fun startupSetting(
         portConflictBehavior: SettingConfiguration.GuiPortConflictBehavior,
-    ): SettingConfiguration {
-        val guiAddress = preferences.getString(KEY_GUI_ADDRESS, null)
-            ?.takeIf(String::isNotBlank)
-            ?: DEFAULT_GUI_ADDRESS
-        return SettingConfiguration.startupDefaults(
-            guiListenAddress = appSettingsStorage.appProtocolStack.guiListenAddress,
-            guiPort = parseGuiPort(guiAddress),
-            guiPortConflictBehavior = portConflictBehavior,
-        )
-    }
+    ): SettingConfiguration = SettingConfiguration.startupDefaults(
+        guiListenAddress = loadProtocolStack().guiListenAddress,
+        guiPort = preferences.getInt(KEY_GUI_PORT, DEFAULT_GUI_PORT),
+        guiPortConflictBehavior = portConflictBehavior,
+    )
 
-    private fun configuredGuiAddress(
+    private fun configuredGuiPort(
         portConflictBehavior: SettingConfiguration.GuiPortConflictBehavior,
-    ): String {
-        val configuredPort = if (configFile.exists) {
-            runCatching {
-                configFile.read(portConflictBehavior, rememberedLocalDeviceId()).guiPort
-            }.getOrElse {
-                preferences.getString(KEY_GUI_ADDRESS, null)
-                    ?.takeIf(String::isNotBlank)
-                    ?.let(::parseGuiPort)
-                    ?: DEFAULT_GUI_PORT
-            }
-        } else {
-            preferences.getString(KEY_GUI_ADDRESS, null)
-                ?.takeIf(String::isNotBlank)
-                ?.let(::parseGuiPort)
-                ?: DEFAULT_GUI_PORT
+    ): Int = if (configFile.exists) {
+        runCatching {
+            configFile.read(portConflictBehavior, rememberedLocalDeviceId()).guiPort
+        }.getOrElse {
+            preferences.getInt(KEY_GUI_PORT, DEFAULT_GUI_PORT)
         }
-        return formatGuiAddress(
-            appSettingsStorage.appProtocolStack.guiListenAddress,
-            configuredPort,
-        )
+    } else {
+        preferences.getInt(KEY_GUI_PORT, DEFAULT_GUI_PORT)
     }
 
     private fun initialGuiPort(): Int {
-        val configuredAddress = configuredGuiAddress(loadGuiPortConflictBehavior())
-        return preferences.getInt(KEY_ACTIVE_GUI_PORT, parseGuiPort(configuredAddress))
+        val configuredPort = configuredGuiPort(loadGuiPortConflictBehavior())
+        return preferences.getInt(KEY_ACTIVE_GUI_PORT, configuredPort)
     }
 
     private fun saveStartupSetting(configuration: SettingConfiguration) {
         preferences.edit {
-            putString(
-                KEY_GUI_ADDRESS,
-                formatGuiAddress(configuration.guiListenAddress, configuration.guiPort),
-            )
+            putInt(KEY_GUI_PORT, configuration.guiPort)
                 .putString(
                     KEY_GUI_PORT_CONFLICT_BEHAVIOR,
                     configuration.guiPortConflictBehavior.name,
                 )
         }
-        appSettings.encode(
-            KEY_ALLOW_GUI_LISTEN_NON_LOCAL,
-            configuration.allowGuiListenNonLocal,
-        )
     }
+
+    private fun loadProtocolStack(): ProtocolStack =
+        appSettingsStorage.getString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK)
+            ?.let { storedValue ->
+                ProtocolStack.entries.firstOrNull { it.name == storedValue }
+            }
+            ?: ProtocolStack.DUAL
 
     private fun rememberedLocalDeviceId(): String? =
         preferences.getString(KEY_LOCAL_DEVICE_ID, null)?.takeIf(String::isNotBlank)

@@ -1,7 +1,6 @@
 package moe.https.syncthing
 
 import android.app.Application
-import com.tencent.mmkv.MMKV
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,7 +9,7 @@ import moe.https.syncthing.core.AndroidCoreController
 import moe.https.syncthing.core.CoreBinaryInstaller
 import moe.https.syncthing.core.CoreRuntime
 import moe.https.syncthing.storage.AppSettingPrivateStorage
-import moe.https.syncthing.storage.MmkvAppSettingsStorage
+import moe.https.syncthing.storage.SharedPreferencesAppSettingsStorage
 
 class SyncthingApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -26,8 +25,7 @@ class SyncthingApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        MMKV.initialize(this)
-        appSettingsStorage = MmkvAppSettingsStorage()
+        appSettingsStorage = SharedPreferencesAppSettingsStorage(this)
         val installer = CoreBinaryInstaller(this)
         coreRuntime = CoreRuntime(this, installer, appSettingsStorage)
         coreController = AndroidCoreController(this, coreRuntime)

@@ -284,7 +284,6 @@ internal class SyncthingRestClient(
             alwaysLocalNetworks = readStringArray(options.optJSONArray("alwaysLocalNets")),
             connectionLimitEnough = options.optInt("connectionLimitEnough", 0),
             connectionLimitMax = options.optInt("connectionLimitMax", 0),
-            allowGuiListenNonLocal = options.optBoolean("allowGuiListenNonLocal", false)
         )
     }
 

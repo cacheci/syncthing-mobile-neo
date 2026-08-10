@@ -214,7 +214,6 @@ private fun SettingConfiguration.toFormState(): SettingFormState = SettingFormSt
     relaysEnabled = relaysEnabled,
     alwaysLocalNetworks = alwaysLocalNetworks.joinToString("\n"),
     connectionLimitMax = connectionLimitMax.toString(),
-    allowGuiListenNonLocal = allowGuiListenNonLocal,
 )
 
 private fun Double.editableString(): String =
@@ -264,7 +263,6 @@ private fun SettingFormState.toConfiguration(setting: SettingConfiguration): Set
     relaysEnabled = relaysEnabled,
     alwaysLocalNetworks = alwaysLocalNetworks.toValues(),
     connectionLimitMax = connectionLimitMax.toIntOrNull() ?: 0,
-    allowGuiListenNonLocal = allowGuiListenNonLocal,
 )
 
 private fun String.toValues(): List<String> = split(',', '\n')
@@ -287,13 +285,10 @@ private fun SettingConfiguration.validationError(): String? = when {
     minHomeDiskFreeUnit == SettingConfiguration.DiskSpaceUnit.PERCENT && minHomeDiskFree > 100 -> {
         "最低磁盘剩余空间使用百分比时不能超过 100%"
     }
-    guiListenAddress !in SUPPORTED_GUI_LISTEN_ADDRESSES && !allowGuiListenNonLocal -> {
-        "监听地址默认仅支持本机地址。"
+    guiListenAddress !in SUPPORTED_GUI_LISTEN_ADDRESSES -> {
+        "监听地址仅支持本机地址。"
     }
     guiPort !in 1..65535 -> "GUI 端口必须在 1 到 65535 之间"
-    guiListenAddress in WILDCARD_GUI_LISTEN_ADDRESSES && !guiAuthenticationEnabled -> {
-        "WebUI 监听所有网络接口时必须启用身份验证"
-    }
     guiAuthenticationEnabled && guiUser.isBlank() -> "启用 GUI 身份验证时，用户名不能为空"
     guiAuthenticationEnabled && !guiPasswordConfigured && newGuiPassword.isBlank() -> {
         "密码不能为空"
@@ -314,13 +309,10 @@ private fun SettingConfiguration.validationError(): String? = when {
 }
 
 private fun SettingConfiguration.startupValidationError(): String? = when {
-    guiListenAddress !in SUPPORTED_GUI_LISTEN_ADDRESSES && !allowGuiListenNonLocal -> {
-        "监听地址默认仅支持本机地址。"
+    guiListenAddress !in SUPPORTED_GUI_LISTEN_ADDRESSES -> {
+        "监听地址仅支持本机地址。"
     }
     guiPort !in 1..65535 -> "GUI 端口必须在 1 到 65535 之间"
-    guiListenAddress in WILDCARD_GUI_LISTEN_ADDRESSES -> {
-        "首次生成配置前不能监听所有网络接口；请先启动一次核心并设置 GUI 身份验证"
-    }
     else -> null
 }
 
@@ -344,9 +336,5 @@ private fun Throwable.userMessage(): String =
 private val SUPPORTED_GUI_LISTEN_ADDRESSES = setOf(
     "127.0.0.1",
     "localhost",
-    "0.0.0.0",
     "::1",
-    "::",
 )
-
-private val WILDCARD_GUI_LISTEN_ADDRESSES = setOf("0.0.0.0", "::")

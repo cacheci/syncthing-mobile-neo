@@ -44,5 +44,4 @@ data class SettingFormState(
     val relaysEnabled: Boolean = false,
     val alwaysLocalNetworks: String = "",
     val connectionLimitMax: String = "",
-    val allowGuiListenNonLocal: Boolean = false,
 )

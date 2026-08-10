@@ -76,7 +76,6 @@ internal class SyncthingConfigFile(
             alwaysLocalNetworks = options.childTexts(ALWAYS_LOCAL_NETWORK_TAG),
             connectionLimitEnough = options.childInt(CONNECTION_LIMIT_ENOUGH_TAG, 0),
             connectionLimitMax = options.childInt(CONNECTION_LIMIT_MAX_TAG, 0),
-            allowGuiListenNonLocal = options.childBoolean(GUI_LISTEN_NON_LOCAL_ALLOWED, false),
         )
     }
 
@@ -264,7 +263,6 @@ internal class SyncthingConfigFile(
         private const val ALWAYS_LOCAL_NETWORK_TAG = "alwaysLocalNet"
         private const val CONNECTION_LIMIT_ENOUGH_TAG = "connectionLimitEnough"
         private const val CONNECTION_LIMIT_MAX_TAG = "connectionLimitMax"
-        private const val GUI_LISTEN_NON_LOCAL_ALLOWED = "allowGuiListenNonLocal"
     }
 
     private fun Element.localDeviceElement(localDeviceId: String?): Element? {

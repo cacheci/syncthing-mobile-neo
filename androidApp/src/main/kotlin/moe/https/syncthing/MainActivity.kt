@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
+import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.model.CoreUiEffect
 import moe.https.syncthing.viewmodel.LogViewModel
@@ -72,10 +73,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             val storage = applicationState.appSettingsStorage
             var developerModeEnabled by remember {
-                mutableStateOf(storage.appDeveloperMode)
+                mutableStateOf(
+                    storage.getBoolean(AppSettingPrivateStorage.KEY_DEVELOPER_MODE, false),
+                )
             }
             var protocolStack by remember {
-                mutableStateOf(storage.appProtocolStack)
+                mutableStateOf(
+                    storage.getString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK)
+                        ?.let { storedValue ->
+                            ProtocolStack.entries.firstOrNull { it.name == storedValue }
+                        }
+                        ?: ProtocolStack.DUAL,
+                )
             }
 
             App(
@@ -87,13 +96,14 @@ class MainActivity : ComponentActivity() {
                 versionName = BuildConfig.VERSION_NAME,
                 developerModeEnabled = developerModeEnabled,
                 onModifyDeveloperMode = {
-                    storage.appDeveloperMode = !developerModeEnabled
-                    developerModeEnabled = storage.appDeveloperMode
+                    val newValue = !developerModeEnabled
+                    storage.putBoolean(AppSettingPrivateStorage.KEY_DEVELOPER_MODE, newValue)
+                    developerModeEnabled = newValue
                 },
                 protocolStack = protocolStack,
                 onProtocolStackChange = { selectedStack: ProtocolStack ->
-                    storage.appProtocolStack = selectedStack
-                    protocolStack = storage.appProtocolStack
+                    storage.putString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK, selectedStack.name)
+                    protocolStack = selectedStack
                 },
                 webUiUrlProvider = applicationState.coreRuntime::guiUrl,
                 webView = { url, reloadToken, onScroll, modifier ->

@@ -30,7 +30,6 @@ data class SettingConfiguration(
     val alwaysLocalNetworks: List<String>,
     val connectionLimitEnough: Int,
     val connectionLimitMax: Int,
-    val allowGuiListenNonLocal: Boolean,
 ) {
     enum class DiskSpaceUnit(val apiValue: String, val displayName: String) {
         PERCENT("%", "%"),
@@ -86,7 +85,6 @@ data class SettingConfiguration(
             alwaysLocalNetworks = emptyList(),
             connectionLimitEnough = 0,
             connectionLimitMax = 0,
-            allowGuiListenNonLocal = false,
         )
     }
 }

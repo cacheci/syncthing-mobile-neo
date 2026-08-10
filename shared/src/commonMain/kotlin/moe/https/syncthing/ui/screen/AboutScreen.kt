@@ -210,15 +210,6 @@ internal fun LicenceScreen(
 
         item {
             AboutCard(
-                title = "MMKV",
-                summary = "BSD-3-Clause",
-                endText = "GitHub",
-                onClick = { uriHandler.openUri("https://github.com/tencent/MMKV") },
-            )
-        }
-
-        item {
-            AboutCard(
                 title = "QRose",
                 summary = "MIT",
                 endText = "GitHub",

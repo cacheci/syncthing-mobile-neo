@@ -20,6 +20,7 @@ import moe.https.syncthing.ui.model.CoreUiEffect
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
+import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 
 class MainActivity : ComponentActivity() {
@@ -36,6 +37,10 @@ class MainActivity : ComponentActivity() {
 
     private val devicesViewModel: DevicesViewModel by viewModels {
         DevicesViewModel.factory(applicationState.coreRuntime)
+    }
+
+    private val foldersViewModel: FoldersViewModel by viewModels {
+        FoldersViewModel.factory(applicationState.coreRuntime)
     }
 
     private val settingViewModel: SettingViewModel by viewModels {
@@ -77,6 +82,7 @@ class MainActivity : ComponentActivity() {
                 coreViewModel = coreViewModel,
                 logViewModel = logViewModel,
                 devicesViewModel = devicesViewModel,
+                foldersViewModel = foldersViewModel,
                 settingViewModel = settingViewModel,
                 versionName = BuildConfig.VERSION_NAME,
                 developerModeEnabled = developerModeEnabled,

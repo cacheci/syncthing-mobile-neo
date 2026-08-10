@@ -4,12 +4,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
 import java.time.LocalDateTime
 
 internal class SyncthingRestClient(
     private val apiKey: String,
     private val baseUrl: () -> String = { DEFAULT_BASE_URL },
+    private val onHttpError: (SyncthingRestException) -> Unit = {},
 ) {
     fun ping(): Boolean = runCatching {
         pingChecked()
@@ -88,6 +90,65 @@ internal class SyncthingRestClient(
                 )
             }
         }
+    }
+
+    fun configuredFolders(): List<RestFolder> {
+        val array = requestArray("/rest/config/folders")
+        return buildList {
+            repeat(array.length()) { index ->
+                val json = array.optJSONObject(index) ?: return@repeat
+                val id = json.optString("id").takeIf(String::isNotBlank) ?: return@repeat
+                add(
+                    RestFolder(
+                        id = id,
+                        label = json.optString("label").takeIf(String::isNotBlank),
+                        group = json.optString("group"),
+                        path = json.optString("path"),
+                        type = json.optString("type", "sendreceive"),
+                        paused = json.optBoolean("paused", false),
+                        fsWatcherEnabled = json.optBoolean("fsWatcherEnabled", true),
+                        rescanIntervalSeconds = json.optInt("rescanIntervalS", 3600),
+                        versioning = parseVersioning(json.optJSONObject("versioning")),
+                        devices = parseFolderDevices(json.optJSONArray("devices")),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun addFolder(configuration: NewFolderConfiguration) {
+        val folder = request("/rest/config/defaults/folder")
+        applyFolderConfiguration(folder, configuration)
+        folder.put("path", defaultFolderPath(configuration.folderId))
+        requestBody(
+            path = "/rest/config/folders",
+            method = "POST",
+            body = folder.toString(),
+        )
+    }
+
+    fun updateFolder(configuration: NewFolderConfiguration) {
+        val encodedFolderId = encodePathSegment(configuration.folderId)
+        val folder = request("/rest/config/folders/$encodedFolderId")
+        applyFolderConfiguration(folder, configuration)
+        requestBody(
+            path = "/rest/config/folders/$encodedFolderId",
+            method = "PUT",
+            body = folder.toString(),
+        )
+    }
+
+    fun folderStatus(folderId: String): RestFolderStatus {
+        val encodedFolderId = URLEncoder.encode(folderId, Charsets.UTF_8.name())
+        val json = request("/rest/db/status?folder=$encodedFolderId")
+        return RestFolderStatus(
+            state = json.optString("state"),
+            localFiles = json.optLong("localFiles", 0L),
+            localBytes = json.optLong("localBytes", 0L),
+            needFiles = json.optLong("needFiles", 0L),
+            needBytes = json.optLong("needBytes", 0L),
+            pullErrors = json.optLong("pullErrors", 0L),
+        )
     }
 
     fun connections(): Map<String, RestConnection> {
@@ -352,7 +413,25 @@ internal class SyncthingRestClient(
 
             val responseCode = connection.responseCode
             if (responseCode !in 200..299) {
-                throw SyncthingRestException(responseCode)
+                val responseBody = runCatching {
+                    connection.errorStream
+                        ?.bufferedReader()
+                        ?.use { it.readText() }
+                }
+                    .getOrNull()
+                    ?.trim()
+                    ?.replace(apiKey, REDACTED_VALUE)
+                    ?.take(MAX_ERROR_BODY_LENGTH)
+                    ?.takeIf(String::isNotBlank)
+                val error = SyncthingRestException(
+                    method = method,
+                    path = path,
+                    responseCode = responseCode,
+                    responseMessage = connection.responseMessage,
+                    responseBody = responseBody,
+                )
+                runCatching { onHttpError(error) }
+                throw error
             }
             connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
@@ -403,9 +482,41 @@ internal class SyncthingRestClient(
         val lastConnectionAt: LocalDateTime?,
     )
 
+    data class RestFolder(
+        val id: String,
+        val label: String?,
+        val group: String,
+        val path: String,
+        val type: String,
+        val paused: Boolean,
+        val fsWatcherEnabled: Boolean,
+        val rescanIntervalSeconds: Int,
+        val versioning: RestFolderVersioning,
+        val devices: List<FolderDeviceConfiguration>,
+    )
+
+    data class RestFolderVersioning(
+        val type: NewFolderConfiguration.Versioning,
+        val supported: Boolean,
+        val cleanoutDays: Int,
+        val keep: Int,
+        val cleanupIntervalSeconds: Int,
+    )
+
+    data class RestFolderStatus(
+        val state: String,
+        val localFiles: Long,
+        val localBytes: Long,
+        val needFiles: Long,
+        val needBytes: Long,
+        val pullErrors: Long,
+    )
+
     companion object {
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8384"
         private const val TIMEOUT_MILLIS = 1_500
+        private const val MAX_ERROR_BODY_LENGTH = 8 * 1024
+        private const val REDACTED_VALUE = "<redacted>"
     }
 
     private fun parseDiscoveryStatus(json: JSONObject?): List<RestDiscoveryStatus> {
@@ -462,6 +573,115 @@ internal class SyncthingRestClient(
         }
     }
 
+    private fun parseVersioning(json: JSONObject?): RestFolderVersioning {
+        val params = json?.optJSONObject("params")
+        val rawType = json?.optString("type").orEmpty()
+        val type = when (rawType) {
+            "trashcan" -> NewFolderConfiguration.Versioning.TRASHCAN
+            "simple" -> NewFolderConfiguration.Versioning.SIMPLE
+            else -> NewFolderConfiguration.Versioning.NONE
+        }
+        return RestFolderVersioning(
+            type = type,
+            supported = rawType.isBlank() || rawType == "trashcan" || rawType == "simple",
+            cleanoutDays = params?.optString("cleanoutDays")?.toIntOrNull() ?: 0,
+            keep = params?.optString("keep")?.toIntOrNull() ?: 5,
+            cleanupIntervalSeconds = json?.optInt("cleanupIntervalS", 3600) ?: 3600,
+        )
+    }
+
+    private fun parseFolderDevices(array: JSONArray?): List<FolderDeviceConfiguration> {
+        if (array == null) return emptyList()
+        return buildList {
+            repeat(array.length()) { index ->
+                val device = array.optJSONObject(index) ?: return@repeat
+                val deviceId = device.optString("deviceID").takeIf(String::isNotBlank)
+                    ?: return@repeat
+                add(
+                    FolderDeviceConfiguration(
+                        deviceId = deviceId,
+                        encryptionPassword = device.optString("encryptionPassword"),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun applyFolderConfiguration(
+        folder: JSONObject,
+        configuration: NewFolderConfiguration,
+    ) {
+        folder.put("id", configuration.folderId)
+        folder.put("label", configuration.label)
+        folder.put("group", configuration.group)
+        folder.put("fsWatcherEnabled", configuration.fsWatcherEnabled)
+        folder.put("rescanIntervalS", configuration.rescanIntervalSeconds)
+        folder.put(
+            "type",
+            when (configuration.type) {
+                NewFolderConfiguration.Type.SEND_RECEIVE -> "sendreceive"
+                NewFolderConfiguration.Type.RECEIVE_ONLY -> "receiveonly"
+                NewFolderConfiguration.Type.SEND_ONLY -> "sendonly"
+            },
+        )
+
+        val currentDevices = folder.optJSONArray("devices")
+        val updatedDevices = JSONArray()
+        val editableCurrentDevices = mutableMapOf<String, JSONObject>()
+        if (currentDevices != null) {
+            repeat(currentDevices.length()) { index ->
+                val device = currentDevices.optJSONObject(index) ?: return@repeat
+                val deviceId = device.optString("deviceID")
+                if (deviceId !in configuration.availableDeviceIds) {
+                    updatedDevices.put(device)
+                } else {
+                    editableCurrentDevices[deviceId] = device
+                }
+            }
+        }
+        configuration.devices.forEach { configuredDevice ->
+            val device = editableCurrentDevices[configuredDevice.deviceId] ?: JSONObject()
+            updatedDevices.put(
+                device
+                    .put("deviceID", configuredDevice.deviceId)
+                    .put("encryptionPassword", configuredDevice.encryptionPassword),
+            )
+        }
+        folder.put("devices", updatedDevices)
+
+        if (configuration.updateVersioning) {
+            val versioning = folder.optJSONObject("versioning") ?: JSONObject()
+            val params = versioning.optJSONObject("params") ?: JSONObject()
+            when (configuration.versioning) {
+                NewFolderConfiguration.Versioning.NONE -> {
+                    versioning.put("type", "")
+                    versioning.put("cleanupIntervalS", 0)
+                    params.remove("cleanoutDays")
+                    params.remove("keep")
+                }
+
+                NewFolderConfiguration.Versioning.TRASHCAN -> {
+                    versioning.put("type", "trashcan")
+                    versioning.put("cleanupIntervalS", configuration.versioningCleanupIntervalSeconds)
+                    params.put("cleanoutDays", configuration.versioningCleanoutDays.toString())
+                    params.remove("keep")
+                }
+
+                NewFolderConfiguration.Versioning.SIMPLE -> {
+                    versioning.put("type", "simple")
+                    versioning.put("cleanupIntervalS", configuration.versioningCleanupIntervalSeconds)
+                    params.put("cleanoutDays", configuration.versioningCleanoutDays.toString())
+                    params.put("keep", configuration.versioningKeep.toString())
+                }
+            }
+            versioning.put("params", params)
+            folder.put("versioning", versioning)
+        }
+    }
+
+    private fun encodePathSegment(value: String): String =
+        URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+
     private fun parseGuiAddress(address: String): Pair<String, Int> {
         val normalizedAddress = address.trim().ifBlank { "127.0.0.1:8384" }
         if (normalizedAddress.startsWith("[")) {
@@ -491,8 +711,18 @@ internal class SyncthingRestClient(
 }
 
 internal class SyncthingRestException(
+    val method: String,
+    val path: String,
     val responseCode: Int,
-) : IOException("Syncthing REST 返回 HTTP $responseCode")
+    val responseMessage: String?,
+    val responseBody: String?,
+) : IOException(
+    buildString {
+        append("Syncthing REST $method $path 返回 HTTP $responseCode")
+        responseMessage?.takeIf(String::isNotBlank)?.let { append(" $it") }
+        responseBody?.takeIf(String::isNotBlank)?.let { append("：$it") }
+    },
+)
 
 private fun JSONObject.optLongOrNull(name: String): Long? =
     if (has(name) && !isNull(name)) optLong(name) else null

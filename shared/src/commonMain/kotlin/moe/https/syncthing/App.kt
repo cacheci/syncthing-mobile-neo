@@ -22,13 +22,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
+import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
+import moe.https.syncthing.ui.screen.AddFolderScreen
 import moe.https.syncthing.ui.screen.CoreScreen
 import moe.https.syncthing.ui.screen.DevicesScreen
-import moe.https.syncthing.ui.screen.EmptyScreen
+import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
 import moe.https.syncthing.ui.screen.SettingScreen
@@ -36,6 +38,7 @@ import moe.https.syncthing.ui.screen.WebviewScreen
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
+import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -67,6 +70,7 @@ fun App(
     coreViewModel: CoreViewModel,
     logViewModel: LogViewModel,
     devicesViewModel: DevicesViewModel,
+    foldersViewModel: FoldersViewModel,
     settingViewModel: SettingViewModel,
     versionName: String,
     developerModeEnabled: Boolean,
@@ -84,10 +88,12 @@ fun App(
     val coreUiState by coreViewModel.uiState.collectAsState()
     val logUiState by logViewModel.uiState.collectAsState()
     val devicesUiState by devicesViewModel.uiState.collectAsState()
+    val foldersUiState by foldersViewModel.uiState.collectAsState()
     val settingUiState by settingViewModel.uiState.collectAsState()
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
+    var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
@@ -115,6 +121,10 @@ fun App(
         when {
             (currentPageMain == AppPage.DEVICES) -> {
                 if (coreUiState.state == CoreState.RUNNING) { devicesViewModel.refresh() }
+            }
+
+            (currentPageMain == AppPage.FOLDERS) -> {
+                if (coreUiState.state == CoreState.RUNNING) { foldersViewModel.refresh() }
             }
 
             (currentPageMain == AppPage.SETTINGS) -> {
@@ -220,6 +230,22 @@ fun App(
                                         },
                                     )
                                 }
+                                if ( currentPageMain == AppPage.FOLDERS && coreUiState.state == CoreState.RUNNING ) {
+                                    IconButton(
+                                        onClick = {
+                                            editingFolder = null
+                                            devicesViewModel.refresh()
+                                            currentPagePlain = AppSubPage.FOLDER_ADD
+                                            navController.navigate(PLAIN_PAGE_ROUTE)
+                                        },
+                                        content = {
+                                            Icon(
+                                                contentDescription = "添加文件夹",
+                                                imageVector = MiuixIcons.Add,
+                                            )
+                                        },
+                                    )
+                                }
                             },
                             isWideScreen = false,
                         )
@@ -289,6 +315,19 @@ fun App(
                                 },
                             )
 
+                            AppPage.FOLDERS -> FoldersScreen(
+                                uiState = foldersUiState,
+                                coreState = coreUiState.state,
+                                topAppBarScrollBehavior = mainScrollBehavior,
+                                onRefresh = foldersViewModel::refresh,
+                                onEditFolder = { folder ->
+                                    editingFolder = folder
+                                    devicesViewModel.refresh()
+                                    currentPagePlain = AppSubPage.FOLDER_ADD
+                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                                },
+                            )
+
                             AppPage.SETTINGS -> SettingScreen(
                                 uiState = settingUiState,
                                 onFormChange = settingViewModel::updateForm,
@@ -336,7 +375,6 @@ fun App(
                                 webView = webView,
                             )
 
-                            else -> EmptyScreen()
                         }
                     }
                 }
@@ -378,6 +416,20 @@ fun App(
                                 modifier = Modifier.padding(padding),
                             )
                         }
+                        AppSubPage.FOLDER_ADD -> {
+                            AddFolderScreen(
+                                isSubmitting = foldersUiState.isLoading,
+                                devices = devicesUiState.devices,
+                                existingFolder = editingFolder,
+                                onConfirm = { configuration ->
+                                    if (editingFolder == null) foldersViewModel.addFolder(configuration)
+                                    else foldersViewModel.updateFolder(configuration)
+                                    editingFolder = null
+                                    navigateBack()
+                                },
+                                modifier = Modifier.padding(padding),
+                            )
+                        }
                         AppSubPage.ABOUT -> {
                             AboutScreen(
                                 versionName = versionName,
@@ -411,6 +463,7 @@ private enum class AppPage(val title: String) {
 private enum class AppSubPage(val title: String) {
     DEBUG("DEBUG*"),
     DEVICE_ADD("设备"),
+    FOLDER_ADD("文件夹"),
     ABOUT("关于"),
     LICENCE("开源许可")
 }

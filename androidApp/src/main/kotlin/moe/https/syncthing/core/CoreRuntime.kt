@@ -42,7 +42,7 @@ class CoreRuntime(
     context: Context,
     private val installer: CoreBinaryInstaller,
     private val appSettingsStorage: AppSettingPrivateStorage,
-) : DevicesController, SettingController {
+) : DevicesController, FoldersController, SettingController {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val appSettings = requireNotNull(MMKV.mmkvWithID(APP_SETTINGS_ID))
@@ -53,9 +53,16 @@ class CoreRuntime(
     private var activeGuiHost = appSettingsStorage.appProtocolStack.guiListenAddress
     @Volatile
     private var activeGuiPort = initialGuiPort()
-    private val restClient = SyncthingRestClient(loadOrCreateApiKey()) {
-        formatGuiBaseUrl(activeGuiHost, activeGuiPort)
-    }
+    private val restClient = SyncthingRestClient(
+        apiKey = loadOrCreateApiKey(),
+        baseUrl = { formatGuiBaseUrl(activeGuiHost, activeGuiPort) },
+        onHttpError = { error ->
+            logError(
+                "REST 请求失败：${error.message}",
+                error,
+            )
+        },
+    )
 
     private val mutableSnapshot = MutableStateFlow(
         CoreSnapshot(
@@ -124,6 +131,48 @@ class CoreRuntime(
 
     override suspend fun updateDevice(configuration: NewDeviceConfiguration) = withContext(Dispatchers.IO) {
         restClient.updateDevice(configuration)
+    }
+
+    override suspend fun loadFolders(): FoldersSnapshot = withContext(Dispatchers.IO) {
+        FoldersSnapshot(
+            folders = restClient.configuredFolders().map { folder ->
+                val status = restClient.folderStatus(folder.id)
+                SyncthingFolder(
+                    id = folder.id,
+                    label = folder.label,
+                    group = folder.group,
+                    path = folder.path,
+                    type = folder.type,
+                    paused = folder.paused,
+                    fsWatcherEnabled = folder.fsWatcherEnabled,
+                    rescanIntervalSeconds = folder.rescanIntervalSeconds,
+                    versioning = folder.versioning.type,
+                    versioningSupported = folder.versioning.supported,
+                    versioningCleanoutDays = folder.versioning.cleanoutDays,
+                    versioningKeep = folder.versioning.keep,
+                    versioningCleanupIntervalSeconds = folder.versioning.cleanupIntervalSeconds,
+                    devices = folder.devices,
+                    state = status.state,
+                    localFiles = status.localFiles,
+                    localBytes = status.localBytes,
+                    needFiles = status.needFiles,
+                    needBytes = status.needBytes,
+                    pullErrors = status.pullErrors,
+                )
+            },
+        )
+    }
+
+    override suspend fun addFolder(
+        configuration: NewFolderConfiguration,
+    ) = withContext(Dispatchers.IO) {
+        restClient.addFolder(configuration)
+    }
+
+    override suspend fun updateFolder(
+        configuration: NewFolderConfiguration,
+    ) = withContext(Dispatchers.IO) {
+        restClient.updateFolder(configuration)
     }
 
     override suspend fun loadSetting(): SettingSnapshot = withContext(Dispatchers.IO) {

@@ -17,6 +17,13 @@ interface DevicesController {
     suspend fun updateDevice(configuration: NewDeviceConfiguration)
 }
 
+interface FoldersController {
+    suspend fun loadFolders(): FoldersSnapshot
+
+    suspend fun addFolder(configuration: NewFolderConfiguration)
+    suspend fun updateFolder(configuration: NewFolderConfiguration)
+}
+
 interface SettingController {
     suspend fun loadSetting(): SettingSnapshot
 

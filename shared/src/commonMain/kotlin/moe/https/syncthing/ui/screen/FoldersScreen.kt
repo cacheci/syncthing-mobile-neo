@@ -1,0 +1,632 @@
+package moe.https.syncthing.ui.screen
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.core.FolderDeviceConfiguration
+import moe.https.syncthing.core.NewFolderConfiguration
+import moe.https.syncthing.core.SyncthingDevice
+import moe.https.syncthing.core.SyncthingFolder
+import moe.https.syncthing.core.defaultFolderPath
+import moe.https.syncthing.ui.component.ImputableValueRow
+import moe.https.syncthing.ui.component.InfoSwitch
+import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.MessageCard
+import moe.https.syncthing.ui.model.FoldersUiState
+import moe.https.syncthing.ui.util.formatBytes
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
+
+@Composable
+internal fun FoldersScreen(
+    uiState: FoldersUiState,
+    coreState: CoreState,
+    topAppBarScrollBehavior: ScrollBehavior,
+    onRefresh: () -> Unit,
+    onEditFolder: (SyncthingFolder) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    PullToRefresh(
+        isRefreshing = uiState.isLoading,
+        onRefresh = onRefresh,
+        pullToRefreshState = pullToRefreshState,
+        topAppBarScrollBehavior = topAppBarScrollBehavior,
+        refreshTexts = listOf("下拉刷新", "松手刷新"),
+    ) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            when {
+                coreState != CoreState.RUNNING -> MessageCard(
+                    title = "核心未运行",
+                    message = "启动 Syncthing 核心后，才能读取文件夹状态。",
+                )
+
+                uiState.isLoading && uiState.folders.isEmpty() -> {}
+
+                uiState.errorMessage != null -> MessageCard(
+                    title = "读取失败",
+                    message = uiState.errorMessage,
+                    isError = true,
+                )
+
+                uiState.hasLoaded && uiState.folders.isEmpty() -> MessageCard(
+                    title = "暂无文件夹",
+                    message = "当前还没有配置 Syncthing 文件夹。",
+                )
+
+                else -> uiState.folders.forEach { folder ->
+                    FolderCard(folder, onEditFolder)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FolderCard(
+    folder: SyncthingFolder,
+    onEditFolder: (SyncthingFolder) -> Unit,
+) {
+    var holdDown by rememberSaveable { mutableStateOf(false) }
+    var foldContentStatus by rememberSaveable { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        pressFeedbackType = PressFeedbackType.Sink,
+        holdDownState = holdDown,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .combinedClickable(
+                        onLongClick = { onEditFolder( folder ) },
+                        onClick = { foldContentStatus = !foldContentStatus },
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "●",
+                        color = folder.statusColor(),
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = folder.label?.takeIf(String::isNotBlank) ?: folder.id,
+                        style = MiuixTheme.textStyles.headline1,
+                    )
+                }
+                Text(
+                    text = folder.statusName(),
+                    color = folder.statusColor(),
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+
+            AnimatedVisibility(
+                visible = foldContentStatus,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)  // 展开动画时长
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)  // 折叠动画时长
+                )
+            ) {
+                Column (verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HorizontalDivider()
+                    FolderValueRow("文件夹 ID", folder.id)
+                    FolderValueRow("路径", folder.path)
+                    FolderValueRow("类型", folder.typeName())
+                    FolderValueRow(
+                        "本地数据",
+                        "${folder.localFiles} 个文件 · ${formatBytes(folder.localBytes)}",
+                    )
+                    FolderValueRow(
+                        "待同步",
+                        "${folder.needFiles} 个文件 · ${formatBytes(folder.needBytes)}",
+                    )
+                    if (folder.pullErrors > 0) {
+                        FolderValueRow("同步错误", "${folder.pullErrors} 个文件", isError = true)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FolderValueRow(
+    label: String,
+    value: String,
+    isError: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.weight(0.35f),
+        )
+        Text(
+            text = value,
+            color = if (isError) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.65f),
+        )
+    }
+}
+
+@Composable
+internal fun AddFolderScreen(
+    modifier: Modifier = Modifier,
+    isSubmitting: Boolean,
+    devices: List<SyncthingDevice>,
+    existingFolder: SyncthingFolder? = null,
+    onConfirm: (NewFolderConfiguration) -> Unit,
+) {
+    val isEditingFolder = (existingFolder != null)
+    var label by remember(existingFolder) { mutableStateOf(existingFolder?.label.orEmpty()) }
+    var group by remember(existingFolder) { mutableStateOf(existingFolder?.group.orEmpty()) }
+    var folderId by remember(existingFolder) { mutableStateOf(existingFolder?.id.orEmpty()) }
+    var versioning by remember(existingFolder) {
+        mutableStateOf(existingFolder?.versioning ?: NewFolderConfiguration.Versioning.NONE)
+    }
+    var cleanoutDays by remember(existingFolder) {
+        mutableStateOf(existingFolder?.versioningCleanoutDays?.toString().orEmpty())
+    }
+    var keepVersions by remember(existingFolder) {
+        mutableStateOf(existingFolder?.versioningKeep?.toString() ?: "5")
+    }
+    var cleanupIntervalSeconds by remember(existingFolder) {
+        mutableStateOf(existingFolder?.versioningCleanupIntervalSeconds?.toString() ?: "3600")
+    }
+    var fsWatcherEnabled by remember(existingFolder) {
+        mutableStateOf(existingFolder?.fsWatcherEnabled ?: true)
+    }
+    var rescanIntervalSeconds by remember(existingFolder) {
+        mutableStateOf(existingFolder?.rescanIntervalSeconds?.toString() ?: "3600")
+    }
+    var folderType by remember(existingFolder) {
+        mutableStateOf(
+            when (existingFolder?.type) {
+                "receiveonly" -> NewFolderConfiguration.Type.RECEIVE_ONLY
+                "sendonly" -> NewFolderConfiguration.Type.SEND_ONLY
+                else -> NewFolderConfiguration.Type.SEND_RECEIVE
+            },
+        )
+    }
+    val remoteDevices = devices.filterNot { it.isLocal }
+    val remoteDeviceIds = remoteDevices.map { it.id }
+    var selectedDeviceIds by remember(existingFolder, remoteDeviceIds) {
+        mutableStateOf(
+            if (existingFolder == null) {
+                remoteDeviceIds.toSet()
+            } else {
+                existingFolder.devices.map { it.deviceId }.toSet()
+            },
+        )
+    }
+    var devicePasswords by remember(existingFolder, remoteDeviceIds) {
+        mutableStateOf(
+            existingFolder?.devices
+                ?.associate { it.deviceId to it.encryptionPassword }
+                .orEmpty(),
+        )
+    }
+    val numericValuesValid = listOf(
+        cleanoutDays,
+        keepVersions,
+        cleanupIntervalSeconds,
+        rescanIntervalSeconds,
+    ).all { value -> value.isBlank() || value.toIntOrNull()?.let { it >= 0 } == true }
+    val cleanupIntervalValid = (cleanupIntervalSeconds.toIntOrNull() ?: 3600) <= 31_536_000
+    val untrustedDevicePasswordsValid = remoteDevices
+        .filter { it.untrusted && it.id in selectedDeviceIds }
+        .all { device -> devicePasswords[device.id].orEmpty().isNotBlank() }
+    val canSubmit = label.trim().isNotBlank() &&
+        folderId.trim().isNotBlank() &&
+        numericValuesValid &&
+        cleanupIntervalValid &&
+        untrustedDevicePasswordsValid &&
+        !isSubmitting
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 20.dp, horizontal = 20.dp),
+    ) {
+        InfoSwitchCard(
+            title = "文件夹",
+            content = {
+                ImputableValueRow(
+                    label = "文件夹 ID",
+                    value = folderId,
+                    valueLabel = "必填，唯一",
+                    allowEdit = !isSubmitting && !isEditingFolder,
+                    onValueChange = { folderId = it },
+                )
+
+                ImputableValueRow(
+                    label = "名称",
+                    value = label,
+                    valueLabel = "可选",
+                    allowEdit = !isSubmitting,
+                    onValueChange = { label = it },
+                )
+
+                ImputableValueRow(
+                    label = "文件夹组",
+                    value = group,
+                    valueLabel = "可选",
+                    allowEdit = !isSubmitting,
+                    onValueChange = { group = it },
+                )
+
+                ArrowPreference(
+                    title = "文件夹位置",
+                    summary = existingFolder?.path ?: if (folderId.isBlank()) {
+                        "~/syncfolders/{folderId}"
+                    } else {
+                        defaultFolderPath(folderId.trim())
+                    },
+                    onClick = null,
+                    enabled = false,
+                    // TODO: 先不做
+                )
+            }
+        )
+
+        InfoSwitchCard(
+            title = "设备",
+            content = {
+                if (remoteDevices.isEmpty()) {
+                    Text(
+                        text = "暂无可共享的远程设备",
+                        color = MiuixTheme.colorScheme.onBackground,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                    )
+                } else {
+                    remoteDevices.forEach { device ->
+                        AddFolderDevices(
+                            device = device,
+                            isSubmitting = isSubmitting,
+                            selected = device.id in selectedDeviceIds,
+                            encryptionPassword = devicePasswords[device.id].orEmpty(),
+                            onSelectedChange = { selected ->
+                                selectedDeviceIds = if (selected) {
+                                    selectedDeviceIds + device.id
+                                } else {
+                                    selectedDeviceIds - device.id
+                                }
+                            },
+                            onEncryptionPasswordChange = { password ->
+                                devicePasswords = devicePasswords + (device.id to password)
+                            },
+                        )
+                    }
+                }
+            }
+        )
+
+        InfoSwitchCard(
+            title = "版本控制",
+            content = {
+                WindowDropdownPreference(
+                    title = "文件版本控制",
+                    summary = if (existingFolder?.versioningSupported == false) {
+                        "当前版本控制类型暂不支持编辑"
+                    } else {
+                        null
+                    },
+                    items = listOf("不启用", "回收站版本控制", "简易版本控制"), // 只做这三个
+                    selectedIndex = versioning.ordinal,
+                    enabled = !isSubmitting && existingFolder?.versioningSupported != false,
+                    onSelectedIndexChange = { selectedIndex ->
+                        versioning = NewFolderConfiguration.Versioning.entries[selectedIndex]
+                    },
+                )
+
+                // 回收站版本控制
+                AnimatedVisibility(
+                    visible = versioning == NewFolderConfiguration.Versioning.TRASHCAN,
+                    enter = expandVertically(
+                        animationSpec = tween(durationMillis = 300)
+                    ),
+                    exit = shrinkVertically(
+                        animationSpec = tween(durationMillis = 300)
+                    ),
+                ) {
+                    Column {
+                        ImputableValueRow(
+                            label = "回收站保留时长（天）",
+                            value = cleanoutDays,
+                            valueLabel = "永久",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { cleanoutDays = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+
+                        // TODO: 历史版本路径（先不做）
+
+                        ImputableValueRow(
+                            label = "定期清除间隔（秒）",
+                            value = cleanupIntervalSeconds,
+                            valueLabel = "3600",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { cleanupIntervalSeconds = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                    }
+                }
+
+                // 简易版本控制
+                AnimatedVisibility(
+                    visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
+                    enter = expandVertically(
+                        animationSpec = tween(durationMillis = 300)
+                    ),
+                    exit = shrinkVertically(
+                        animationSpec = tween(durationMillis = 300)
+                    ),
+                ) {
+                    Column {
+                        ImputableValueRow(
+                            label = "删除文件保留时长（天）",
+                            value = cleanoutDays,
+                            valueLabel = "永久",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { cleanoutDays = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+
+                        ImputableValueRow(
+                            label = "保留版本数量",
+                            value = keepVersions,
+                            valueLabel = "5",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { keepVersions = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+
+                        // TODO: 历史版本路径（先不做）
+
+                        ImputableValueRow(
+                            label = "定期清除间隔（秒）",
+                            value = cleanupIntervalSeconds,
+                            valueLabel = "禁用",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { cleanupIntervalSeconds = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                    }
+                }
+            }
+        )
+
+        InfoSwitchCard(
+            title = "忽略模式",
+            content = {
+                InfoSwitch(
+                    title = "使用忽略模式",
+                    summary = "暂未支持编辑 .stignore",
+                    checked = false,
+                    enabled = false,
+                    onCheckedChange = {},
+                )
+            }
+        )
+
+        InfoSwitchCard(
+            title = "同步控制",
+            content = {
+
+                WindowDropdownPreference(
+                    title = "文件变化检测",
+                    items = listOf("监听并定期扫描", "定期扫描"),
+                    selectedIndex = if (fsWatcherEnabled) 0 else 1,
+                    enabled = !isSubmitting,
+                    onSelectedIndexChange = { selectedIndex ->
+                        fsWatcherEnabled = selectedIndex == 0
+                    },
+                )
+
+                ImputableValueRow(
+                    label = "重新扫描间隔（秒）",
+                    value = rescanIntervalSeconds,
+                    valueLabel = "3600",
+                    allowEdit = !isSubmitting,
+                    onValueChange = { rescanIntervalSeconds = it },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+
+                WindowDropdownPreference(
+                    title = "同步方向",
+                    items = listOf("双向", "单向下载", "单向上传"), // TODO: 不做 "单向加密下载"
+                    selectedIndex = folderType.ordinal,
+                    enabled = !isSubmitting,
+                    onSelectedIndexChange = { selectedIndex ->
+                        folderType = NewFolderConfiguration.Type.entries[selectedIndex]
+                    },
+                )
+            }
+
+        )
+
+        if (!numericValuesValid || !cleanupIntervalValid || !untrustedDevicePasswordsValid) {
+            Text(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+                text = when {
+                    !cleanupIntervalValid -> "定期清除间隔不能超过一年。"
+                    !numericValuesValid -> "时间和数量设置必须是非负整数。"
+                    else -> "与不受信任设备共享时必须设置加密密码。"
+                },
+                color = MiuixTheme.colorScheme.error,
+                style = MiuixTheme.textStyles.main,
+            )
+        }
+
+        TextButton(
+            text = if (isEditingFolder) "保存" else "添加",
+            enabled = canSubmit,
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 16.dp)
+                .fillMaxWidth(),
+            onClick = {
+                onConfirm(
+                    NewFolderConfiguration(
+                        folderId = folderId,
+                        label = label,
+                        group = group,
+                        versioning = versioning,
+                        updateVersioning = existingFolder?.versioningSupported != false,
+                        versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,
+                        versioningKeep = keepVersions.toIntOrNull() ?: 5,
+                        versioningCleanupIntervalSeconds = cleanupIntervalSeconds.toIntOrNull() ?: 3600,
+                        fsWatcherEnabled = fsWatcherEnabled,
+                        rescanIntervalSeconds = rescanIntervalSeconds.toIntOrNull() ?: 3600,
+                        type = folderType,
+                        devices = remoteDevices
+                            .filter { it.id in selectedDeviceIds }
+                            .map { device ->
+                                FolderDeviceConfiguration(
+                                    deviceId = device.id,
+                                    encryptionPassword = devicePasswords[device.id].orEmpty(),
+                                )
+                            },
+                        availableDeviceIds = remoteDeviceIds.toSet(),
+                    ),
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun AddFolderDevices(
+    device: SyncthingDevice,
+    isSubmitting: Boolean,
+    selected: Boolean,
+    encryptionPassword: String,
+    onSelectedChange: (Boolean) -> Unit,
+    onEncryptionPasswordChange: (String) -> Unit,
+) {
+    Column {
+        InfoSwitch (
+            title = device.name?.takeIf(String::isNotBlank) ?: "未命名设备",
+            summary = if (device.id == device.name) null else device.id,
+            checked = selected,
+            enabled = !isSubmitting,
+            onCheckedChange = onSelectedChange,
+        )
+        AnimatedVisibility(
+            visible = selected,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300)
+            ),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300)
+            ),
+        ) {
+            ImputableValueRow(
+                label = "共享密码",
+                value = encryptionPassword,
+                onValueChange = onEncryptionPasswordChange,
+                valueLabel = "无密码",
+                allowEdit = !isSubmitting,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = PasswordVisualTransformation(),
+            )
+        }
+    }
+}
+
+private fun SyncthingFolder.statusName(): String = when {
+    paused -> "已暂停"
+    pullErrors > 0 -> "存在错误"
+    state == "idle" && needFiles == 0L -> "已同步"
+    state == "scanning" -> "正在扫描"
+    state == "scan-wait" -> "等待扫描"
+    state == "sync-wait" -> "等待同步"
+    state == "sync-preparing" -> "准备同步"
+    state == "syncing" -> "正在同步"
+    state == "clean-wait" -> "等待清理"
+    state == "cleaning" -> "正在清理"
+    state == "error" -> "状态异常"
+    needFiles > 0 -> "需要同步"
+    else -> state.ifBlank { "未知" }
+}
+
+@Composable
+private fun SyncthingFolder.statusColor(): Color = when {
+    paused -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+    pullErrors > 0 || state == "error" -> MiuixTheme.colorScheme.error
+    state == "idle" && needFiles == 0L -> Color(0xFF2E7D32)
+    else -> Color(0xFFF57C00)
+}
+
+private fun SyncthingFolder.typeName(): String = when (type) {
+    "sendreceive" -> "发送与接收"
+    "sendonly" -> "仅发送"
+    "receiveonly" -> "仅接收"
+    "receiveencrypted" -> "接收加密数据"
+    else -> type.ifBlank { "未知" }
+}

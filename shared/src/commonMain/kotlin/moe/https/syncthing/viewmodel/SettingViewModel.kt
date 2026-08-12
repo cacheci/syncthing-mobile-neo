@@ -64,7 +64,7 @@ class SettingViewModel(
                             formState = formState,
                             accessMode = snapshot.accessMode,
                             isLoading = false,
-                            isFormValid = formState.isValid(snapshot.accessMode),
+                            isFormValid = formState.isValid(snapshot.configuration, snapshot.accessMode),
                             hasLoaded = true,
                             errorMessage = null,
                         )
@@ -91,7 +91,9 @@ class SettingViewModel(
             } else {
                 it.copy(
                     formState = formState,
-                    isFormValid = formState.isValid(it.accessMode),
+                    isFormValid = it.setting?.let { setting ->
+                        formState.isValid(setting, it.accessMode)
+                    } == true,
                 )
             }
         }
@@ -111,12 +113,7 @@ class SettingViewModel(
         val configuration = formState.toConfiguration(setting)
         val normalizedConfiguration = configuration.normalized()
         val accessMode = state.accessMode
-        val validationError = when (accessMode) {
-            SettingAccessMode.STARTUP_ONLY -> normalizedConfiguration.startupValidationError()
-            SettingAccessMode.REST,
-            SettingAccessMode.CONFIG_FILE -> normalizedConfiguration.validationError()
-            null -> "设置尚未加载"
-        }
+        val validationError = formState.validationError(setting, accessMode)
         if (validationError != null) {
             mutableUiState.update {
                 it.copy(errorMessage = validationError, successMessage = null)
@@ -155,7 +152,7 @@ class SettingViewModel(
                             formState = savedFormState,
                             accessMode = result.accessMode,
                             isSaving = false,
-                            isFormValid = savedFormState.isValid(result.accessMode),
+                            isFormValid = savedFormState.isValid(savedConfiguration, result.accessMode),
                             hasLoaded = true,
                             successMessage = result.successMessage(),
                             restartRequired = result.restartRequired,
@@ -219,22 +216,10 @@ private fun SettingConfiguration.toFormState(): SettingFormState = SettingFormSt
 private fun Double.editableString(): String =
     if (this % 1.0 == 0.0) toLong().toString() else toString()
 
-private fun SettingFormState.isValid(accessMode: SettingAccessMode?): Boolean {
-    if (accessMode == null) return false
-    if (accessMode == SettingAccessMode.STARTUP_ONLY) return true
-
-    return listOf(
-        guiPort.toIntOrNull() ?: 8384,
-        reconnectionIntervalSeconds.toIntOrNull() ?: 20,
-        localDiscoveryPort.toIntOrNull() ?: 0,
-        connectionLimitMax.toIntOrNull() ?: 0,
-    ).all { it in 0..65535 } && listOf(
-        maxSendKiBPerSecond.toIntOrNull() ?: 0,
-        maxReceiveKiBPerSecond.toIntOrNull() ?: 0,
-    ).all { it >= 0 } && (
-        (minHomeDiskFree.toDoubleOrNull() ?: 1.0) >= 0.0
-    )
-}
+private fun SettingFormState.isValid(
+    setting: SettingConfiguration,
+    accessMode: SettingAccessMode?,
+): Boolean = validationError(setting, accessMode) == null
 
 private fun SettingFormState.toConfiguration(setting: SettingConfiguration): SettingConfiguration = setting.copy(
     deviceName = deviceName,
@@ -256,7 +241,7 @@ private fun SettingFormState.toConfiguration(setting: SettingConfiguration): Set
     globalDiscoveryEnabled = globalDiscoveryEnabled,
     globalDiscoveryServers = globalDiscoveryServers.toValues(),
     localDiscoveryEnabled = localDiscoveryEnabled,
-    localDiscoveryPort = localDiscoveryPort.toIntOrNull() ?: 0,
+    localDiscoveryPort = localDiscoveryPort.toIntOrNull() ?: 21027,
     localDiscoveryMulticastAddress = localDiscoveryMulticastAddress,
     announceLanAddresses = announceLanAddresses,
     natEnabled = natEnabled,
@@ -279,41 +264,79 @@ private fun SettingConfiguration.normalized(): SettingConfiguration = copy(
     alwaysLocalNetworks = alwaysLocalNetworks.normalizedValues(),
 )
 
-private fun SettingConfiguration.validationError(): String? = when {
-    deviceName.isBlank() -> "设备名不能为空"
-    !minHomeDiskFree.isFinite() || minHomeDiskFree < 0 -> "最低磁盘剩余空间必须是非负数"
-    minHomeDiskFreeUnit == SettingConfiguration.DiskSpaceUnit.PERCENT && minHomeDiskFree > 100 -> {
-        "最低磁盘剩余空间使用百分比时不能超过 100%"
-    }
-    guiListenAddress !in SUPPORTED_GUI_LISTEN_ADDRESSES -> {
-        "监听地址仅支持本机地址。"
-    }
-    guiPort !in 1..65535 -> "GUI 端口必须在 1 到 65535 之间"
-    guiAuthenticationEnabled && guiUser.isBlank() -> "启用 GUI 身份验证时，用户名不能为空"
-    guiAuthenticationEnabled && !guiPasswordConfigured && newGuiPassword.isBlank() -> {
-        "密码不能为空"
-    }
-    newGuiPassword.isNotEmpty() && newGuiPassword.isBlank() -> "身份验证密码不能仅包含空字符"
-    newGuiPassword.encodeToByteArray().size > 72 -> "身份验证密码不能超过 72 字节"
-    listenAddresses.isEmpty() -> "至少需要一个设备连接监听地址"
-    maxSendKiBPerSecond < 0 || maxReceiveKiBPerSecond < 0 -> "上传和下载速率限制必须是非负整数"
-    reconnectionIntervalSeconds <= 0 -> "重新连接间隔必须大于 0 秒"
-    globalDiscoveryEnabled && globalDiscoveryServers.isEmpty() -> "启用全局发现时，至少需要一个发现服务器"
-    localDiscoveryPort !in 1..65535 -> "本地发现端口必须在 1 到 65535 之间"
-    localDiscoveryEnabled && localDiscoveryMulticastAddress.isBlank() -> "启用本地发现时，IPv6 组播地址不能为空"
-    connectionLimitEnough < 0 || connectionLimitMax < 0 -> "连接数量限制必须是非负整数"
-    connectionLimitMax in 1..<connectionLimitEnough -> {
-        "足够连接数不能大于最大连接数"
-    }
-    else -> null
-}
+private fun SettingFormState.validationError(
+    setting: SettingConfiguration,
+    accessMode: SettingAccessMode?,
+): String? {
+    if (accessMode == null) return "设置尚未加载"
 
-private fun SettingConfiguration.startupValidationError(): String? = when {
-    guiListenAddress !in SUPPORTED_GUI_LISTEN_ADDRESSES -> {
-        "监听地址仅支持本机地址。"
+    if (guiPort.toIntOrNull() == null) return "WebUI 端口必须是整数"
+    if (guiPort.toInt() !in 1..65535) return "WebUI 端口必须在 1 到 65535 之间"
+    if (accessMode == SettingAccessMode.STARTUP_ONLY) return null
+
+    val configuration = toConfiguration(setting).normalized()
+    if (deviceName.isBlank()) return "设备名不能为空"
+    if (minHomeDiskFree.isNotBlank() && minHomeDiskFree.toDoubleOrNull() == null) {
+        return "最低磁盘剩余空间必须是数字"
     }
-    guiPort !in 1..65535 -> "GUI 端口必须在 1 到 65535 之间"
-    else -> null
+    if (!configuration.minHomeDiskFree.isFinite() || configuration.minHomeDiskFree < 0) {
+        return "最低磁盘剩余空间必须是非负数"
+    }
+    if (configuration.minHomeDiskFreeUnit == SettingConfiguration.DiskSpaceUnit.PERCENT &&
+        configuration.minHomeDiskFree > 100
+    ) {
+        return "最低磁盘剩余空间使用百分比时不能超过 100%"
+    }
+    if (guiAuthenticationEnabled && guiUser.isBlank()) {
+        return "启用 GUI 身份验证时，用户名不能为空"
+    }
+    if (guiAuthenticationEnabled && !setting.guiPasswordConfigured && newGuiPassword.isBlank()) {
+        return "密码不能为空"
+    }
+    if (newGuiPassword.isNotEmpty() && newGuiPassword.isBlank()) {
+        return "身份验证密码不能仅包含空字符"
+    }
+    if (newGuiPassword.encodeToByteArray().size > 72) {
+        return "身份验证密码不能超过 72 字节"
+    }
+    if (listenAddresses.isEmpty()) return "至少需要一个设备连接监听地址"
+    if (maxSendKiBPerSecond.isNotBlank() && maxSendKiBPerSecond.toIntOrNull() == null) {
+        return "上传限速必须是整数"
+    }
+    if (maxReceiveKiBPerSecond.isNotBlank() && maxReceiveKiBPerSecond.toIntOrNull() == null) {
+        return "下载限速必须是整数"
+    }
+    if (configuration.maxSendKiBPerSecond < 0 || configuration.maxReceiveKiBPerSecond < 0) {
+        return "上传和下载速率限制必须是非负整数"
+    }
+    if (reconnectionIntervalSeconds.isNotBlank() && reconnectionIntervalSeconds.toIntOrNull() == null) {
+        return "重新连接间隔必须是整数"
+    }
+    if (configuration.reconnectionIntervalSeconds < 0) {
+        return "重新连接间隔必须是非负整数"
+    }
+    if (globalDiscoveryEnabled && globalDiscoveryServers.isEmpty()) {
+        return "启用全局发现时，至少需要一个发现服务器"
+    }
+    if (localDiscoveryPort.isNotBlank() && localDiscoveryPort.toIntOrNull() == null) {
+        return "本地发现端口必须是整数"
+    }
+    if (configuration.localDiscoveryPort !in 1..65535) {
+        return "本地发现端口必须在 1 到 65535 之间"
+    }
+    if (localDiscoveryEnabled && localDiscoveryMulticastAddress.isBlank()) {
+        return "启用本地发现时，IPv6 组播地址不能为空"
+    }
+    if (connectionLimitMax.isNotBlank() && connectionLimitMax.toIntOrNull() == null) {
+        return "最大连接数必须是整数"
+    }
+    if (configuration.connectionLimitEnough !in 0..1023 || configuration.connectionLimitMax !in 0..1023) {
+        return "连接数量限制必须在 0 到 1023 之间"
+    }
+    if (configuration.connectionLimitMax in 1..<configuration.connectionLimitEnough) {
+        return "足够连接数不能大于最大连接数"
+    }
+    return null
 }
 
 private fun moe.https.syncthing.core.SettingSaveResult.successMessage(): String = when (accessMode) {

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -61,23 +62,5 @@ internal fun WebviewScreen(
         CoreState.RUNNING -> "WebUI 地址不可用" to "请检查 GUI 监听地址和端口设置。"
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = title,
-            style = MiuixTheme.textStyles.headline1,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = message,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-    }
+    CoreNotReadyTakePlace(title = title, message = message, modifier = modifier)
 }

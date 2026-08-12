@@ -47,10 +47,10 @@ import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_qr
+import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.ImputableValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
-import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.model.DevicesUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -85,35 +85,35 @@ internal fun DevicesScreen(
         topAppBarScrollBehavior = topAppBarScrollBehavior,
         refreshTexts = listOf("下拉刷新", "松手刷新"),
     ) {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (coreState != CoreState.RUNNING) {
-                MessageCard(
-                    title = "核心未运行",
-                    message = "启动 Syncthing 核心后，才能读取设备连接状态。",
-                )
-            } else if (uiState.isLoading && uiState.devices.isEmpty()) {
-                MessageCard(
-                    title = "正在读取设备",
-                    message = "正在从 Syncthing 获取设备列表…",
-                )
-            } else if (uiState.errorMessage != null) {
-                MessageCard(
-                    title = "读取失败",
-                    message = uiState.errorMessage,
-                    isError = true,
-                )
-            } else if (uiState.hasLoaded && uiState.devices.isEmpty()) {
-                MessageCard(
-                    title = "暂无设备",
-                    message = "当前还没有配置其他 Syncthing 设备。",
-                )
-            } else {
+        if (coreState != CoreState.RUNNING) {
+            CoreNotReadyTakePlace(
+                title = "核心未运行",
+                message = "启动后才能读取设备连接状态。",
+            )
+        } else if (uiState.isLoading && uiState.devices.isEmpty()) {
+            CoreNotReadyTakePlace(
+                title = "正在读取设备",
+                message = "正在获取设备列表…",
+            )
+        } else if (uiState.errorMessage != null) {
+            CoreNotReadyTakePlace(
+                title = "读取失败",
+                message = uiState.errorMessage,
+                isError = true,
+            )
+        } else if (uiState.hasLoaded && uiState.devices.isEmpty()) {
+            CoreNotReadyTakePlace(
+                title = "暂无设备",
+                message = "当前还没有配置的设备。",
+            )
+        } else {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 uiState.devices.forEach { device ->
                     if (device.isLocal) LocalDeviceCard(device, uiState.localInfo) else RemoteDeviceCard(device, onEditDevice)
                 }

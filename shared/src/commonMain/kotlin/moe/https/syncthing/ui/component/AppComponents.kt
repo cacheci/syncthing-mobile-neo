@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
@@ -317,6 +318,34 @@ internal fun InfoSwitch(
             )
         },
     )
+}
+
+@Composable
+internal fun CoreNotReadyTakePlace(
+    modifier: Modifier = Modifier,
+    title: String,
+    message: String,
+    isError: Boolean = false,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = title,
+            style = MiuixTheme.textStyles.headline1,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = message,
+            color = if (isError) { MiuixTheme.colorScheme.error } else { MiuixTheme.colorScheme.onSurfaceVariantSummary },
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
 }
 
 @Composable

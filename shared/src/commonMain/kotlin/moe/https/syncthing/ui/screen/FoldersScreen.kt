@@ -37,6 +37,7 @@ import moe.https.syncthing.core.NewFolderConfiguration
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.defaultFolderPath
+import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.ImputableValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
@@ -73,33 +74,33 @@ internal fun FoldersScreen(
         topAppBarScrollBehavior = topAppBarScrollBehavior,
         refreshTexts = listOf("下拉刷新", "松手刷新"),
     ) {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when {
-                coreState != CoreState.RUNNING -> MessageCard(
-                    title = "核心未运行",
-                    message = "启动 Syncthing 核心后，才能读取文件夹状态。",
-                )
+        when {
+            coreState != CoreState.RUNNING -> CoreNotReadyTakePlace(
+                title = "核心未运行",
+                message = "启动后才能读取文件夹状态。",
+            )
 
-                uiState.isLoading && uiState.folders.isEmpty() -> {}
+            uiState.isLoading && uiState.folders.isEmpty() -> {}
 
-                uiState.errorMessage != null -> MessageCard(
-                    title = "读取失败",
-                    message = uiState.errorMessage,
-                    isError = true,
-                )
+            uiState.errorMessage != null -> CoreNotReadyTakePlace(
+                title = "读取失败",
+                message = uiState.errorMessage,
+                isError = true,
+            )
 
-                uiState.hasLoaded && uiState.folders.isEmpty() -> MessageCard(
-                    title = "暂无文件夹",
-                    message = "当前还没有配置 Syncthing 文件夹。",
-                )
+            uiState.hasLoaded && uiState.folders.isEmpty() -> CoreNotReadyTakePlace(
+                title = "暂无文件夹",
+                message = "当前还没有配置文件夹。",
+            )
 
-                else -> uiState.folders.forEach { folder ->
+            else -> uiState.folders.forEach { folder ->
+                Column(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     FolderCard(folder, onEditFolder)
                 }
             }

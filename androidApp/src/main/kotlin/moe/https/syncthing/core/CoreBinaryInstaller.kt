@@ -11,6 +11,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import androidx.core.content.edit
 
 class CoreBinaryInstaller(context: Context) {
     private val applicationContext = context.applicationContext
@@ -57,7 +58,7 @@ class CoreBinaryInstaller(context: Context) {
                 )
             }
             Os.chmod(binaryFile.absolutePath, EXECUTABLE_MODE)
-            preferences.edit().putString(KEY_VERSION, version).apply()
+            preferences.edit { putString(KEY_VERSION, version) }
             version
         } catch (error: Exception) {
             candidate.delete()

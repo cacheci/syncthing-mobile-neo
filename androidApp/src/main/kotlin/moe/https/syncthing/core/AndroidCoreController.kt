@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 class AndroidCoreController(
     context: Context,
-    private val runtime: CoreRuntime,
+    runtime: CoreRuntime,
 ) : CoreController {
     private val applicationContext = context.applicationContext
 

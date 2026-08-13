@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.os.PowerManager
@@ -23,11 +22,13 @@ import moe.https.syncthing.MainActivity
 import moe.https.syncthing.R
 import moe.https.syncthing.SyncthingApplication
 import kotlin.math.min
+import androidx.core.content.edit
+import kotlin.time.Duration.Companion.milliseconds
 
 class SyncthingCoreService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val preferences by lazy {
-        getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        getSharedPreferences(PREFERENCES, MODE_PRIVATE)
     }
     private val runtime: CoreRuntime
         get() = (application as SyncthingApplication).coreRuntime
@@ -73,7 +74,7 @@ class SyncthingCoreService : Service() {
     }
 
     private fun requestStart() {
-        preferences.edit().putBoolean(KEY_DESIRED_RUNNING, true).apply()
+        preferences.edit { putBoolean(KEY_DESIRED_RUNNING, true) }
         if (!foregroundStarted) {
             foregroundStarted = true
             startForeground(NOTIFICATION_ID, buildNotification(runtime.snapshot.value))
@@ -105,7 +106,7 @@ class SyncthingCoreService : Service() {
 
                 failures = if (result.runtimeMillis >= STABLE_SESSION_MILLIS) 0 else failures + 1
                 if (!result.started || failures >= MAX_RESTART_ATTEMPTS) {
-                    preferences.edit().putBoolean(KEY_DESIRED_RUNNING, false).apply()
+                    preferences.edit { putBoolean(KEY_DESIRED_RUNNING, false) }
                     runtime.fail(
                         message = "核心连续启动失败，已停止自动重试",
                         includeCoreLogs = true,
@@ -117,7 +118,7 @@ class SyncthingCoreService : Service() {
                     INITIAL_BACKOFF_MILLIS * (1L shl (failures - 1).coerceAtLeast(0)),
                     MAX_BACKOFF_MILLIS,
                 )
-                delay(backoff)
+                delay(backoff.milliseconds)
             }
 
             releaseWakeLock()
@@ -130,7 +131,7 @@ class SyncthingCoreService : Service() {
     }
 
     private fun requestStop() {
-        preferences.edit().putBoolean(KEY_DESIRED_RUNNING, false).apply()
+        preferences.edit { putBoolean(KEY_DESIRED_RUNNING, false) }
         serviceScope.launch {
             val runningSupervisor = supervisorJob
             supervisorJob = null

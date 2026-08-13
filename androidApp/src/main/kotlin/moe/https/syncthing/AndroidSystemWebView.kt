@@ -33,10 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.core.net.toUri
 
 @Composable
 internal fun AndroidSystemWebView(
@@ -50,7 +50,7 @@ internal fun AndroidSystemWebView(
         var canGoBack by remember { mutableStateOf(false) }
         val appliedReloadToken = remember { intArrayOf(reloadToken) }
         val currentOnScroll by rememberUpdatedState(onScroll)
-        val lifecycleOwner = LocalLifecycleOwner.current
+        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
         BackHandler(enabled = canGoBack) {
             webView?.goBack()
@@ -145,7 +145,7 @@ internal fun AndroidSystemWebView(
                             view: WebView,
                             request: WebResourceRequest,
                         ): Boolean {
-                            if (!request.isForMainFrame || request.url.hasSameOrigin(Uri.parse(url))) {
+                            if (!request.isForMainFrame || request.url.hasSameOrigin(url.toUri())) {
                                 return false
                             }
                             return openExternalUrl(view, request.url)
@@ -181,7 +181,7 @@ internal fun AndroidSystemWebView(
                             host: String,
                             realm: String,
                         ) {
-                            if (host.equals(Uri.parse(url).host, ignoreCase = true)) {
+                            if (host.equals(url.toUri().host, ignoreCase = true)) {
                                 showAuthenticationDialog(view, handler, host, realm)
                             } else {
                                 handler.cancel()

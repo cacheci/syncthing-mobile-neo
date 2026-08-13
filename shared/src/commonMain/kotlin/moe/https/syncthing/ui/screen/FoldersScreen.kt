@@ -27,9 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.FolderDeviceConfiguration
@@ -41,7 +39,6 @@ import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.ImputableValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
-import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.util.formatBytes
 import top.yukonga.miuix.kmp.basic.Card
@@ -258,11 +255,7 @@ internal fun AddFolderScreen(
     val remoteDeviceIds = remoteDevices.map { it.id }
     var selectedDeviceIds by remember(existingFolder, remoteDeviceIds) {
         mutableStateOf(
-            if (existingFolder == null) {
-                remoteDeviceIds.toSet()
-            } else {
-                existingFolder.devices.map { it.deviceId }.toSet()
-            },
+            existingFolder?.devices?.map { it.deviceId }?.toSet() ?: remoteDeviceIds.toSet(),
         )
     }
     var devicePasswords by remember(existingFolder, remoteDeviceIds) {

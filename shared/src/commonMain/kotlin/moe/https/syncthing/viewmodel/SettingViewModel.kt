@@ -355,9 +355,3 @@ private fun List<String>.normalizedValues(): List<String> = map(String::trim)
 
 private fun Throwable.userMessage(): String =
     message?.takeIf(String::isNotBlank) ?: javaClass.simpleName
-
-private val SUPPORTED_GUI_LISTEN_ADDRESSES = setOf(
-    "127.0.0.1",
-    "localhost",
-    "::1",
-)

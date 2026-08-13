@@ -1,5 +1,7 @@
 package moe.https.syncthing.ui.component
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +10,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -25,13 +31,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.generated.resources.Res
+import moe.https.syncthing.generated.resources.logo_qr
+import moe.https.syncthing.platform.rememberClipboard
 import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.util.displayName
 import moe.https.syncthing.ui.util.formatBytes
 import moe.https.syncthing.ui.util.formatDuration
+import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -39,6 +51,8 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -346,6 +360,73 @@ internal fun CoreNotReadyTakePlace(
             modifier = Modifier.padding(top = 8.dp),
         )
     }
+}
+
+@Composable
+internal fun DeviceShareOverlayDialog(
+    show: Boolean,
+    onDismissRequest: () -> Unit,
+    onDismissFinished: () -> Unit,
+    deviceID: String,
+) {
+    val clipboard = rememberClipboard()
+
+    OverlayDialog(
+        show = show,
+        title = "分享设备",
+        onDismissRequest = onDismissRequest,
+        onDismissFinished = onDismissFinished,
+        content = {
+            Column (
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box (
+                    modifier = Modifier
+                        .padding(vertical = 10.dp)
+                        .width(140.dp)
+                        .height(140.dp)
+                        .background(
+                            Color(0xFFFFFFFF),
+                            shape = RoundedCornerShape(8.dp),
+                        ),
+                ) {
+                    Image(
+                        modifier = Modifier.padding(10.dp).size(120.dp),
+                        painter = rememberQrCodePainter(
+                            data = deviceID,
+                            logoPainter = painterResource(Res.drawable.logo_qr),
+                            logoSize = 0.2f,
+                        ),
+                        contentDescription = deviceID,
+                    )
+                }
+                Text(
+                    modifier = Modifier.padding(
+                        vertical = 10.dp,
+                        horizontal = 20.dp,
+                    ),
+                    text = deviceID,
+                    textAlign = TextAlign.Center
+                )
+                Row {
+                    TextButton(
+                        modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
+                        text = "复制",
+                        onClick = {
+                            clipboard.copy(deviceID)
+                            onDismissRequest()
+                        },
+                    )
+                    TextButton(
+                        modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
+                        text = "确定",
+                        onClick = onDismissRequest,
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                    )
+                }
+            }
+        }
+    )
 }
 
 @Composable

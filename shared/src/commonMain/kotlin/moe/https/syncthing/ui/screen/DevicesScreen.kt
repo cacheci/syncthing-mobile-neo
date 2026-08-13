@@ -4,24 +4,17 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -33,21 +26,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.NewDeviceConfiguration
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingDiscoveryStatus
 import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingListenAddress
-import moe.https.syncthing.generated.resources.Res
-import moe.https.syncthing.generated.resources.logo_qr
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
+import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
 import moe.https.syncthing.ui.component.ImputableValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
@@ -238,58 +228,12 @@ private fun RemoteDeviceCard(
         }
     }
 
-    OverlayDialog(
+
+    DeviceShareOverlayDialog(
         show = showShareOverlay,
-        title = "分享设备",
         onDismissRequest = { showShareOverlay = false },
         onDismissFinished = { holdDown = false },
-        content = {
-            Column (
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box (
-                    modifier = Modifier
-                        .padding(vertical = 10.dp)
-                        .width(140.dp)
-                        .height(140.dp)
-                        .background(
-                            Color(0xFFFFFFFF),
-                            shape = RoundedCornerShape(8.dp),
-                        ),
-                ) {
-                    Image(
-                        modifier = Modifier.padding(10.dp).size(120.dp),
-                        painter = rememberQrCodePainter(
-                            data = device.id,
-                            logoPainter = painterResource(Res.drawable.logo_qr),
-                            logoSize = 0.2f,
-                        ),
-                        contentDescription = device.id,
-                    )
-                }
-                Text(
-                    modifier = Modifier.padding(
-                        vertical = 10.dp,
-                        horizontal = 20.dp,
-                    ),
-                    text = device.id,
-                    textAlign = TextAlign.Center
-                )
-                Row {
-                    TextButton(
-                        modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
-                        text = "复制",
-                        onClick = {}, // TODO: copy it to clip
-                    )
-                    TextButton(
-                        modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
-                        text = "确定",
-                        onClick = { showShareOverlay = false },
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-            }
-        }
+        deviceID = device.id,
     )
 }
 
@@ -467,58 +411,11 @@ private fun LocalDeviceCard(
         }
     )
 
-    OverlayDialog(
+    DeviceShareOverlayDialog(
         show = showShareOverlay,
-        title = "分享设备",
         onDismissRequest = { showShareOverlay = false },
         onDismissFinished = { holdDown = false },
-        content = {
-            Column (
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box (
-                    modifier = Modifier
-                        .padding(vertical = 10.dp)
-                        .width(140.dp)
-                        .height(140.dp)
-                        .background(
-                            Color(0xFFFFFFFF),
-                            shape = RoundedCornerShape(8.dp),
-                        ),
-                ) {
-                    Image(
-                        modifier = Modifier.padding(10.dp).size(120.dp),
-                        painter = rememberQrCodePainter(
-                            data = device.id,
-                            logoPainter = painterResource(Res.drawable.logo_qr),
-                            logoSize = 0.2f,
-                        ),
-                        contentDescription = device.id,
-                    )
-                }
-                Text(
-                    modifier = Modifier.padding(
-                        vertical = 10.dp,
-                        horizontal = 20.dp,
-                    ),
-                    text = device.id,
-                    textAlign = TextAlign.Center
-                )
-                Row {
-                    TextButton(
-                        modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
-                        text = "复制",
-                        onClick = {}, // TODO: copy it to clip
-                    )
-                    TextButton(
-                        modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
-                        text = "确定",
-                        onClick = { showShareOverlay = false },
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-            }
-        }
+        deviceID = device.id,
     )
 }
 

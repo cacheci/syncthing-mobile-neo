@@ -13,6 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import io.github.g00fy2.quickie.QRResult
+import io.github.g00fy2.quickie.ScanQRCode
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
 import moe.https.syncthing.storage.AppSettingPrivateStorage
@@ -25,6 +27,14 @@ import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 
 class MainActivity : ComponentActivity() {
+    private var scannedDeviceId by mutableStateOf("")
+
+    private val scanQrCodeLauncher = registerForActivityResult(ScanQRCode()) { result ->
+        if (result is QRResult.QRSuccess) {
+            scannedDeviceId = result.content.rawValue.orEmpty()
+        }
+    }
+
     private val applicationState: SyncthingApplication
         get() = application as SyncthingApplication
 
@@ -105,6 +115,10 @@ class MainActivity : ComponentActivity() {
                     storage.putString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK, selectedStack.name)
                     protocolStack = selectedStack
                 },
+                onScanQrCode = {
+                    scanQrCodeLauncher.launch(null)
+                },
+                scannedDeviceId = scannedDeviceId,
                 webUiUrlProvider = applicationState.coreRuntime::guiUrl,
                 webView = { url, reloadToken, onScroll, modifier ->
                     AndroidSystemWebView(

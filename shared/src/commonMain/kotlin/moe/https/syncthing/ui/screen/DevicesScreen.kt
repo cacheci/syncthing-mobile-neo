@@ -454,9 +454,12 @@ internal fun AddDeviceScreen(
     modifier: Modifier = Modifier,
     isSubmitting: Boolean,
     existingDevice: SyncthingDevice? = null,
+    scannedDeviceId: String = "",
     onConfirm: (NewDeviceConfiguration) -> Unit,
 ) {
-    var deviceId by remember(existingDevice) { mutableStateOf(existingDevice?.id.orEmpty()) }
+    var deviceId by remember(existingDevice, scannedDeviceId) {
+        mutableStateOf(scannedDeviceId.takeIf { it.isNotBlank() } ?: existingDevice?.id.orEmpty())
+    }
     var name by remember(existingDevice) { mutableStateOf(existingDevice?.name.orEmpty()) }
     var group by remember(existingDevice) { mutableStateOf(existingDevice?.group.orEmpty()) }
     var addresses by remember(existingDevice) { mutableStateOf(existingDevice?.addresses?.joinToString(",").orEmpty()) }

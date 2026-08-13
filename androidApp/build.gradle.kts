@@ -52,5 +52,6 @@ dependencies {
     implementation(libs.google.material)
     implementation(libs.ui)
     implementation(libs.bcrypt)
+    implementation(libs.quickie.bundled)
     debugImplementation(libs.ui.tooling)
 }

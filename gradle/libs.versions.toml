@@ -13,6 +13,7 @@ qrose = "1.1.2"
 runtime = "1.11.1"
 ui = "1.11.1"
 bcrypt = "0.10.2"
+quickie = "1.12.0"
 
 [libraries]
 foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "foundation" }
@@ -32,6 +33,7 @@ runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "run
 ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "ui" }
 ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "ui" }
 bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
+quickie-bundled = { module = "io.github.g00fy2.quickie:quickie-bundled", version.ref = "quickie" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

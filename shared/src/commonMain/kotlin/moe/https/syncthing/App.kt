@@ -47,7 +47,6 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -57,6 +56,7 @@ import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -75,6 +75,8 @@ fun App(
     onModifyDeveloperMode: () -> Unit,
     protocolStack: ProtocolStack,
     onProtocolStackChange: (ProtocolStack) -> Unit,
+    onScanQrCode: () -> Unit,
+    scannedDeviceId: String,
     webUiUrlProvider: () -> String,
     webView: @Composable (
         url: String,
@@ -385,8 +387,11 @@ fun App(
 
                 Scaffold(
                     topBar = {
-                        TopAppBar(
+                        AdaptiveTopAppBar(
                             title = currentPagePlain.title,
+                            showTopAppBar = true,
+                            isWideScreen = false,
+                            scrollBehavior = mainScrollBehavior,
                             navigationIcon = {
                                 IconButton(onClick = navigateBack) {
                                     Icon(
@@ -395,6 +400,50 @@ fun App(
                                     )
                                 }
                             },
+                            actions = {
+                                when (currentPagePlain) {
+                                    AppSubPage.DEVICE_ADD -> {
+                                        if ( editingDevice == null ) {
+                                            IconButton(
+                                                onClick = {
+                                                    onScanQrCode()
+                                                },
+                                                content = {
+                                                    Icon(
+                                                        contentDescription = "扫描二维码",
+                                                        imageVector = MiuixIcons.Scan
+                                                    )
+                                                },
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+
+                                            },
+                                            content = {
+                                                Icon(
+                                                    contentDescription = "保存",
+                                                    imageVector = MiuixIcons.Send // TODO: Draw and replace with some save icon later
+                                                )
+                                            },
+                                        )
+                                    }
+                                    AppSubPage.FOLDER_ADD -> {
+                                        IconButton(
+                                            onClick = {
+
+                                            },
+                                            content = {
+                                                Icon(
+                                                    contentDescription = "保存",
+                                                    imageVector = MiuixIcons.Send // TODO: Draw and replace with some save icon later
+                                                )
+                                            },
+                                        )
+                                    }
+                                    else -> {}
+                                }
+                            }
                         )
                     },
                 ) { padding ->
@@ -404,6 +453,7 @@ fun App(
                             AddDeviceScreen(
                                 isSubmitting = devicesUiState.isLoading,
                                 existingDevice = editingDevice,
+                                scannedDeviceId = scannedDeviceId,
                                 onConfirm = { configuration ->
                                     if (editingDevice == null) devicesViewModel.addDevice(configuration)
                                     else devicesViewModel.updateDevice(configuration)

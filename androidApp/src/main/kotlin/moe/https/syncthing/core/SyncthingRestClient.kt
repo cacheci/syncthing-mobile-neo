@@ -543,20 +543,13 @@ internal class SyncthingRestClient(
             while (keys.hasNext()) {
                 val serviceAddress = keys.next()
                 val service = json.optJSONObject(serviceAddress)
-                val addresses = if (service == null) {
-                    emptyList()
-                } else {
-                    readStringArray(service.optJSONArray("lanAddresses")) +
-                        readStringArray(service.optJSONArray("wanAddresses"))
-                }
                 val errorValue = service?.opt("error")
                 val error = if (errorValue == null || errorValue == JSONObject.NULL) {
                     null
                 } else {
                     errorValue.toString().takeIf(String::isNotBlank)
                 }
-                (addresses.ifEmpty { listOf(serviceAddress) })
-                    .forEach { add(RestListenAddress(it, error)) }
+                add(RestListenAddress(serviceAddress, error))
             }
         }.distinct()
     }

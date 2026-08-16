@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -331,7 +333,11 @@ private fun LocalDeviceCard(
         content = {
             Column ( horizontalAlignment = Alignment.CenterHorizontally ) {
                 LazyColumn (
-                    modifier = Modifier.padding(vertical = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .padding(vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
                         localInfo?.discoveryStatus ?: listOf(
@@ -344,7 +350,7 @@ private fun LocalDeviceCard(
                         if (item.error != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = MiuixTheme.colorScheme.error)
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(item.method)
                                     Text(text = item.error.toCharArray().joinToString("\u200B"), color = MiuixTheme.colorScheme.onSecondaryContainer)
                                 }
@@ -352,7 +358,7 @@ private fun LocalDeviceCard(
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = Color(0xFF2E7D32))
-                                Text(item.method)
+                                Text(item.method, modifier = Modifier.weight(1f))
                             }
                         }
                     }
@@ -375,7 +381,11 @@ private fun LocalDeviceCard(
         content = {
             Column (horizontalAlignment = Alignment.CenterHorizontally) {
                 LazyColumn (
-                    modifier = Modifier.padding(vertical = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .padding(vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
                         localInfo?.listenAddresses ?: listOf (
@@ -388,7 +398,7 @@ private fun LocalDeviceCard(
                         if (item.error != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = MiuixTheme.colorScheme.error)
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(item.address)
                                     Text(text = item.error.toCharArray().joinToString("\u200B"), color = MiuixTheme.colorScheme.onSecondaryContainer)
                                 }
@@ -396,7 +406,7 @@ private fun LocalDeviceCard(
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("●", color = Color(0xFF2E7D32))
-                                Text(item.address)
+                                Text(item.address, modifier = Modifier.weight(1f))
                             }
                         }
                     }

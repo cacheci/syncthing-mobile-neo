@@ -22,7 +22,6 @@ import androidx.navigation.compose.rememberNavController
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
-import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
@@ -32,6 +31,8 @@ import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
+import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
+import moe.https.syncthing.ui.screen.SettingEditListenScreen
 import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.ui.screen.WebviewScreen
 import moe.https.syncthing.viewmodel.LogViewModel
@@ -50,11 +51,13 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.icon.extended.Send
@@ -73,8 +76,6 @@ fun App(
     versionName: String,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
-    protocolStack: ProtocolStack,
-    onProtocolStackChange: (ProtocolStack) -> Unit,
     onScanQrCode: () -> Unit,
     scannedDeviceId: String,
     webUiUrlProvider: () -> String,
@@ -215,10 +216,7 @@ fun App(
                                         }
                                     )
                                 }
-                                if (
-                                    currentPageMain == AppPage.WEBUI &&
-                                    coreUiState.state == CoreState.RUNNING
-                                ) {
+                                if ( currentPageMain == AppPage.WEBUI && coreUiState.state == CoreState.RUNNING ) {
                                     IconButton(
                                         onClick = { webUiReloadToken += 1 },
                                         content = {
@@ -329,13 +327,19 @@ fun App(
 
                             AppPage.SETTINGS -> SettingScreen(
                                 uiState = settingUiState,
-                                onFormChange = settingViewModel::updateForm,
+                                settingViewModel = settingViewModel,
                                 developerModeEnabled = developerModeEnabled,
                                 onModifyDeveloperMode = onModifyDeveloperMode,
-                                protocolStack = protocolStack,
-                                onProtocolStackChange = onProtocolStackChange,
                                 onChangeToAbout = {
                                     currentPagePlain = AppSubPage.ABOUT
+                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                                },
+                                onEditingListenAddresses = {
+                                    currentPagePlain = AppSubPage.SETTINGS_LISTEN_EDIT
+                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                                } ,
+                                onEditingDiscoverServers = {
+                                    currentPagePlain = AppSubPage.SETTINGS_DISCOVERY_EDIT
                                     navController.navigate(PLAIN_PAGE_ROUTE)
                                 },
                                 onChangeToLicence = {
@@ -393,11 +397,24 @@ fun App(
                             isWideScreen = false,
                             scrollBehavior = mainScrollBehavior,
                             navigationIcon = {
-                                IconButton(onClick = navigateBack) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Back,
-                                        contentDescription = "返回",
-                                    )
+                                when (currentPagePlain) {
+                                    AppSubPage.FOLDER_ADD,
+                                    AppSubPage.DEVICE_ADD -> {
+                                        IconButton(onClick = navigateBack) {
+                                            Icon(
+                                                imageVector = MiuixIcons.Close,
+                                                contentDescription = "取消",
+                                            )
+                                        }
+                                    }
+                                    else -> {
+                                        IconButton(onClick = navigateBack) {
+                                            Icon(
+                                                imageVector = MiuixIcons.Back,
+                                                contentDescription = "返回",
+                                            )
+                                        }
+                                    }
                                 }
                             },
                             actions = {
@@ -418,12 +435,12 @@ fun App(
                                         }
                                         IconButton(
                                             onClick = {
-
+                                                // TODO
                                             },
                                             content = {
                                                 Icon(
                                                     contentDescription = "保存",
-                                                    imageVector = MiuixIcons.Send // TODO: Draw and replace with some save icon later
+                                                    imageVector = MiuixIcons.Ok
                                                 )
                                             },
                                         )
@@ -431,12 +448,12 @@ fun App(
                                     AppSubPage.FOLDER_ADD -> {
                                         IconButton(
                                             onClick = {
-
+                                                // TODO
                                             },
                                             content = {
                                                 Icon(
                                                     contentDescription = "保存",
-                                                    imageVector = MiuixIcons.Send // TODO: Draw and replace with some save icon later
+                                                    imageVector = MiuixIcons.Ok
                                                 )
                                             },
                                         )
@@ -447,46 +464,68 @@ fun App(
                         )
                     },
                 ) { padding ->
-                    when (currentPagePlain) {
-                        AppSubPage.DEBUG -> {}
-                        AppSubPage.DEVICE_ADD -> {
-                            AddDeviceScreen(
-                                isSubmitting = devicesUiState.isLoading,
-                                existingDevice = editingDevice,
-                                scannedDeviceId = scannedDeviceId,
-                                onConfirm = { configuration ->
-                                    if (editingDevice == null) devicesViewModel.addDevice(configuration)
-                                    else devicesViewModel.updateDevice(configuration)
-                                    editingDevice = null
-                                    navigateBack()
-                                },
-                                modifier = Modifier.padding(padding),
-                            )
-                        }
-                        AppSubPage.FOLDER_ADD -> {
-                            AddFolderScreen(
-                                isSubmitting = foldersUiState.isLoading,
-                                devices = devicesUiState.devices,
-                                existingFolder = editingFolder,
-                                onConfirm = { configuration ->
-                                    if (editingFolder == null) foldersViewModel.addFolder(configuration)
-                                    else foldersViewModel.updateFolder(configuration)
-                                    editingFolder = null
-                                    navigateBack()
-                                },
-                                modifier = Modifier.padding(padding),
-                            )
-                        }
-                        AppSubPage.ABOUT -> {
-                            AboutScreen(
-                                versionName = versionName,
-                                modifier = Modifier.padding(padding),
-                            )
-                        }
-                        AppSubPage.LICENCE -> {
-                            LicenceScreen(
-                                modifier = Modifier.padding(padding)
-                            )
+                    Box (
+                        modifier = Modifier
+                            .padding(padding)
+                            .nestedScroll(
+                            mainScrollBehavior.nestedScrollConnection,
+                        )
+                    ) {
+                        when (currentPagePlain) {
+                            AppSubPage.DEBUG -> {}
+                            AppSubPage.DEVICE_ADD -> {
+                                AddDeviceScreen(
+                                    isSubmitting = devicesUiState.isLoading,
+                                    existingDevice = editingDevice,
+                                    scannedDeviceId = scannedDeviceId,
+                                    onConfirm = { configuration ->
+                                        if (editingDevice == null) devicesViewModel.addDevice(
+                                            configuration
+                                        )
+                                        else devicesViewModel.updateDevice(configuration)
+                                        editingDevice = null
+                                        navigateBack()
+                                    },
+                                )
+                            }
+
+                            AppSubPage.FOLDER_ADD -> {
+                                AddFolderScreen(
+                                    isSubmitting = foldersUiState.isLoading,
+                                    devices = devicesUiState.devices,
+                                    existingFolder = editingFolder,
+                                    onConfirm = { configuration ->
+                                        if (editingFolder == null) foldersViewModel.addFolder(
+                                            configuration
+                                        )
+                                        else foldersViewModel.updateFolder(configuration)
+                                        editingFolder = null
+                                        navigateBack()
+                                    },
+                                )
+                            }
+
+                            AppSubPage.ABOUT -> {
+                                AboutScreen(
+                                    versionName = versionName,
+                                )
+                            }
+
+                            AppSubPage.LICENCE -> {
+                                LicenceScreen()
+                            }
+
+                            AppSubPage.SETTINGS_LISTEN_EDIT -> {
+                                SettingEditListenScreen(
+                                    settingViewModel = settingViewModel,
+                                )
+                            }
+
+                            AppSubPage.SETTINGS_DISCOVERY_EDIT -> {
+                                SettingEditDiscoveryScreen(
+                                    settingViewModel = settingViewModel,
+                                )
+                            }
                         }
                     }
                 }
@@ -512,5 +551,7 @@ private enum class AppSubPage(val title: String) {
     DEVICE_ADD("设备"),
     FOLDER_ADD("文件夹"),
     ABOUT("关于"),
-    LICENCE("开源许可")
+    LICENCE("开源许可"),
+    SETTINGS_LISTEN_EDIT("监听地址"),
+    SETTINGS_DISCOVERY_EDIT("发现服务器"),
 }

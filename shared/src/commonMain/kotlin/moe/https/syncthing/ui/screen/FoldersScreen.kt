@@ -36,7 +36,7 @@ import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.defaultFolderPath
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
-import moe.https.syncthing.ui.component.ImputableValueRow
+import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.model.FoldersUiState
@@ -291,7 +291,7 @@ internal fun AddFolderScreen(
         InfoSwitchCard(
             title = "文件夹",
             content = {
-                ImputableValueRow(
+                InputValueRow(
                     label = "文件夹 ID",
                     value = folderId,
                     valueLabel = "必填，唯一",
@@ -299,7 +299,7 @@ internal fun AddFolderScreen(
                     onValueChange = { folderId = it },
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     label = "名称",
                     value = label,
                     valueLabel = "可选",
@@ -307,7 +307,7 @@ internal fun AddFolderScreen(
                     onValueChange = { label = it },
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     label = "文件夹组",
                     value = group,
                     valueLabel = "可选",
@@ -390,7 +390,7 @@ internal fun AddFolderScreen(
                     ),
                 ) {
                     Column {
-                        ImputableValueRow(
+                        InputValueRow(
                             label = "回收站保留时长（天）",
                             value = cleanoutDays,
                             valueLabel = "永久",
@@ -401,7 +401,7 @@ internal fun AddFolderScreen(
 
                         // TODO: 历史版本路径（先不做）
 
-                        ImputableValueRow(
+                        InputValueRow(
                             label = "定期清除间隔（秒）",
                             value = cleanupIntervalSeconds,
                             valueLabel = "3600",
@@ -423,7 +423,7 @@ internal fun AddFolderScreen(
                     ),
                 ) {
                     Column {
-                        ImputableValueRow(
+                        InputValueRow(
                             label = "删除文件保留时长（天）",
                             value = cleanoutDays,
                             valueLabel = "永久",
@@ -432,7 +432,7 @@ internal fun AddFolderScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
 
-                        ImputableValueRow(
+                        InputValueRow(
                             label = "保留版本数量",
                             value = keepVersions,
                             valueLabel = "5",
@@ -443,7 +443,7 @@ internal fun AddFolderScreen(
 
                         // TODO: 历史版本路径（先不做）
 
-                        ImputableValueRow(
+                        InputValueRow(
                             label = "定期清除间隔（秒）",
                             value = cleanupIntervalSeconds,
                             valueLabel = "禁用",
@@ -483,7 +483,7 @@ internal fun AddFolderScreen(
                     },
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     label = "重新扫描间隔（秒）",
                     value = rescanIntervalSeconds,
                     valueLabel = "3600",
@@ -580,7 +580,7 @@ private fun AddFolderDevices(
                 animationSpec = tween(durationMillis = 300)
             ),
         ) {
-            ImputableValueRow(
+            InputValueRow(
                 label = "共享密码",
                 value = encryptionPassword,
                 onValueChange = onEncryptionPasswordChange,

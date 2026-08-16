@@ -4,8 +4,8 @@ import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 
 data class SettingUiState(
-    val setting: SettingConfiguration? = null,
-    val formState: SettingFormState? = null,
+    val settingRaw: SettingConfiguration? = null,
+    val formState: SettingFormState = SettingFormState(),
     val accessMode: SettingAccessMode? = null,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,

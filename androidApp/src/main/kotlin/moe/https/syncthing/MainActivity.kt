@@ -18,7 +18,6 @@ import io.github.g00fy2.quickie.ScanQRCode
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
 import moe.https.syncthing.storage.AppSettingPrivateStorage
-import moe.https.syncthing.storage.ProtocolStack
 import moe.https.syncthing.ui.model.CoreUiEffect
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
@@ -55,7 +54,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private val settingViewModel: SettingViewModel by viewModels {
-        SettingViewModel.factory(applicationState.coreRuntime)
+        SettingViewModel.factory(
+            applicationState.coreRuntime,
+            appSettingsStorage = applicationState.appSettingsStorage,
+        )
     }
 
     private val corePicker = registerForActivityResult(
@@ -87,15 +89,6 @@ class MainActivity : ComponentActivity() {
                     storage.getBoolean(AppSettingPrivateStorage.KEY_DEVELOPER_MODE, false),
                 )
             }
-            var protocolStack by remember {
-                mutableStateOf(
-                    storage.getString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK)
-                        ?.let { storedValue ->
-                            ProtocolStack.entries.firstOrNull { it.name == storedValue }
-                        }
-                        ?: ProtocolStack.DUAL,
-                )
-            }
 
             App(
                 coreViewModel = coreViewModel,
@@ -109,11 +102,6 @@ class MainActivity : ComponentActivity() {
                     val newValue = !developerModeEnabled
                     storage.putBoolean(AppSettingPrivateStorage.KEY_DEVELOPER_MODE, newValue)
                     developerModeEnabled = newValue
-                },
-                protocolStack = protocolStack,
-                onProtocolStackChange = { selectedStack: ProtocolStack ->
-                    storage.putString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK, selectedStack.name)
-                    protocolStack = selectedStack
                 },
                 onScanQrCode = {
                     scanQrCodeLauncher.launch(null)

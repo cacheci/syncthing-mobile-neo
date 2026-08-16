@@ -143,6 +143,24 @@ internal fun LicenceScreen(
 
         item {
             AboutCard(
+                title = "kotlinx.serialization",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/Kotlin/kotlinx.serialization") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "ktor",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/ktorio/ktor") },
+            )
+        }
+
+        item {
+            AboutCard(
                 title = "Compose Multiplatform",
                 summary = "Apache-2.0",
                 endText = "GitHub",
@@ -214,6 +232,15 @@ internal fun LicenceScreen(
                 summary = "MIT",
                 endText = "GitHub",
                 onClick = { uriHandler.openUri("https://github.com/alexzhirkevich/qrose") },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "uri-kmp",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/eygraber/uri-kmp") },
             )
         }
     }

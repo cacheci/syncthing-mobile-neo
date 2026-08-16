@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.jetbrains.compose)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -33,6 +34,9 @@ kotlin {
             implementation(libs.miuix.icons)
             implementation(libs.miuix.preference)
             implementation(libs.qrose)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.http)
+            implementation(libs.uri.kmp)
         }
     }
 }

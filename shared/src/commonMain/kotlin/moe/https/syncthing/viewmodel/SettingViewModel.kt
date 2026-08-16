@@ -1,10 +1,15 @@
 package moe.https.syncthing.viewmodel
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.eygraber.uri.Uri
+import com.eygraber.uri.toKmpUriOrNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,19 +19,45 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.Json
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.core.SettingController
+import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
+import moe.https.syncthing.ui.util.ListenAddressListItem
+import moe.https.syncthing.ui.util.ListenAddressSetting
+import moe.https.syncthing.ui.util.SettingProtocolStack
+import moe.https.syncthing.ui.util.UriProtocolStack
 import kotlin.time.Duration.Companion.milliseconds
 
 class SettingViewModel(
     private val controller: SettingController,
+    private val appSettingsStorage: AppSettingPrivateStorage,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(SettingUiState())
     val uiState: StateFlow<SettingUiState> = mutableUiState.asStateFlow()
     private val operationMutex = Mutex()
+    var listenAddressSettingUnsaved by mutableStateOf( loadSavedListenSetting() )
+    var discoveryAddressSettingUnsaved by mutableStateOf( loadSavedDiscoverySetting() )
+    var addressProtocolStack by mutableStateOf(
+        appSettingsStorage.getString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK)
+            ?.let { storedValue ->
+                SettingProtocolStack.entries.firstOrNull { it.name == storedValue }
+            }
+            ?: SettingProtocolStack.DUAL,
+    )
+
+    var actualListenStack by mutableStateOf(
+        when (addressProtocolStack) {
+            SettingProtocolStack.CUSTOM -> listenAddressSettingUnsaved.stackPrefer
+            SettingProtocolStack.IPV4 -> UriProtocolStack.IPV4
+            SettingProtocolStack.IPV6 -> UriProtocolStack.IPV6
+            SettingProtocolStack.DUAL -> UriProtocolStack.DUAL
+        }
+    )
+
 
     fun onCoreUnavailable() {
         mutableUiState.update {
@@ -55,12 +86,12 @@ class SettingViewModel(
                     val snapshot = controller.loadSetting()
                     mutableUiState.update { state ->
                         val formState = if (state.hasUnsavedChanges()) {
-                            state.formState ?: snapshot.configuration.toFormState()
+                            state.formState
                         } else {
                             snapshot.configuration.toFormState()
                         }
                         state.copy(
-                            setting = snapshot.configuration,
+                            settingRaw = snapshot.configuration,
                             formState = formState,
                             accessMode = snapshot.accessMode,
                             isLoading = false,
@@ -84,36 +115,139 @@ class SettingViewModel(
         }
     }
 
-    fun updateForm(formState: SettingFormState) {
-        mutableUiState.update {
-            if (it.isSaving || it.formState == null) {
-                it
+    fun onFormChange(
+        deviceName: String? = null,
+        minHomeDiskFree: String? = null,
+        minHomeDiskFreeUnit: SettingConfiguration.DiskSpaceUnit? = null,
+        usageReportingEnabled: Boolean? = null,
+        guiListenAddress: String? = null,
+        guiPort: String? = null,
+        guiPortConflictBehavior: SettingConfiguration.GuiPortConflictBehavior? = null,
+        guiAuthenticationEnabled: Boolean? = null,
+        guiUser: String? = null,
+        newGuiPassword: String? = null,
+        guiTheme: SettingConfiguration.GuiTheme? = null,
+        listenAddresses: String? = null,
+        maxSendKiBPerSecond: String? = null,
+        maxReceiveKiBPerSecond: String? = null,
+        reconnectionIntervalSeconds: String? = null,
+        limitBandwidthInLan: Boolean? = null,
+        globalDiscoveryEnabled: Boolean? = null,
+        globalDiscoveryServers: String? = null,
+        localDiscoveryEnabled: Boolean? = null,
+        localDiscoveryPort: String? = null,
+        localDiscoveryMulticastAddress: String? = null,
+        announceLanAddresses: Boolean? = null,
+        natEnabled: Boolean? = null,
+        relaysEnabled: Boolean? = null,
+        alwaysLocalNetworks: String? = null,
+        connectionLimitMax: String? = null,
+    ) {
+        if (
+            deviceName == null &&
+            minHomeDiskFree == null &&
+            minHomeDiskFreeUnit == null &&
+            usageReportingEnabled == null &&
+            guiListenAddress == null &&
+            guiPort == null &&
+            guiPortConflictBehavior == null &&
+            guiAuthenticationEnabled == null &&
+            guiUser == null &&
+            newGuiPassword == null &&
+            guiTheme == null &&
+            listenAddresses == null &&
+            maxSendKiBPerSecond == null &&
+            maxReceiveKiBPerSecond == null &&
+            reconnectionIntervalSeconds == null &&
+            limitBandwidthInLan == null &&
+            globalDiscoveryEnabled == null &&
+            globalDiscoveryServers == null &&
+            localDiscoveryEnabled == null &&
+            localDiscoveryPort == null &&
+            localDiscoveryMulticastAddress == null &&
+            announceLanAddresses == null &&
+            natEnabled == null &&
+            relaysEnabled == null &&
+            alwaysLocalNetworks == null &&
+            connectionLimitMax == null
+        ) {
+            return
+        }
+
+        mutableUiState.update { state ->
+            val setting = state.settingRaw
+            if (state.isSaving || setting == null) {
+                state
             } else {
-                it.copy(
-                    formState = formState,
-                    isFormValid = it.setting?.let { setting ->
-                        formState.isValid(setting, it.accessMode)
-                    } == true,
+                val currentFormState = state.formState
+                val changedFormState = currentFormState.copy(
+                    deviceName = deviceName ?: currentFormState.deviceName,
+                    minHomeDiskFree = minHomeDiskFree ?: currentFormState.minHomeDiskFree,
+                    minHomeDiskFreeUnit = minHomeDiskFreeUnit ?: currentFormState.minHomeDiskFreeUnit,
+                    usageReportingEnabled = usageReportingEnabled ?: currentFormState.usageReportingEnabled,
+                    guiListenAddress = guiListenAddress ?: currentFormState.guiListenAddress,
+                    guiPort = guiPort ?: currentFormState.guiPort,
+                    guiPortConflictBehavior =
+                        guiPortConflictBehavior ?: currentFormState.guiPortConflictBehavior,
+                    guiAuthenticationEnabled =
+                        guiAuthenticationEnabled ?: currentFormState.guiAuthenticationEnabled,
+                    guiUser = guiUser ?: currentFormState.guiUser,
+                    newGuiPassword = newGuiPassword ?: currentFormState.newGuiPassword,
+                    guiTheme = guiTheme ?: currentFormState.guiTheme,
+                    listenAddresses = listenAddresses ?: currentFormState.listenAddresses,
+                    maxSendKiBPerSecond =
+                        maxSendKiBPerSecond ?: currentFormState.maxSendKiBPerSecond,
+                    maxReceiveKiBPerSecond =
+                        maxReceiveKiBPerSecond ?: currentFormState.maxReceiveKiBPerSecond,
+                    reconnectionIntervalSeconds =
+                        reconnectionIntervalSeconds ?: currentFormState.reconnectionIntervalSeconds,
+                    limitBandwidthInLan = limitBandwidthInLan ?: currentFormState.limitBandwidthInLan,
+                    globalDiscoveryEnabled =
+                        globalDiscoveryEnabled ?: currentFormState.globalDiscoveryEnabled,
+                    globalDiscoveryServers =
+                        globalDiscoveryServers ?: currentFormState.globalDiscoveryServers,
+                    localDiscoveryEnabled =
+                        localDiscoveryEnabled ?: currentFormState.localDiscoveryEnabled,
+                    localDiscoveryPort = localDiscoveryPort ?: currentFormState.localDiscoveryPort,
+                    localDiscoveryMulticastAddress =
+                        localDiscoveryMulticastAddress ?: currentFormState.localDiscoveryMulticastAddress,
+                    announceLanAddresses = announceLanAddresses ?: currentFormState.announceLanAddresses,
+                    natEnabled = natEnabled ?: currentFormState.natEnabled,
+                    relaysEnabled = relaysEnabled ?: currentFormState.relaysEnabled,
+                    alwaysLocalNetworks = alwaysLocalNetworks ?: currentFormState.alwaysLocalNetworks,
+                    connectionLimitMax = connectionLimitMax ?: currentFormState.connectionLimitMax,
                 )
+                if (changedFormState == currentFormState) {
+                    state
+                } else {
+                    state.copy(
+                        formState = changedFormState,
+                        isFormValid = changedFormState.isValid(setting, state.accessMode),
+                    )
+                }
             }
         }
     }
 
     fun save() {
         val state = mutableUiState.value
-        val setting = state.setting
+        val settingRaw = state.settingRaw
         val formState = state.formState
-        if (setting == null || formState == null) {
+            .copy(
+                listenAddresses = getListenAddressStringFromUnsaved(listenAddressSettingUnsaved),
+                globalDiscoveryServers = getDiscoveryAddressStringFromUnsaved(discoveryAddressSettingUnsaved)
+            )
+        if ( settingRaw == null ) {
             mutableUiState.update {
                 it.copy(errorMessage = "设置尚未加载", successMessage = null)
             }
             return
         }
 
-        val configuration = formState.toConfiguration(setting)
-        val normalizedConfiguration = configuration.normalized()
+        val configuration = formState.toConfiguration(settingRaw)
+        val normalizedConfiguration = configuration.trim()
         val accessMode = state.accessMode
-        val validationError = formState.validationError(setting, accessMode)
+        val validationError = formState.validationError(settingRaw, accessMode)
         if (validationError != null) {
             mutableUiState.update {
                 it.copy(errorMessage = validationError, successMessage = null)
@@ -148,7 +282,7 @@ class SettingViewModel(
                     delay(1000.milliseconds)
                     mutableUiState.update {
                         it.copy(
-                            setting = savedConfiguration,
+                            settingRaw = savedConfiguration,
                             formState = savedFormState,
                             accessMode = result.accessMode,
                             isSaving = false,
@@ -158,6 +292,21 @@ class SettingViewModel(
                             restartRequired = result.restartRequired,
                         )
                     }
+
+                    appSettingsStorage.putString(
+                        AppSettingPrivateStorage.KEY_LISTEN_PREFERENCE,
+                        Json.encodeToString(listenAddressSettingUnsaved.trim()),
+                    )
+
+                    appSettingsStorage.putString(
+                        AppSettingPrivateStorage.KEY_DISCOVERY_PREFERENCE,
+                        Json.encodeToString(discoveryAddressSettingUnsaved.trim()),
+                    )
+
+                    appSettingsStorage.putString(
+                        AppSettingPrivateStorage.KEY_PROTOCOL_STACK,
+                        addressProtocolStack.name
+                    )
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
@@ -172,89 +321,226 @@ class SettingViewModel(
         }
     }
 
+    fun loadSavedListenSetting(): ListenAddressSetting {
+        return runCatching {
+            Json.decodeFromString<ListenAddressSetting>(
+                appSettingsStorage.getString( AppSettingPrivateStorage.KEY_LISTEN_PREFERENCE)!!
+            )
+        }.getOrDefault( ListenAddressSetting(
+            stackPrefer = UriProtocolStack.DUAL,
+            tcp = true,
+            quic = true,
+            port = 22000,
+            relays = listOf(
+                ListenAddressListItem(
+                    enabled = true,
+                    uri = "dynamic+relay://relays.syncthing.net/endpoint"
+                )
+            )
+        ))
+    }
+
+    fun loadSavedDiscoverySetting(): List<ListenAddressListItem> {
+        return runCatching {
+            Json.decodeFromString<List<ListenAddressListItem>>(
+                appSettingsStorage.getString( AppSettingPrivateStorage.KEY_DISCOVERY_PREFERENCE)!!
+            )
+        }.getOrDefault( listOf(
+            ListenAddressListItem(
+                enabled = true, uri = "https://discovery-announce-v4.syncthing.net/v2/?nolookup"
+            ),
+            ListenAddressListItem(
+                enabled = true, uri = "https://discovery-announce-v6.syncthing.net/v2/?nolookup"
+            ),
+            ListenAddressListItem(
+                enabled = true, uri = "https://discovery-lookup.syncthing.net/v2/?noannounce"
+            ),
+        ))
+    }
+
+    fun getListenAddressStringFromUnsaved(listenAddressSetting: ListenAddressSetting ): String {
+        val result = mutableListOf<String>()
+
+        if ( ifStackFits( actualListenStack, UriProtocolStack.IPV4 ) ) {
+            if ( listenAddressSetting.tcp ) result += ("tcp4://0.0.0.0:" + listenAddressSetting.port.toString())
+            if ( listenAddressSetting.quic ) result += ("quic4://0.0.0.0:" + listenAddressSetting.port.toString())
+        }
+        if ( ifStackFits( actualListenStack, UriProtocolStack.IPV6 ) ) {
+            if ( listenAddressSetting.tcp ) result += ("tcp6://[::]:" + listenAddressSetting.port.toString())
+            if ( listenAddressSetting.quic ) result += ("quic6://[::]:" + listenAddressSetting.port.toString())
+        }
+
+        for (item in listenAddressSetting.relays) {
+            if (item.enabled) { result += item.uri }
+        }
+
+        return result.joinToString(", ")
+    }
+
+    fun getDiscoveryAddressStringFromUnsaved(listenAddressListItem: List<ListenAddressListItem>): String {
+        val result = mutableListOf<String>()
+
+        for (item in listenAddressListItem) {
+            if (item.enabled) { result += item.uri }
+        }
+
+        return result.joinToString(", ")
+    }
+
+    fun listenRelayAddressValidator(address: String): Boolean {
+        return ( address.startsWith("relay://") || address.startsWith("dynamic+relay://") ) //TODO
+    }
+
+    fun discoveryAddressValidator(address: String): Boolean {
+        return (true) //TODO
+    }
+
+    fun ifStackFits(parent: UriProtocolStack, item: UriProtocolStack): Boolean {
+        return when {
+            ( parent == UriProtocolStack.DUAL ) || ( item == UriProtocolStack.DUAL ) || ( parent == item ) -> true
+            else -> false
+        }
+    }
+
     companion object {
-        fun factory(controller: SettingController): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(
+            controller: SettingController,
+            appSettingsStorage: AppSettingPrivateStorage,
+        ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                SettingViewModel(controller)
+                SettingViewModel(
+                    controller = controller,
+                    appSettingsStorage = appSettingsStorage,
+                )
             }
         }
     }
 }
 
-private fun SettingUiState.hasUnsavedChanges(): Boolean =
-    formState != null && formState != setting?.toFormState()
+private fun ListenAddressSetting.trim(): ListenAddressSetting =
+    copy(
+        relays = relays.map { relayItem ->
+            relayItem.copy(uri = ( rebuildUriOrNot(relayItem.uri)) )
+        }
+    )
 
-private fun SettingConfiguration.toFormState(): SettingFormState = SettingFormState(
-    deviceName = deviceName,
-    minHomeDiskFree = minHomeDiskFree.editableString(),
-    minHomeDiskFreeUnit = minHomeDiskFreeUnit,
-    usageReportingEnabled = usageReportingEnabled,
-    guiListenAddress = guiListenAddress,
-    guiPort = guiPort.toString(),
-    guiPortConflictBehavior = guiPortConflictBehavior,
-    guiAuthenticationEnabled = guiAuthenticationEnabled,
-    guiUser = guiUser,
-    newGuiPassword = "",
-    guiTheme = guiTheme,
-    listenAddresses = listenAddresses.joinToString("\n"),
-    maxSendKiBPerSecond = maxSendKiBPerSecond.toString(),
-    maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toString(),
-    reconnectionIntervalSeconds = reconnectionIntervalSeconds.toString(),
-    limitBandwidthInLan = limitBandwidthInLan,
-    globalDiscoveryEnabled = globalDiscoveryEnabled,
-    globalDiscoveryServers = globalDiscoveryServers.joinToString("\n"),
-    localDiscoveryEnabled = localDiscoveryEnabled,
-    localDiscoveryPort = localDiscoveryPort.toString(),
-    localDiscoveryMulticastAddress = localDiscoveryMulticastAddress,
-    announceLanAddresses = announceLanAddresses,
-    natEnabled = natEnabled,
-    relaysEnabled = relaysEnabled,
-    alwaysLocalNetworks = alwaysLocalNetworks.joinToString("\n"),
-    connectionLimitMax = connectionLimitMax.toString(),
-)
+private fun List<ListenAddressListItem>.trim(): List<ListenAddressListItem> =
+    map { item ->
+        item.copy(
+            uri = rebuildUriOrNot(item.uri),
+        )
+    }
+
+private fun rebuildUriOrNot(raw: String): String {
+    val parsed = raw.trim().toKmpUriOrNull() ?: return raw
+    val scheme = parsed.scheme?.lowercase() ?: return raw
+    val authority = parsed.encodedAuthority ?: return raw
+
+    if (!parsed.isHierarchical || parsed.host.isNullOrBlank()) {
+        return raw
+    }
+
+    return Uri.Builder()
+        .scheme(scheme)
+        .encodedAuthority(authority)
+        .path(parsed.path)
+        .encodedQuery(parsed.encodedQuery)
+        .fragment(parsed.fragment)
+        .build()
+        .toString()
+}
+
+private fun SettingUiState.hasUnsavedChanges(): Boolean =
+    settingRaw != null && formState != settingRaw.toFormState()
+
+private fun SettingConfiguration.toFormState(): SettingFormState {
+    val defaults = SettingConfiguration.startupDefaults()
+    return SettingFormState(
+        deviceName = deviceName,
+        minHomeDiskFree = minHomeDiskFree.editableStringUnless(defaults.minHomeDiskFree),
+        minHomeDiskFreeUnit = minHomeDiskFreeUnit,
+        usageReportingEnabled = usageReportingEnabled,
+        guiListenAddress = guiListenAddress,
+        guiPort = guiPort.editableStringUnless(defaults.guiPort),
+        guiPortConflictBehavior = guiPortConflictBehavior,
+        guiAuthenticationEnabled = guiAuthenticationEnabled,
+        guiUser = guiUser,
+        newGuiPassword = "",
+        guiTheme = guiTheme,
+        maxSendKiBPerSecond = maxSendKiBPerSecond.editableStringUnless(defaults.maxSendKiBPerSecond),
+        maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.editableStringUnless(defaults.maxReceiveKiBPerSecond),
+        reconnectionIntervalSeconds =
+            reconnectionIntervalSeconds.editableStringUnless(defaults.reconnectionIntervalSeconds),
+        limitBandwidthInLan = limitBandwidthInLan,
+        globalDiscoveryEnabled = globalDiscoveryEnabled,
+        localDiscoveryEnabled = localDiscoveryEnabled,
+        localDiscoveryPort = localDiscoveryPort.editableStringUnless(defaults.localDiscoveryPort),
+        localDiscoveryMulticastAddress =
+            localDiscoveryMulticastAddress.takeUnless { it == defaults.localDiscoveryMulticastAddress }.orEmpty(),
+        announceLanAddresses = announceLanAddresses,
+        natEnabled = natEnabled,
+        relaysEnabled = relaysEnabled,
+        alwaysLocalNetworks = alwaysLocalNetworks.editableStringUnless(defaults.alwaysLocalNetworks),
+        connectionLimitMax = connectionLimitMax.editableStringUnless(defaults.connectionLimitMax),
+    )
+}
 
 private fun Double.editableString(): String =
     if (this % 1.0 == 0.0) toLong().toString() else toString()
+
+private fun Double.editableStringUnless(defaultValue: Double): String =
+    takeUnless { it == defaultValue }?.editableString().orEmpty()
+
+private fun Int.editableStringUnless(defaultValue: Int): String =
+    takeUnless { it == defaultValue }?.toString().orEmpty()
+
+private fun List<String>.editableStringUnless(defaultValue: List<String>): String =
+    takeUnless { it == defaultValue }?.joinToString("\n").orEmpty()
 
 private fun SettingFormState.isValid(
     setting: SettingConfiguration,
     accessMode: SettingAccessMode?,
 ): Boolean = validationError(setting, accessMode) == null
 
-private fun SettingFormState.toConfiguration(setting: SettingConfiguration): SettingConfiguration = setting.copy(
-    deviceName = deviceName,
-    minHomeDiskFree = minHomeDiskFree.toDoubleOrNull() ?: 1.0,
-    minHomeDiskFreeUnit = minHomeDiskFreeUnit,
-    usageReportingEnabled = usageReportingEnabled,
-    guiListenAddress = guiListenAddress,
-    guiPort = guiPort.toIntOrNull() ?: 8384,
-    guiPortConflictBehavior = guiPortConflictBehavior,
-    guiAuthenticationEnabled = guiAuthenticationEnabled,
-    guiUser = guiUser,
-    newGuiPassword = newGuiPassword,
-    guiTheme = guiTheme,
-    listenAddresses = listenAddresses.toValues(),
-    maxSendKiBPerSecond = maxSendKiBPerSecond.toIntOrNull() ?: 0,
-    maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toIntOrNull() ?: 0,
-    reconnectionIntervalSeconds = reconnectionIntervalSeconds.toIntOrNull() ?: 20,
-    limitBandwidthInLan = limitBandwidthInLan,
-    globalDiscoveryEnabled = globalDiscoveryEnabled,
-    globalDiscoveryServers = globalDiscoveryServers.toValues(),
-    localDiscoveryEnabled = localDiscoveryEnabled,
-    localDiscoveryPort = localDiscoveryPort.toIntOrNull() ?: 21027,
-    localDiscoveryMulticastAddress = localDiscoveryMulticastAddress,
-    announceLanAddresses = announceLanAddresses,
-    natEnabled = natEnabled,
-    relaysEnabled = relaysEnabled,
-    alwaysLocalNetworks = alwaysLocalNetworks.toValues(),
-    connectionLimitMax = connectionLimitMax.toIntOrNull() ?: 0,
-)
+private fun SettingFormState.toConfiguration(setting: SettingConfiguration): SettingConfiguration {
+    val defaults = SettingConfiguration.startupDefaults()
+    return setting.copy(
+        deviceName = deviceName,
+        minHomeDiskFree = minHomeDiskFree.toDoubleOrNull() ?: defaults.minHomeDiskFree,
+        minHomeDiskFreeUnit = minHomeDiskFreeUnit,
+        usageReportingEnabled = usageReportingEnabled,
+        guiListenAddress = guiListenAddress,
+        guiPort = guiPort.toIntOrNull() ?: defaults.guiPort,
+        guiPortConflictBehavior = guiPortConflictBehavior,
+        guiAuthenticationEnabled = guiAuthenticationEnabled,
+        guiUser = guiUser,
+        newGuiPassword = if (guiAuthenticationEnabled) newGuiPassword else "",
+        guiTheme = guiTheme,
+        listenAddresses = listenAddresses.toValues(),
+        maxSendKiBPerSecond = maxSendKiBPerSecond.toIntOrNull() ?: defaults.maxSendKiBPerSecond,
+        maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toIntOrNull() ?: defaults.maxReceiveKiBPerSecond,
+        reconnectionIntervalSeconds =
+            reconnectionIntervalSeconds.toIntOrNull() ?: defaults.reconnectionIntervalSeconds,
+        limitBandwidthInLan = limitBandwidthInLan,
+        globalDiscoveryEnabled = globalDiscoveryEnabled,
+        globalDiscoveryServers = globalDiscoveryServers.toValues(),
+        localDiscoveryEnabled = localDiscoveryEnabled,
+        localDiscoveryPort = localDiscoveryPort.toIntOrNull() ?: defaults.localDiscoveryPort,
+        localDiscoveryMulticastAddress =
+            localDiscoveryMulticastAddress.ifBlank { defaults.localDiscoveryMulticastAddress },
+        announceLanAddresses = announceLanAddresses,
+        natEnabled = natEnabled,
+        relaysEnabled = relaysEnabled,
+        alwaysLocalNetworks = alwaysLocalNetworks.toValues().ifEmpty { defaults.alwaysLocalNetworks },
+        connectionLimitMax = connectionLimitMax.toIntOrNull() ?: defaults.connectionLimitMax,
+    )
+}
 
 private fun String.toValues(): List<String> = split(',', '\n')
     .map(String::trim)
     .filter(String::isNotBlank)
 
-private fun SettingConfiguration.normalized(): SettingConfiguration = copy(
+private fun SettingConfiguration.trim(): SettingConfiguration = copy(
     deviceName = deviceName.trim(),
     guiListenAddress = guiListenAddress.trim().removePrefix("[").removeSuffix("]"),
     guiUser = guiUser.trim(),
@@ -270,11 +556,13 @@ private fun SettingFormState.validationError(
 ): String? {
     if (accessMode == null) return "设置尚未加载"
 
-    if (guiPort.toIntOrNull() == null) return "WebUI 端口必须是整数"
-    if (guiPort.toInt() !in 1..65535) return "WebUI 端口必须在 1 到 65535 之间"
+    if (guiPort.isNotBlank() && guiPort.toIntOrNull() == null) return "WebUI 端口必须是整数"
+    if (guiPort.toIntOrNull()?.let { it !in 1..65535 } == true) {
+        return "WebUI 端口必须在 1 到 65535 之间"
+    }
     if (accessMode == SettingAccessMode.STARTUP_ONLY) return null
 
-    val configuration = toConfiguration(setting).normalized()
+    val configuration = toConfiguration(setting).trim()
     if (deviceName.isBlank()) return "设备名不能为空"
     if (minHomeDiskFree.isNotBlank() && minHomeDiskFree.toDoubleOrNull() == null) {
         return "最低磁盘剩余空间必须是数字"
@@ -293,13 +581,12 @@ private fun SettingFormState.validationError(
     if (guiAuthenticationEnabled && !setting.guiPasswordConfigured && newGuiPassword.isBlank()) {
         return "密码不能为空"
     }
-    if (newGuiPassword.isNotEmpty() && newGuiPassword.isBlank()) {
+    if (guiAuthenticationEnabled && newGuiPassword.isNotEmpty() && newGuiPassword.isBlank()) {
         return "身份验证密码不能仅包含空字符"
     }
-    if (newGuiPassword.encodeToByteArray().size > 72) {
+    if (guiAuthenticationEnabled && newGuiPassword.encodeToByteArray().size > 72) {
         return "身份验证密码不能超过 72 字节"
     }
-    if (listenAddresses.isEmpty()) return "至少需要一个设备连接监听地址"
     if (maxSendKiBPerSecond.isNotBlank() && maxSendKiBPerSecond.toIntOrNull() == null) {
         return "上传限速必须是整数"
     }
@@ -315,17 +602,11 @@ private fun SettingFormState.validationError(
     if (configuration.reconnectionIntervalSeconds < 0) {
         return "重新连接间隔必须是非负整数"
     }
-    if (globalDiscoveryEnabled && globalDiscoveryServers.isEmpty()) {
-        return "启用全局发现时，至少需要一个发现服务器"
-    }
     if (localDiscoveryPort.isNotBlank() && localDiscoveryPort.toIntOrNull() == null) {
         return "本地发现端口必须是整数"
     }
     if (configuration.localDiscoveryPort !in 1..65535) {
         return "本地发现端口必须在 1 到 65535 之间"
-    }
-    if (localDiscoveryEnabled && localDiscoveryMulticastAddress.isBlank()) {
-        return "启用本地发现时，IPv6 组播地址不能为空"
     }
     if (connectionLimitMax.isNotBlank() && connectionLimitMax.toIntOrNull() == null) {
         return "最大连接数必须是整数"

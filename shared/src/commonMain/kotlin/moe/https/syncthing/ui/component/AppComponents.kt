@@ -1,5 +1,12 @@
 package moe.https.syncthing.ui.component
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,25 +15,37 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.selection.triStateToggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +65,7 @@ import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
@@ -54,6 +74,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.SinkFeedback
+import top.yukonga.miuix.kmp.utils.pressable
 
 @Composable
 internal fun StatusCard(
@@ -219,7 +241,7 @@ internal fun MultipleValueRow(
 }
 
 @Composable
-internal fun ImputableValueRow(
+internal fun InputValueRow(
     modifier: Modifier = Modifier,
     label: String,
     valueLabel: String,
@@ -427,6 +449,131 @@ internal fun DeviceShareOverlayDialog(
             }
         }
     )
+}
+
+@Composable
+internal fun CheckableInputValueRow(
+    state: Boolean,
+    value: String,
+    valueLabel: String,
+    onValueChange: (String) -> Unit,
+    valueValidator: (String) -> Boolean,
+    onStateChange: () -> Unit,
+    onDelete: () -> Unit,
+    enabled: Boolean = true,
+    singleLine: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(),
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+) {
+
+    var isEditing by remember { mutableStateOf(false) }
+
+    Column ( horizontalAlignment = Alignment.CenterHorizontally ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Checkbox(
+                state = if (!valueValidator(value)) ToggleableState.Indeterminate else ToggleableState(state),
+                onClick = onStateChange,
+                enabled = enabled && valueValidator(value),
+            )
+
+            AnimatedVisibility(
+                visible = !state || !valueValidator(value) || !enabled,
+                enter = scaleIn(animationSpec = tween(durationMillis = 300)) + slideInHorizontally(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = scaleOut(animationSpec = tween(durationMillis = 300)) + slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+            ) {
+                DeleteBox(enabled = true, onDelete = onDelete)
+            }
+
+            Box {
+                BasicTextField(
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { focusState ->
+                        isEditing = focusState.isFocused
+                    },
+                    value = value,
+                    textStyle = MiuixTheme.textStyles.main.copy(
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.End,
+                        color = if (enabled) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
+                    ),
+                    onValueChange = onValueChange,
+                    singleLine = singleLine,
+                    keyboardOptions = keyboardOptions,
+                    visualTransformation = visualTransformation,
+                    enabled = enabled || isEditing,
+                )
+                if (!value.isNotEmpty()) {
+                    Text(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = valueLabel,
+                        textAlign = TextAlign.End,
+                        color = MiuixTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider( modifier = Modifier.fillMaxWidth( 0.85f ) )
+    }
+}
+
+@Composable
+internal fun DeleteBox(
+    enabled: Boolean,
+    onDelete: () -> Unit,
+) {
+    val sinkFeedback = remember {
+        SinkFeedback(
+            sinkAmount = 0.85f,
+            animationSpec = spring(0.99f, 986.96f)
+        )
+    }
+    val hapticFeedback = LocalHapticFeedback.current
+
+    Box(
+        modifier = Modifier
+            .wrapContentSize(Alignment.Center)
+            .requiredSize(26.dp)
+            .pressable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = sinkFeedback,
+                enabled = enabled,
+                delay = null,
+            )
+            .clip(CircleShape)
+            .background(
+                color = MiuixTheme.colorScheme.error,
+                shape = CircleShape,
+            )
+            .triStateToggleable(
+                state = ToggleableState(true),
+                onClick = {
+                    onDelete()
+                    hapticFeedback.performHapticFeedback(
+                        HapticFeedbackType.ToggleOff,
+                    )
+                },
+                enabled = enabled,
+                role = Role.Checkbox,
+                interactionSource = null,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box (
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .fillMaxHeight(0.1f)
+                .clip(CircleShape)
+                .background(MiuixTheme.colorScheme.background),
+        )
+    }
 }
 
 @Composable

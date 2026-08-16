@@ -17,7 +17,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.https.syncthing.storage.AppSettingPrivateStorage
-import moe.https.syncthing.storage.ProtocolStack
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
@@ -36,6 +35,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import androidx.core.content.edit
+import moe.https.syncthing.ui.util.SettingProtocolStack
 import kotlin.time.Duration.Companion.milliseconds
 
 class CoreRuntime(
@@ -975,12 +975,12 @@ class CoreRuntime(
         }
     }
 
-    private fun loadProtocolStack(): ProtocolStack =
+    private fun loadProtocolStack(): SettingProtocolStack =
         appSettingsStorage.getString(AppSettingPrivateStorage.KEY_PROTOCOL_STACK)
             ?.let { storedValue ->
-                ProtocolStack.entries.firstOrNull { it.name == storedValue }
+                SettingProtocolStack.entries.firstOrNull { it.name == storedValue }
             }
-            ?: ProtocolStack.DUAL
+            ?: SettingProtocolStack.DUAL
 
     private fun rememberedLocalDeviceId(): String? =
         preferences.getString(KEY_LOCAL_DEVICE_ID, null)?.takeIf(String::isNotBlank)

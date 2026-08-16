@@ -4,9 +4,15 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -15,46 +21,53 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
-import moe.https.syncthing.storage.ProtocolStack
-import moe.https.syncthing.ui.component.ImputableValueRow
+import moe.https.syncthing.ui.component.CheckableInputValueRow
+import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
+import moe.https.syncthing.ui.util.ListenAddressListItem
+import moe.https.syncthing.ui.util.SettingProtocolStack
+import moe.https.syncthing.ui.util.UriProtocolStack
+import moe.https.syncthing.viewmodel.SettingViewModel
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun SettingScreen(
     uiState: SettingUiState,
-    onFormChange: (SettingFormState) -> Unit,
+    settingViewModel: SettingViewModel,
     modifier: Modifier = Modifier,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
-    protocolStack: ProtocolStack,
-    onProtocolStackChange: (ProtocolStack) -> Unit,
+    onEditingDiscoverServers: () -> Unit,
+    onEditingListenAddresses: () -> Unit,
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
 ) {
     var developerModeVisible by remember { mutableStateOf(developerModeEnabled) }
-    val settingAvailable = uiState.setting != null &&
-        uiState.formState != null &&
-        uiState.accessMode != null
-    val displayedSetting = uiState.setting ?: SettingConfiguration.startupDefaults(
-        guiListenAddress = protocolStack.guiListenAddress,
+    val settingAvailable = uiState.settingRaw != null && uiState.accessMode != null
+    val displayedSetting = uiState.settingRaw ?: SettingConfiguration.startupDefaults(
+        guiListenAddress = settingViewModel.addressProtocolStack.guiListenAddress,
     )
-    val displayedFormState = uiState.formState ?: SettingFormState()
     val displayedAccessMode = uiState.accessMode ?: SettingAccessMode.STARTUP_ONLY
 
     Column(
@@ -75,7 +88,7 @@ internal fun SettingScreen(
                 isError = true,
             )
 
-            uiState.hasLoaded && uiState.setting == null -> MessageCard(
+            uiState.hasLoaded && uiState.settingRaw == null -> MessageCard(
                 title = "暂无设置",
                 message = "没有可用的设置项。",
                 isError = true,
@@ -104,17 +117,16 @@ internal fun SettingScreen(
 
         SettingForm(
             setting = displayedSetting,
-            formState = displayedFormState,
+            formState = uiState.formState,
             accessMode = displayedAccessMode,
             isSaving = uiState.isSaving,
-            isFormValid = uiState.isFormValid,
-            onFormChange = onFormChange,
+            settingViewModel = settingViewModel,
             developerModeEnabled = developerModeEnabled,
             onModifyDeveloperMode = onModifyDeveloperMode,
             developerModeVisible = developerModeVisible,
-            protocolStack = protocolStack,
-            onProtocolStackChange = onProtocolStackChange,
             settingAvailable = settingAvailable,
+            onEditingDiscoverServers = onEditingDiscoverServers,
+            onEditingListenAddresses = onEditingListenAddresses,
         )
 
         InfoSwitchCard( title = "关于" ) {
@@ -140,31 +152,22 @@ private fun SettingForm(
     formState: SettingFormState,
     accessMode: SettingAccessMode,
     isSaving: Boolean,
-    isFormValid: Boolean,
-    onFormChange: (SettingFormState) -> Unit,
+    settingViewModel: SettingViewModel,
     developerModeEnabled: Boolean,
     developerModeVisible: Boolean,
     onModifyDeveloperMode: () -> Unit,
-    protocolStack: ProtocolStack,
-    onProtocolStackChange: (ProtocolStack) -> Unit,
+    onEditingDiscoverServers: () -> Unit,
+    onEditingListenAddresses: () -> Unit,
     settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
     val startupSettingEnabled = settingAvailable && !isSaving
     val fullSettingEnabled = startupSettingEnabled && !startupOnly
 
-    if (settingAvailable && !isFormValid) {
-        Text(
-            text = "部分设置项设定了无效值。",
-            color = MiuixTheme.colorScheme.error,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
-
     InfoSwitchCard(title = "常规") {
-        ImputableValueRow(
+        InputValueRow(
             value = formState.deviceName,
-            onValueChange = { onFormChange(formState.copy(deviceName = it)) },
+            onValueChange = { settingViewModel.onFormChange(deviceName = it) },
             label = "设备名",
             valueLabel = "必填",
             allowEdit = fullSettingEnabled,
@@ -174,7 +177,7 @@ private fun SettingForm(
             summary = "允许 Syncthing 发送匿名使用报告。",
             checked = formState.usageReportingEnabled,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(usageReportingEnabled = it)) },
+            onCheckedChange = { settingViewModel.onFormChange(usageReportingEnabled = it) },
         )
         if (developerModeVisible) {
             InfoSwitch(
@@ -197,7 +200,7 @@ private fun SettingForm(
         TextWithOptionField(
             value = formState.minHomeDiskFree,
             title = "最低磁盘剩余空间",
-            onValueChange = { onFormChange(formState.copy(minHomeDiskFree = it)) },
+            onValueChange = { settingViewModel.onFormChange(minHomeDiskFree = it) },
             label = "1",
             useLabelAsPlaceholder = true,
             singleLine = true,
@@ -209,19 +212,17 @@ private fun SettingForm(
             enabled = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             onSelectedIndexChange = { index ->
-                onFormChange(
-                    formState.copy(
-                        minHomeDiskFreeUnit = SettingConfiguration.DiskSpaceUnit.entries[index],
-                    ),
+                settingViewModel.onFormChange(
+                    minHomeDiskFreeUnit = SettingConfiguration.DiskSpaceUnit.entries[index],
                 )
             },
         )
     }
 
     InfoSwitchCard(title = "WebUI") {
-        ImputableValueRow(
+        InputValueRow(
             value = formState.guiPort,
-            onValueChange = { onFormChange(formState.copy(guiPort = it)) },
+            onValueChange = { settingViewModel.onFormChange(guiPort = it) },
             label = "端口",
             valueLabel = "8384",
             allowEdit = startupSettingEnabled,
@@ -233,10 +234,8 @@ private fun SettingForm(
             selectedIndex = formState.guiPortConflictBehavior.ordinal,
             enabled = startupSettingEnabled,
             onSelectedIndexChange = { index ->
-                onFormChange(
-                    formState.copy(
-                        guiPortConflictBehavior = SettingConfiguration.GuiPortConflictBehavior.entries[index],
-                    ),
+                settingViewModel.onFormChange(
+                    guiPortConflictBehavior = SettingConfiguration.GuiPortConflictBehavior.entries[index],
                 )
             },
         )
@@ -246,7 +245,13 @@ private fun SettingForm(
             summary = "使用用户名和密码登录 WebUI。",
             checked = formState.guiAuthenticationEnabled,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(guiAuthenticationEnabled = it)) },
+            onCheckedChange = {
+                settingViewModel.onFormChange(
+                    guiAuthenticationEnabled = it,
+                    guiUser = "",
+                    newGuiPassword = "",
+                )
+            },
         )
 
         AnimatedVisibility(
@@ -259,16 +264,16 @@ private fun SettingForm(
             ),
         ) {
             Column {
-                ImputableValueRow(
+                InputValueRow(
                     value = formState.guiUser,
-                    onValueChange = { onFormChange(formState.copy(guiUser = it)) },
+                    onValueChange = { settingViewModel.onFormChange(guiUser = it) },
                     label = "身份验证用户",
                     valueLabel = "必填",
                     allowEdit = fullSettingEnabled,
                 )
-                ImputableValueRow(
+                InputValueRow(
                     value = formState.newGuiPassword,
-                    onValueChange = { onFormChange(formState.copy(newGuiPassword = it)) },
+                    onValueChange = { settingViewModel.onFormChange(newGuiPassword = it) },
                     label = "身份验证密码",
                     valueLabel = if (setting.guiPasswordConfigured) "***" else "必填",
                     allowEdit = fullSettingEnabled,
@@ -284,59 +289,40 @@ private fun SettingForm(
             selectedIndex = formState.guiTheme.ordinal,
             enabled = fullSettingEnabled,
             onSelectedIndexChange = { index ->
-                onFormChange(
-                    formState.copy(guiTheme = SettingConfiguration.GuiTheme.entries[index]),
+                settingViewModel.onFormChange(
+                    guiTheme = SettingConfiguration.GuiTheme.entries[index],
                 )
             },
         )
     }
 
     InfoSwitchCard(title = "连接") {
-        OverlayDropdownPreference(
-            title = "协议栈",
-            summary = "连接使用的协议栈",
-            items = ProtocolStack.entries.map { it.displayName },
-            selectedIndex = protocolStack.ordinal,
-            enabled = startupSettingEnabled,
-            onSelectedIndexChange = { index ->
-                val selectedStack = ProtocolStack.entries[index]
-                onProtocolStackChange(selectedStack)
-                onFormChange(
-                    formState.copy(guiListenAddress = selectedStack.guiListenAddress),
-                )
-            },
-            onExpandedChange = {},
+        ArrowPreference(
+            title = "监听地址",
+            onClick = onEditingListenAddresses,
+            enabled = fullSettingEnabled,
         )
-        // TODO: 监听/relay等遵守协议栈
-        ImputableValueRow(
-            value = formState.listenAddresses,
-            onValueChange = { onFormChange(formState.copy(listenAddresses = it)) },
-            label = "监听地址",
-            valueLabel = "default",
-            singleLine = false,
-            allowEdit = fullSettingEnabled,
-        )
-        ImputableValueRow(
+        InputValueRow(
             value = formState.maxSendKiBPerSecond,
-            onValueChange = { onFormChange(formState.copy(maxSendKiBPerSecond = it)) },
+            onValueChange = { settingViewModel.onFormChange(maxSendKiBPerSecond = it) },
             label = "上传限速（KiB/s）",
             valueLabel = "无限制",
             allowEdit = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
-        ImputableValueRow(
+        InputValueRow(
             value = formState.maxReceiveKiBPerSecond,
-            onValueChange = { onFormChange(formState.copy(maxReceiveKiBPerSecond = it)) },
+            onValueChange = { settingViewModel.onFormChange(maxReceiveKiBPerSecond = it) },
             label = "下载限速（KiB/s）",
             valueLabel = "无限制",
             allowEdit = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
-        ImputableValueRow(
+        InputValueRow(
             value = formState.reconnectionIntervalSeconds,
-            onValueChange = { onFormChange(formState.copy(reconnectionIntervalSeconds = it)) },
+            onValueChange = { settingViewModel.onFormChange(reconnectionIntervalSeconds = it) },
             label = "重连间隔（s）",
-            valueLabel = "20",
+            valueLabel = "60",
             allowEdit = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
@@ -345,7 +331,7 @@ private fun SettingForm(
             summary = "对局域网设备启用限速",
             checked = formState.limitBandwidthInLan,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(limitBandwidthInLan = it)) },
+            onCheckedChange = { settingViewModel.onFormChange(limitBandwidthInLan = it) },
         )
     }
 
@@ -355,7 +341,7 @@ private fun SettingForm(
             summary = "通过发现服务器查找其他设备。",
             checked = formState.globalDiscoveryEnabled,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(globalDiscoveryEnabled = it)) },
+            onCheckedChange = { settingViewModel.onFormChange(globalDiscoveryEnabled = it) },
         )
 
         AnimatedVisibility(
@@ -373,16 +359,13 @@ private fun SettingForm(
                     summary = "向发现服务器公布局域网地址。",
                     checked = formState.announceLanAddresses,
                     enabled = fullSettingEnabled,
-                    onCheckedChange = { onFormChange(formState.copy(announceLanAddresses = it)) },
+                    onCheckedChange = { settingViewModel.onFormChange(announceLanAddresses = it) },
                 )
 
-                ImputableValueRow(
-                    value = formState.globalDiscoveryServers,
-                    onValueChange = { onFormChange(formState.copy(globalDiscoveryServers = it)) },
-                    label = "广域网发现服务器",
-                    valueLabel = "default",
-                    singleLine = false,
-                    allowEdit = fullSettingEnabled,
+                ArrowPreference(
+                    title = "广域网发现服务器",
+                    onClick = onEditingDiscoverServers,
+                    enabled = fullSettingEnabled,
                 )
             }
         }
@@ -392,7 +375,7 @@ private fun SettingForm(
             summary = "通过组播查找其他设备。",
             checked = formState.localDiscoveryEnabled,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(localDiscoveryEnabled = it)) },
+            onCheckedChange = { settingViewModel.onFormChange(localDiscoveryEnabled = it) },
         )
 
         AnimatedVisibility(
@@ -405,18 +388,18 @@ private fun SettingForm(
             ),
         ) {
             Column {
-                ImputableValueRow(
+                InputValueRow(
                     value = formState.localDiscoveryPort,
-                    onValueChange = { onFormChange(formState.copy(localDiscoveryPort = it)) },
+                    onValueChange = { settingViewModel.onFormChange(localDiscoveryPort = it) },
                     label = "IPv4 组播监听端口",
                     valueLabel = "21027",
                     allowEdit = fullSettingEnabled,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
-                ImputableValueRow(
+                InputValueRow(
                     value = formState.localDiscoveryMulticastAddress,
                     onValueChange = {
-                        onFormChange(formState.copy(localDiscoveryMulticastAddress = it))
+                        settingViewModel.onFormChange(localDiscoveryMulticastAddress = it)
                     },
                     label = "IPv6 组播地址",
                     valueLabel = "[ff12::8384]:21027",
@@ -428,33 +411,54 @@ private fun SettingForm(
     }
 
     InfoSwitchCard(title = "网络") {
+        OverlayDropdownPreference(
+            title = "协议栈",
+            summary = "连接使用的协议栈",
+            items = SettingProtocolStack.entries.map { it.displayName },
+            selectedIndex = settingViewModel.addressProtocolStack.ordinal,
+            enabled = startupSettingEnabled,
+            onSelectedIndexChange = { index ->
+                val selectedStack = SettingProtocolStack.entries[index]
+                settingViewModel.addressProtocolStack = selectedStack
+                settingViewModel.actualListenStack = when (selectedStack) {
+                        SettingProtocolStack.CUSTOM -> settingViewModel.listenAddressSettingUnsaved.stackPrefer
+                        SettingProtocolStack.IPV4 -> UriProtocolStack.IPV4
+                        SettingProtocolStack.IPV6 -> UriProtocolStack.IPV6
+                        SettingProtocolStack.DUAL -> UriProtocolStack.DUAL
+                }
+                settingViewModel.onFormChange(
+                    guiListenAddress = selectedStack.guiListenAddress,
+                )
+            },
+            onExpandedChange = {},
+        )
         InfoSwitch(
             title = "NAT 穿透",
             summary = "尝试通过路由器自动映射设备连接端口。",
             checked = formState.natEnabled,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(natEnabled = it)) },
+            onCheckedChange = { settingViewModel.onFormChange(natEnabled = it) },
         )
         InfoSwitch(
             title = "使用中继",
             summary = "直接连接不可用时，允许通过 Syncthing 中继建立连接。",
             checked = formState.relaysEnabled,
             enabled = fullSettingEnabled,
-            onCheckedChange = { onFormChange(formState.copy(relaysEnabled = it)) },
+            onCheckedChange = { settingViewModel.onFormChange(relaysEnabled = it) },
         )
-        ImputableValueRow(
+        InputValueRow(
             value = formState.alwaysLocalNetworks,
-            onValueChange = { onFormChange(formState.copy(alwaysLocalNetworks = it)) },
+            onValueChange = { settingViewModel.onFormChange(alwaysLocalNetworks = it) },
             label = "额外局域网网段",
             valueLabel = "CIDR，每行一个",
             singleLine = false,
             allowEdit = fullSettingEnabled,
         )
-        ImputableValueRow(
+        InputValueRow(
             value = formState.connectionLimitMax,
-            onValueChange = { onFormChange(formState.copy(connectionLimitMax = it)) },
+            onValueChange = { settingViewModel.onFormChange(connectionLimitMax = it) },
             label = "最大连接数",
-            valueLabel = "0 为不限",
+            valueLabel = "无限制",
             allowEdit = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
@@ -481,5 +485,183 @@ private fun SettingForm(
             onClick = null,
             enabled = false,
         )
+    }
+}
+
+@Composable
+internal fun SettingEditListenScreen(
+    modifier: Modifier = Modifier,
+    settingViewModel: SettingViewModel,
+) {
+    val isSettingProtocolStackCustom = settingViewModel.addressProtocolStack == SettingProtocolStack.CUSTOM
+
+    Column( modifier = modifier.fillMaxSize().padding(20.dp) ) {
+        Card {
+            OverlayDropdownPreference(
+                title = "协议栈",
+                summary = "监听使用的协议栈",
+                items = UriProtocolStack.entries.map { it.displayName },
+                selectedIndex = settingViewModel.actualListenStack.ordinal,
+                enabled = isSettingProtocolStackCustom,
+                onSelectedIndexChange = { index ->
+                    settingViewModel.actualListenStack = UriProtocolStack.entries.getOrNull(index)!!
+                    settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                        stackPrefer = UriProtocolStack.entries.getOrNull(index)!!
+                    )
+                },
+            )
+            InfoSwitch(
+                title = "TCP",
+                checked = settingViewModel.listenAddressSettingUnsaved.tcp,
+                enabled = true,
+                onCheckedChange = { settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                    tcp = !settingViewModel.listenAddressSettingUnsaved.tcp
+                ) },
+            )
+            InfoSwitch(
+                title = "QUIC",
+                checked = settingViewModel.listenAddressSettingUnsaved.quic,
+                enabled = true,
+                onCheckedChange = { settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                    quic = !settingViewModel.listenAddressSettingUnsaved.quic
+                ) },
+            )
+        }
+
+        HorizontalDivider( modifier = Modifier.padding(vertical = 20.dp) )
+
+        Row (
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp, start = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text (text = "Relay 服务器")
+            IconButton(
+                onClick = {
+                    settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                        relays = settingViewModel.listenAddressSettingUnsaved.relays + ListenAddressListItem( false, "relay://" )
+                    )
+                },
+                content = {
+                    Icon(
+                        modifier = Modifier.size(20.dp),
+                        contentDescription = "添加 Relay 服务器",
+                        imageVector = MiuixIcons.Add
+                    )
+                },
+            )
+        }
+
+        Card {
+            LazyColumn (
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                itemsIndexed( settingViewModel.listenAddressSettingUnsaved.relays ) { index, item ->
+                    CheckableInputValueRow(
+                        state = item.enabled,
+                        value = item.uri,
+                        valueLabel = "必填",
+                        singleLine = false,
+                        onValueChange = { result ->
+                            settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                                relays = settingViewModel.listenAddressSettingUnsaved.relays.mapIndexed { itemIndex, item2 ->
+                                    if ( itemIndex == index ) { item2.copy(uri = result) } else item2
+                                },
+                            )
+                        },
+                        onStateChange = {
+                            settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                                relays = settingViewModel.listenAddressSettingUnsaved.relays.mapIndexed { itemIndex, item2 ->
+                                    if ( itemIndex == index ) { item2.copy(enabled = !item2.enabled) } else item2
+                                },
+                            )
+                        },
+                        onDelete = {
+                            settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
+                                relays = settingViewModel.listenAddressSettingUnsaved.relays.filterIndexed { itemIndex, _ ->
+                                    itemIndex != index
+                                }
+                            )
+                        },
+                        valueValidator = settingViewModel::listenRelayAddressValidator
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingEditDiscoveryScreen(
+    modifier: Modifier = Modifier,
+    settingViewModel: SettingViewModel
+) {
+    Column ( modifier = modifier.fillMaxSize().padding(20.dp) ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp, start = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Discovery 服务器")
+            IconButton(
+                onClick = {
+                    settingViewModel.discoveryAddressSettingUnsaved +=
+                        ListenAddressListItem(false, "")
+                },
+                content = {
+                    Icon(
+                        modifier = Modifier.size(20.dp),
+                        contentDescription = "添加 Discovery 服务器",
+                        imageVector = MiuixIcons.Add
+                    )
+                },
+            )
+        }
+
+        Card {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                itemsIndexed(settingViewModel.discoveryAddressSettingUnsaved) { index, item ->
+                    CheckableInputValueRow(
+                        state = item.enabled,
+                        value = item.uri,
+                        valueLabel = "必填",
+                        singleLine = false,
+                        onValueChange = { result ->
+                            settingViewModel.discoveryAddressSettingUnsaved =
+                                settingViewModel.discoveryAddressSettingUnsaved.mapIndexed { itemIndex, currentItem ->
+                                    if (itemIndex == index) {
+                                        currentItem.copy(uri = result)
+                                    } else {
+                                        currentItem
+                                    }
+                                }
+                        },
+                        onStateChange = {
+                            settingViewModel.discoveryAddressSettingUnsaved =
+                                settingViewModel.discoveryAddressSettingUnsaved.mapIndexed { itemIndex, currentItem ->
+                                    if (itemIndex == index) {
+                                        currentItem.copy(enabled = !item.enabled)
+                                    } else {
+                                        currentItem
+                                    }
+                                }
+                        },
+                        onDelete = {
+                            settingViewModel.discoveryAddressSettingUnsaved =
+                                    settingViewModel.discoveryAddressSettingUnsaved.filterIndexed { itemIndex, _ ->
+                                        itemIndex != index
+                                    }
+                        },
+                        valueValidator = settingViewModel::discoveryAddressValidator
+                    )
+                }
+            }
+        }
     }
 }

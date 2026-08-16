@@ -1,5 +1,7 @@
 package moe.https.syncthing.ui.util
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import moe.https.syncthing.core.CoreState
 
 internal fun CoreState.displayName(): String = when (this) {
@@ -40,4 +42,46 @@ internal fun formatDuration(seconds: Long?): String {
         if (minutes > 0 || hours > 0 || days > 0) append("${minutes}分 ")
         append("${remainingSeconds}秒")
     }
+}
+
+@Serializable
+data class ListenAddressListItem(
+    val enabled: Boolean,
+    val uri: String
+)
+
+@Serializable
+data class ListenAddressSetting(
+    @SerialName("STACK")
+    val stackPrefer: UriProtocolStack,
+
+    @SerialName("TCP")
+    val tcp: Boolean = true,
+
+    @SerialName("QUIC")
+    val quic: Boolean = true,
+
+    @SerialName("PORT")
+    val port: Int,
+
+    @SerialName("relay")
+    val relays: List<ListenAddressListItem> = emptyList(),
+)
+
+enum class SettingProtocolStack(
+    val displayName: String,
+    val guiListenAddress: String,
+) {
+    IPV4("IPv4", "127.0.0.1"),
+    IPV6("IPv6", "::1"),
+    DUAL("双栈", "localhost"),
+    CUSTOM("高级", guiListenAddress = "localhost")
+}
+
+enum class UriProtocolStack(
+    val displayName: String,
+) {
+    IPV4("IPv4"),
+    IPV6("IPv6"),
+    DUAL("双栈"),
 }

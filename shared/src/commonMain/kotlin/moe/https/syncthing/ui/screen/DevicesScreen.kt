@@ -38,7 +38,7 @@ import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
-import moe.https.syncthing.ui.component.ImputableValueRow
+import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.MultipleValueRow
@@ -488,7 +488,7 @@ internal fun AddDeviceScreen(
         InfoSwitchCard(
             title = "设备",
             content = {
-                ImputableValueRow(
+                InputValueRow(
                     value = deviceId,
                     onValueChange = { deviceId = it },
                     label = "设备 ID",
@@ -497,7 +497,7 @@ internal fun AddDeviceScreen(
                     allowEdit = existingDevice == null
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     value = name,
                     onValueChange = { name = it },
                     label = "设备名",
@@ -505,7 +505,7 @@ internal fun AddDeviceScreen(
                     singleLine = true,
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     value = group,
                     onValueChange = { group = it },
                     label = "设备组",
@@ -545,7 +545,7 @@ internal fun AddDeviceScreen(
         InfoSwitchCard(
             title = "连接",
             content = {
-                ImputableValueRow(
+                InputValueRow(
                     value = addresses,
                     onValueChange = { addresses = it },
                     label = "地址",
@@ -553,7 +553,7 @@ internal fun AddDeviceScreen(
                     singleLine = false,
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     value = maxSendKiBPerSecond,
                     onValueChange = { maxSendKiBPerSecond = it },
                     label = "上传限速（KiB/s）",
@@ -561,7 +561,7 @@ internal fun AddDeviceScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
-                ImputableValueRow(
+                InputValueRow(
                     value = maxReceiveKiBPerSecond,
                     onValueChange = { maxReceiveKiBPerSecond = it },
                     label = "下载限速（KiB/s）",
@@ -570,7 +570,7 @@ internal fun AddDeviceScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
 
-                ImputableValueRow(
+                InputValueRow(
                     value = numConnections,
                     onValueChange = { numConnections = it },
                     label = "连接数",

@@ -25,14 +25,7 @@ interface AppSettingPrivateStorage {
     companion object {
         const val KEY_DEVELOPER_MODE = "developer_mode"
         const val KEY_PROTOCOL_STACK = "protocol_stack"
+        const val KEY_LISTEN_PREFERENCE = "listen_prefer"
+        const val KEY_DISCOVERY_PREFERENCE = "discovery_prefer"
     }
-}
-
-enum class ProtocolStack(
-    val displayName: String,
-    val guiListenAddress: String,
-) {
-    IPV4("IPv4", "127.0.0.1"),
-    IPV6("IPv6", "::1"),
-    DUAL("双栈", "localhost"),
 }

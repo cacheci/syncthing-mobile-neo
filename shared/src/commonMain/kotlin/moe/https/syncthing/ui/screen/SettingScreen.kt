@@ -194,7 +194,7 @@ private fun SettingForm(
         ArrowPreference(
             title = "存储权限",
             onClick = null,
-            enabled = false,
+            enabled = false, // TODO
         )
 
         TextWithOptionField(
@@ -468,22 +468,22 @@ private fun SettingForm(
         ArrowPreference(
             title = "当连接到网络...",
             onClick = null,
-            enabled = false,
+            enabled = false, // TODO
         )
         ArrowPreference(
             title = "当电池状态...",
             onClick = null,
-            enabled = false,
+            enabled = false, // TODO
         )
         ArrowPreference(
             title = "特定时间段...",
             onClick = null,
-            enabled = false,
+            enabled = false, // TODO
         )
         ArrowPreference(
             title = "后台运行权限",
             onClick = null,
-            enabled = false,
+            enabled = false, // TODO
         )
     }
 }

@@ -53,7 +53,7 @@ internal fun CoreScreen(
                 modifier = Modifier.weight(1f),
             )
             TextButton(
-                text = if (uiState.version == null) "导入 arm64 核心" else "更新核心",
+                text = if (uiState.version == null) "导入核心" else "更新核心",
                 onClick = onImportCore,
                 enabled = uiState.canImportCore,
                 modifier = Modifier.weight(1f),

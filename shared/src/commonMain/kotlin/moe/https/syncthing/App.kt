@@ -1,7 +1,13 @@
 package moe.https.syncthing
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -92,6 +98,7 @@ fun App(
     val foldersUiState by foldersViewModel.uiState.collectAsState()
     val settingUiState by settingViewModel.uiState.collectAsState()
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
+    var requestedPageMain by remember { mutableStateOf(AppPage.CORE) }
     var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
@@ -110,27 +117,26 @@ fun App(
     }
 
     LaunchedEffect(
-        currentPageMain,
+        requestedPageMain,
         coreUiState.state,
         settingUiState.errorMessage,
         settingUiState.successMessage,
     ) {
+        val ready = when (requestedPageMain) {
+            AppPage.DEVICES -> !devicesUiState.isLoading
+            AppPage.FOLDERS -> !foldersUiState.isLoading
+            AppPage.SETTINGS -> !settingUiState.isLoading
+            else -> true
+        }
+
+        if (ready) {
+            currentPageMain = requestedPageMain
+        }
+
         if (coreUiState.state != CoreState.RUNNING) {
             settingViewModel.onCoreUnavailable()
         }
-        when {
-            (currentPageMain == AppPage.DEVICES) -> {
-                if (coreUiState.state == CoreState.RUNNING) { devicesViewModel.refresh() }
-            }
 
-            (currentPageMain == AppPage.FOLDERS) -> {
-                if (coreUiState.state == CoreState.RUNNING) { foldersViewModel.refresh() }
-            }
-
-            (currentPageMain == AppPage.SETTINGS) -> {
-                settingViewModel.refresh()
-            }
-        }
         when {
             !settingUiState.errorMessage.isNullOrBlank() -> {
                 snackbarHostState.showSnackbar(
@@ -299,85 +305,99 @@ fun App(
                             .padding(padding)
                             .nestedScroll(mainScrollBehavior.nestedScrollConnection),
                     ) {
-                        when (currentPageMain) {
-                            AppPage.DEVICES -> DevicesScreen(
-                                uiState = devicesUiState,
-                                coreState = coreUiState.state,
-                                topAppBarScrollBehavior = mainScrollBehavior,
-                                onRefresh = devicesViewModel::refresh,
-                                onEditDevice = { device ->
-                                    editingDevice = device
-                                    currentPagePlain = AppSubPage.DEVICE_ADD
-                                    navController.navigate(PLAIN_PAGE_ROUTE)
-                                },
-                            )
-
-                            AppPage.FOLDERS -> FoldersScreen(
-                                uiState = foldersUiState,
-                                coreState = coreUiState.state,
-                                topAppBarScrollBehavior = mainScrollBehavior,
-                                onRefresh = foldersViewModel::refresh,
-                                onEditFolder = { folder ->
-                                    editingFolder = folder
-                                    devicesViewModel.refresh()
-                                    currentPagePlain = AppSubPage.FOLDER_ADD
-                                    navController.navigate(PLAIN_PAGE_ROUTE)
-                                },
-                            )
-
-                            AppPage.SETTINGS -> SettingScreen(
-                                uiState = settingUiState,
-                                settingViewModel = settingViewModel,
-                                developerModeEnabled = developerModeEnabled,
-                                onModifyDeveloperMode = onModifyDeveloperMode,
-                                onChangeToAbout = {
-                                    currentPagePlain = AppSubPage.ABOUT
-                                    navController.navigate(PLAIN_PAGE_ROUTE)
-                                },
-                                onEditingListenAddresses = {
-                                    currentPagePlain = AppSubPage.SETTINGS_LISTEN_EDIT
-                                    navController.navigate(PLAIN_PAGE_ROUTE)
-                                } ,
-                                onEditingDiscoverServers = {
-                                    currentPagePlain = AppSubPage.SETTINGS_DISCOVERY_EDIT
-                                    navController.navigate(PLAIN_PAGE_ROUTE)
-                                },
-                                onChangeToLicence = {
-                                    currentPagePlain = AppSubPage.LICENCE
-                                    navController.navigate(PLAIN_PAGE_ROUTE)
+                        AnimatedContent(
+                            targetState = currentPageMain,
+                            transitionSpec = {
+                                if (targetState.ordinal > initialState.ordinal) {
+                                    (slideInHorizontally { it } + fadeIn()) togetherWith
+                                            (slideOutHorizontally { -it } + fadeOut())
+                                } else {
+                                    (slideInHorizontally { -it } + fadeIn()) togetherWith
+                                            (slideOutHorizontally { it } + fadeOut())
                                 }
-                            )
+                            },
+                            label = "MainPageTransition",
+                        ) { page ->
+                            when (page) {
+                                AppPage.DEVICES -> DevicesScreen(
+                                    uiState = devicesUiState,
+                                    coreState = coreUiState.state,
+                                    topAppBarScrollBehavior = mainScrollBehavior,
+                                    onRefresh = devicesViewModel::refresh,
+                                    onEditDevice = { device ->
+                                        editingDevice = device
+                                        currentPagePlain = AppSubPage.DEVICE_ADD
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
+                                )
 
-                            AppPage.CORE -> CoreScreen(
-                                uiState = coreUiState,
-                                onStartAction = if (coreUiState.isStarted) {
-                                    coreViewModel::onStopClicked
-                                } else {
-                                    coreViewModel::onStartClicked
-                                },
-                                onImportCore = coreViewModel::onImportCoreClicked,
-                                snackbarHostState = snackbarHostState,
-                                developerModeEnabled = developerModeEnabled,
-                                onModifyDeveloperMode = onModifyDeveloperMode,
-                            )
+                                AppPage.FOLDERS -> FoldersScreen(
+                                    uiState = foldersUiState,
+                                    coreState = coreUiState.state,
+                                    topAppBarScrollBehavior = mainScrollBehavior,
+                                    onRefresh = foldersViewModel::refresh,
+                                    onEditFolder = { folder ->
+                                        editingFolder = folder
+                                        devicesViewModel.refresh()
+                                        currentPagePlain = AppSubPage.FOLDER_ADD
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
+                                )
 
-                            AppPage.LOGS -> LogScreen(
-                                uiState = logUiState,
-                                onSourceSelected = logViewModel::onSourceSelected,
-                            )
+                                AppPage.SETTINGS -> SettingScreen(
+                                    uiState = settingUiState,
+                                    settingViewModel = settingViewModel,
+                                    developerModeEnabled = developerModeEnabled,
+                                    onModifyDeveloperMode = onModifyDeveloperMode,
+                                    onChangeToAbout = {
+                                        currentPagePlain = AppSubPage.ABOUT
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
+                                    onEditingListenAddresses = {
+                                        currentPagePlain = AppSubPage.SETTINGS_LISTEN_EDIT
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
+                                    onEditingDiscoverServers = {
+                                        currentPagePlain = AppSubPage.SETTINGS_DISCOVERY_EDIT
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
+                                    onChangeToLicence = {
+                                        currentPagePlain = AppSubPage.LICENCE
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    }
+                                )
 
-                            AppPage.WEBUI -> WebviewScreen(
-                                coreState = coreUiState.state,
-                                topAppBarScrollBehavior = mainScrollBehavior,
-                                webUiUrl = if (coreUiState.state == CoreState.RUNNING) {
-                                    webUiUrlProvider()
-                                } else {
-                                    null
-                                },
-                                reloadToken = webUiReloadToken,
-                                webView = webView,
-                            )
+                                AppPage.CORE -> CoreScreen(
+                                    uiState = coreUiState,
+                                    onStartAction = if (coreUiState.isStarted) {
+                                        coreViewModel::onStopClicked
+                                    } else {
+                                        coreViewModel::onStartClicked
+                                    },
+                                    onImportCore = coreViewModel::onImportCoreClicked,
+                                    snackbarHostState = snackbarHostState,
+                                    developerModeEnabled = developerModeEnabled,
+                                    onModifyDeveloperMode = onModifyDeveloperMode,
+                                )
 
+                                AppPage.LOGS -> LogScreen(
+                                    uiState = logUiState,
+                                    onSourceSelected = logViewModel::onSourceSelected,
+                                )
+
+                                AppPage.WEBUI -> WebviewScreen(
+                                    coreState = coreUiState.state,
+                                    topAppBarScrollBehavior = mainScrollBehavior,
+                                    webUiUrl = if (coreUiState.state == CoreState.RUNNING) {
+                                        webUiUrlProvider()
+                                    } else {
+                                        null
+                                    },
+                                    reloadToken = webUiReloadToken,
+                                    webView = webView,
+                                )
+
+                            }
                         }
                     }
                 }

@@ -1,6 +1,12 @@
 package moe.https.syncthing
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,9 +30,11 @@ import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
     private var scannedDeviceId by mutableStateOf("")
+    private var publicStorageAccessGranted by mutableStateOf(false)
 
     private val scanQrCodeLauncher = registerForActivityResult(ScanQRCode()) { result ->
         if (result is QRResult.QRSuccess) {
@@ -70,8 +78,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val legacyStoragePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        publicStorageAccessGranted = hasPublicStorageAccess()
+    }
+
+    private val allFilesAccessLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        publicStorageAccessGranted = hasPublicStorageAccess()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        publicStorageAccessGranted = hasPublicStorageAccess()
         enableEdgeToEdge()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -106,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 onScanQrCode = {
                     scanQrCodeLauncher.launch(null)
                 },
+                onRequestPublicStorageAccess = ::requestPublicStorageAccess,
                 scannedDeviceId = scannedDeviceId,
                 webUiUrlProvider = applicationState.coreRuntime::guiUrl,
                 webView = { url, reloadToken, onScroll, modifier ->
@@ -116,6 +138,43 @@ class MainActivity : ComponentActivity() {
                         modifier = modifier,
                     )
                 },
+            )
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        publicStorageAccessGranted = hasPublicStorageAccess()
+    }
+
+    private fun hasPublicStorageAccess(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
+        }
+
+    private fun requestPublicStorageAccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val appSettingsIntent = Intent(
+                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                "package:$packageName".toUri(),
+            )
+            val intent = if (appSettingsIntent.resolveActivity(packageManager) != null) {
+                appSettingsIntent
+            } else {
+                Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+            }
+            allFilesAccessLauncher.launch(intent)
+        } else {
+            legacyStoragePermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ),
             )
         }
     }

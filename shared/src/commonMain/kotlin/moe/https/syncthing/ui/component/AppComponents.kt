@@ -310,6 +310,7 @@ internal fun MessageCard(
     title: String,
     message: String,
     isError: Boolean = false,
+    content: @Composable () -> Unit = {},
 ) {
     Card(
         modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth(),
@@ -323,11 +324,19 @@ internal fun MessageCard(
         },
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(text = title, style = MiuixTheme.textStyles.title4)
-            Text(text = message, color = MiuixTheme.colorScheme.onSecondaryContainer)
+            Text(
+                text = title,
+                style = MiuixTheme.textStyles.title4,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
+            )
+            Text(
+                text = message,
+                color = MiuixTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            )
+            content()
         }
     }
 }

@@ -45,6 +45,7 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -60,6 +61,7 @@ internal fun SettingScreen(
     onModifyDeveloperMode: () -> Unit,
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
+    onEditingStoragePermission: () -> Unit,
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
 ) {
@@ -127,6 +129,7 @@ internal fun SettingScreen(
             settingAvailable = settingAvailable,
             onEditingDiscoverServers = onEditingDiscoverServers,
             onEditingListenAddresses = onEditingListenAddresses,
+            onEditingStoragePermission = onEditingStoragePermission,
         )
 
         InfoSwitchCard( title = "关于" ) {
@@ -158,6 +161,7 @@ private fun SettingForm(
     onModifyDeveloperMode: () -> Unit,
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
+    onEditingStoragePermission: () -> Unit,
     settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
@@ -193,8 +197,7 @@ private fun SettingForm(
     InfoSwitchCard(title = "磁盘与存储") {
         ArrowPreference(
             title = "存储权限",
-            onClick = null,
-            enabled = false, // TODO
+            onClick = onEditingStoragePermission,
         )
 
         TextWithOptionField(
@@ -662,6 +665,29 @@ internal fun SettingEditDiscoveryScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun SettingStoragePermissionPage(
+    onRequestPermission: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        MessageCard(
+            title = "公共目录访问权限",
+            message = "若希望同步公有存储中的文件夹，请启用公共目录访问权限。"
+        ) {
+            ArrowPreference(
+                title = "授权公共目录访问权限",
+                onClick = onRequestPermission,
+            )
         }
     }
 }

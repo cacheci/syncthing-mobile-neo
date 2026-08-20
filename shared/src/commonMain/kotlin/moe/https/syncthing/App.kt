@@ -20,6 +20,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation.compose.NavHost
@@ -40,6 +42,7 @@ import moe.https.syncthing.ui.screen.LogScreen
 import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
 import moe.https.syncthing.ui.screen.SettingEditListenScreen
 import moe.https.syncthing.ui.screen.SettingScreen
+import moe.https.syncthing.ui.screen.SettingStoragePermissionPage
 import moe.https.syncthing.ui.screen.WebviewScreen
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
@@ -83,6 +86,7 @@ fun App(
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
     onScanQrCode: () -> Unit,
+    onRequestPublicStorageAccess: () -> Unit,
     scannedDeviceId: String,
     webUiUrlProvider: () -> String,
     webView: @Composable (
@@ -99,7 +103,17 @@ fun App(
     val settingUiState by settingViewModel.uiState.collectAsState()
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var requestedPageMain by remember { mutableStateOf(AppPage.CORE) }
-    var currentPagePlain by remember { mutableStateOf(AppSubPage.DEBUG) }
+    var currentPagePlain by rememberSaveable(
+        stateSaver = Saver(
+            save = { page -> page.name },
+            restore = { pageName ->
+                AppSubPage.entries.firstOrNull { page -> page.name == pageName }
+                    ?: AppSubPage.DEBUG
+            },
+        ),
+    ) {
+        mutableStateOf(AppSubPage.DEBUG)
+    }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
@@ -367,6 +381,10 @@ fun App(
                                         currentPagePlain = AppSubPage.ABOUT
                                         navController.navigate(PLAIN_PAGE_ROUTE)
                                     },
+                                    onEditingStoragePermission = {
+                                        currentPagePlain = AppSubPage.SETTINGS_STORAGE_PERMISSION
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
                                     onEditingListenAddresses = {
                                         currentPagePlain = AppSubPage.SETTINGS_LISTEN_EDIT
                                         navController.navigate(PLAIN_PAGE_ROUTE)
@@ -506,7 +524,19 @@ fun App(
                         )
                     ) {
                         when (currentPagePlain) {
-                            AppSubPage.DEBUG -> {}
+                            AppSubPage.DEBUG -> {
+                                LogScreen(
+                                    uiState = logUiState,
+                                    onSourceSelected = logViewModel::onSourceSelected,
+                                )
+                            }
+
+                            AppSubPage.SETTINGS_STORAGE_PERMISSION -> {
+                                SettingStoragePermissionPage(
+                                    onRequestPermission = onRequestPublicStorageAccess,
+                                )
+                            }
+
                             AppSubPage.DEVICE_ADD -> {
                                 AddDeviceScreen(
                                     isSubmitting = devicesUiState.isLoading,
@@ -588,4 +618,5 @@ private enum class AppSubPage(val title: String) {
     LICENCE("开源许可"),
     SETTINGS_LISTEN_EDIT("监听地址"),
     SETTINGS_DISCOVERY_EDIT("发现服务器"),
+    SETTINGS_STORAGE_PERMISSION("存储权限"),
 }

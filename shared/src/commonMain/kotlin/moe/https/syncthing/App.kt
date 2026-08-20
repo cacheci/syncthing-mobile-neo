@@ -121,6 +121,9 @@ fun App(
         coreUiState.state,
         settingUiState.errorMessage,
         settingUiState.successMessage,
+        devicesUiState.isLoading,
+        foldersUiState.isLoading,
+        settingUiState.isLoading,
     ) {
         val ready = when (requestedPageMain) {
             AppPage.DEVICES -> !devicesUiState.isLoading
@@ -149,6 +152,17 @@ fun App(
                     "保存成功：${settingUiState.successMessage}",
                 )
             }
+        }
+    }
+
+    fun requestSwitchToPageMain( targetPage: AppPage ) {
+        requestedPageMain = targetPage
+
+        when (targetPage) {
+            AppPage.DEVICES -> devicesViewModel.refresh()
+            AppPage.FOLDERS -> foldersViewModel.refresh()
+            AppPage.SETTINGS -> settingViewModel.refresh()
+            else -> currentPageMain = targetPage
         }
     }
 
@@ -257,13 +271,13 @@ fun App(
                         NavigationBar {
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.DEVICES,
-                                onClick = { currentPageMain = AppPage.DEVICES },
+                                onClick = { requestSwitchToPageMain(AppPage.DEVICES) },
                                 icon = MiuixIcons.Link,
                                 label = AppPage.DEVICES.title,
                             )
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.FOLDERS,
-                                onClick = { currentPageMain = AppPage.FOLDERS },
+                                onClick = { requestSwitchToPageMain(AppPage.FOLDERS) },
                                 icon = MiuixIcons.Folder,
                                 label = AppPage.FOLDERS.title,
                             )
@@ -290,7 +304,7 @@ fun App(
                             }
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.SETTINGS,
-                                onClick = { currentPageMain = AppPage.SETTINGS },
+                                onClick = { requestSwitchToPageMain(AppPage.SETTINGS) },
                                 icon = MiuixIcons.Settings,
                                 label = AppPage.SETTINGS.title,
                             )

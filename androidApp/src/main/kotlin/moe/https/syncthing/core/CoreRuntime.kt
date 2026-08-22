@@ -40,7 +40,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class CoreRuntime(
     context: Context,
-    private val installer: CoreBinaryInstaller,
+    private val coreRegistry: CoreRegistry,
     private val appSettingsStorage: AppSettingPrivateStorage,
 ) : DevicesController, FoldersController, SettingController {
     private val applicationContext = context.applicationContext
@@ -63,13 +63,87 @@ class CoreRuntime(
         },
     )
 
-    private val mutableSnapshot = MutableStateFlow(
-        CoreSnapshot(
-            state = if (installer.binaryFile.isFile) CoreState.STOPPED else CoreState.NOT_INSTALLED,
-            version = installer.installedVersion,
-        ),
-    )
+    private val mutableSnapshot = MutableStateFlow(idleSnapshot())
     val snapshot: StateFlow<CoreSnapshot> = mutableSnapshot.asStateFlow()
+
+    private fun idleSnapshot(
+        state: CoreState? = null,
+        operationMessage: String? = null,
+    ): CoreSnapshot {
+        val options = coreRegistry.availableOptions()
+        val selected = coreRegistry.selectedOption()
+        val effectiveState = state ?: if (selected.availability == CoreAvailability.AVAILABLE) {
+            CoreState.STOPPED
+        } else {
+            CoreState.NOT_INSTALLED
+        }
+        return CoreSnapshot(
+            state = effectiveState,
+            version = selected.version,
+            operationMessage = operationMessage,
+            selectedCoreId = selected.id,
+            selectedCoreSource = selected.source,
+            availableCores = options,
+            canSelectCore = !SyncthingCoreService.isDesiredRunning(applicationContext) &&
+                effectiveState in setOf(
+                    CoreState.NOT_INSTALLED,
+                    CoreState.STOPPED,
+                    CoreState.FAILED,
+                ),
+        )
+    }
+
+    suspend fun selectCore(id: String) = withContext(Dispatchers.IO) {
+        processMutex.withLock {
+            if (
+                SyncthingCoreService.isDesiredRunning(applicationContext) ||
+                process?.isAlive == true ||
+                currentPid() != null ||
+                restClient.ping()
+            ) {
+                mutableSnapshot.update {
+                    it.copy(operationMessage = "请先停止核心，再切换核心")
+                }
+                return@withLock
+            }
+            runCatching { coreRegistry.select(id) }
+                .onSuccess {
+                    mutableSnapshot.value = idleSnapshot()
+                }
+                .onFailure { error ->
+                    mutableSnapshot.update {
+                        it.copy(operationMessage = error.userMessage())
+                    }
+                }
+        }
+    }
+
+    suspend fun deleteCore(id: String) = withContext(Dispatchers.IO) {
+        processMutex.withLock {
+            if (
+                SyncthingCoreService.isDesiredRunning(applicationContext) ||
+                process?.isAlive == true ||
+                currentPid() != null ||
+                restClient.ping()
+            ) {
+                mutableSnapshot.update {
+                    it.copy(operationMessage = "请先停止核心，再删除外置核心")
+                }
+                return@withLock
+            }
+            runCatching { coreRegistry.deleteExternal(id) }
+                .onSuccess { core ->
+                    mutableSnapshot.value = idleSnapshot(
+                        operationMessage = "已删除外置核心 ${core.version}",
+                    )
+                }
+                .onFailure { error ->
+                    mutableSnapshot.update {
+                        it.copy(operationMessage = error.userMessage())
+                    }
+                }
+        }
+    }
 
     fun guiUrl(): String = formatGuiBaseUrl(activeGuiHost, activeGuiPort)
 
@@ -258,7 +332,7 @@ class CoreRuntime(
     private var process: Process? = null
 
     suspend fun refreshInstallation() = withContext(Dispatchers.IO) {
-        if (process?.isAlive == true || restClient.ping()) {
+        if (process?.isAlive == true || currentPid() != null || restClient.ping()) {
             val status = runCatching { restClient.status() }
                 .onFailure { error ->
                     logConnectionFailure(
@@ -269,90 +343,83 @@ class CoreRuntime(
                 }
                 .getOrNull()
             rememberLocalDeviceId(status?.myId)
-            mutableSnapshot.update {
-                it.copy(
-                    state = CoreState.RUNNING,
-                    version = installer.installedVersion,
-                    uptimeSeconds = status?.uptimeSeconds,
-                    rssBytes = readRssBytes(currentPid()),
-                    allocatedBytes = status?.allocatedBytes,
-                    systemBytes = status?.systemBytes,
-                    goroutines = status?.goroutines,
-                    lastError = null,
-                )
-            }
+            mutableSnapshot.value = idleSnapshot(state = CoreState.RUNNING).copy(
+                uptimeSeconds = status?.uptimeSeconds,
+                rssBytes = readRssBytes(currentPid()),
+                allocatedBytes = status?.allocatedBytes,
+                systemBytes = status?.systemBytes,
+                goroutines = status?.goroutines,
+            )
             return@withContext
         }
-        mutableSnapshot.update {
-            it.copy(
-                state = if (installer.binaryFile.isFile) CoreState.STOPPED else CoreState.NOT_INSTALLED,
-                version = installer.installedVersion,
-                uptimeSeconds = null,
-                rssBytes = null,
-                allocatedBytes = null,
-                systemBytes = null,
-                goroutines = null,
-            )
-        }
+        mutableSnapshot.value = idleSnapshot()
     }
 
-    suspend fun importCore(uri: Uri) {
-        if (process?.isAlive == true || restClient.ping()) {
-            fail("请先停止核心，再进行更新")
-            return
-        }
-        if (!supportsArm64()) {
-            fail("当前设备不是 arm64-v8a，无法使用此核心")
-            return
-        }
-
-        mutableSnapshot.update { it.copy(state = CoreState.INSTALLING, lastError = null) }
-        runCatching { installer.install(uri) }
-            .onSuccess { version ->
-                mutableSnapshot.value = CoreSnapshot(
-                    state = CoreState.STOPPED,
-                    version = version,
-                )
-                if (version.contains("linux-arm64", ignoreCase = true)) {
-                    logWarning(
-                        "已导入 linux-arm64 核心；该构建可能无法在 Android 上正确使用 DNS、网络接口、发现和中继功能，请优先使用 android-arm64 核心",
-                    )
-                } else {
-                    logInfo("核心导入成功：${redact(version)}")
-                }
-            }
-            .onFailure { error ->
-                logError("核心导入失败", error)
+    suspend fun importCore(uri: Uri) = withContext(Dispatchers.IO) {
+        processMutex.withLock {
+            if (
+                SyncthingCoreService.isDesiredRunning(applicationContext) ||
+                process?.isAlive == true ||
+                currentPid() != null ||
+                restClient.ping()
+            ) {
                 mutableSnapshot.update {
-                    it.copy(
-                        state = if (installer.binaryFile.isFile) CoreState.STOPPED else CoreState.NOT_INSTALLED,
-                        lastError = error.userMessage(),
+                    it.copy(operationMessage = "请先停止核心，再导入外置核心")
+                }
+                return@withLock
+            }
+            if (!supportsArm64()) {
+                mutableSnapshot.update {
+                    it.copy(operationMessage = "当前设备不是 arm64-v8a，无法使用此外置核心")
+                }
+                return@withLock
+            }
+
+            mutableSnapshot.update {
+                it.copy(
+                    state = CoreState.INSTALLING,
+                    lastError = null,
+                    operationMessage = null,
+                    canSelectCore = false,
+                )
+            }
+            runCatching { coreRegistry.importAndSelect(uri) }
+                .onSuccess { core ->
+                    mutableSnapshot.value = idleSnapshot(
+                        operationMessage = "已导入并选中外置核心 ${core.version}",
+                    )
+                    if (core.version.contains("linux-arm64", ignoreCase = true)) {
+                        logWarning(
+                            "已导入 linux-arm64 核心；该构建可能无法在 Android 上正确使用 DNS、网络接口、发现和中继功能，请优先使用 android-arm64 核心",
+                        )
+                    } else {
+                        logInfo("外置核心导入成功：${redact(core.version)}")
+                    }
+                }
+                .onFailure { error ->
+                    logError("外置核心导入失败", error)
+                    mutableSnapshot.value = idleSnapshot(
+                        operationMessage = error.userMessage(),
                     )
                 }
-            }
+        }
     }
 
     suspend fun runSession(): SessionResult = withContext(Dispatchers.IO) {
         val startedAt = System.currentTimeMillis()
-        if (!installer.binaryFile.isFile) {
-            fail("尚未导入 Syncthing 核心")
-            return@withContext SessionResult(started = false, runtimeMillis = 0, exitCode = null)
-        }
         if (!supportsArm64()) {
             fail("当前设备不是 arm64-v8a")
             return@withContext SessionResult(started = false, runtimeMillis = 0, exitCode = null)
         }
-        installer.installedVersion
-            ?.takeIf { it.contains("linux-arm64", ignoreCase = true) }
-            ?.let {
-                logWarning(
-                    "当前核心为 linux-arm64 构建，Android 下 DNS、网络接口、发现和中继连接可能不可用",
-                )
-            }
 
         if (restClient.ping()) {
             mutableSnapshot.update {
-                it.copy(state = CoreState.RUNNING, lastError = null)
+                it.copy(
+                    state = CoreState.RUNNING,
+                    lastError = null,
+                    operationMessage = null,
+                    canSelectCore = false,
+                )
             }
             monitorSession(process = null)
             return@withContext SessionResult(
@@ -362,15 +429,32 @@ class CoreRuntime(
             )
         }
 
-        val launchedProcess = processMutex.withLock {
-            process?.takeIf { it.isAlive } ?: launchProcess().also { process = it }
+        val (launchedProcess, executable) = processMutex.withLock {
+            process?.takeIf { it.isAlive }?.let { running ->
+                val selected = coreRegistry.resolveSelected()
+                running to selected
+            } ?: coreRegistry.resolveSelected().let { selected ->
+                val launched = launchProcess(selected)
+                process = launched
+                rememberProcess(selected)
+                launched to selected
+            }
         }
+        executable.version
+            .takeIf { executable.source == CoreSource.EXTERNAL && it.contains("linux-arm64", ignoreCase = true) }
+            ?.let {
+                logWarning(
+                    "当前外置核心为 linux-arm64 构建，Android 下 DNS、网络接口、发现和中继连接可能不可用",
+                )
+            }
         logInfo("核心进程已创建，开始连接 REST API：${restApiAddress()}")
 
         mutableSnapshot.update {
             it.copy(
                 state = CoreState.STARTING,
                 lastError = null,
+                operationMessage = null,
+                canSelectCore = false,
                 uptimeSeconds = null,
                 rssBytes = null,
                 allocatedBytes = null,
@@ -394,6 +478,7 @@ class CoreRuntime(
             )
             launchedProcess.destroyForcibly()
             process = null
+            clearProcessRecord()
             return@withContext SessionResult(
                 started = false,
                 runtimeMillis = System.currentTimeMillis() - startedAt,
@@ -407,7 +492,7 @@ class CoreRuntime(
         monitorSession(launchedProcess)
         val exitCode = launchedProcess.exitCodeOrNull()
         process = null
-        preferences.edit { remove(KEY_PID) }
+        clearProcessRecord()
 
         if (mutableSnapshot.value.state != CoreState.STOPPING) {
             fail(
@@ -454,11 +539,8 @@ class CoreRuntime(
         }
 
         process = null
-        preferences.edit { remove(KEY_PID) }
-        mutableSnapshot.value = CoreSnapshot(
-            state = if (installer.binaryFile.isFile) CoreState.STOPPED else CoreState.NOT_INSTALLED,
-            version = installer.installedVersion,
-        )
+        clearProcessRecord()
+        mutableSnapshot.value = idleSnapshot()
         logInfo("核心已停止")
     }
 
@@ -480,11 +562,12 @@ class CoreRuntime(
                 systemBytes = null,
                 goroutines = null,
                 lastError = message,
+                canSelectCore = !SyncthingCoreService.isDesiredRunning(applicationContext),
             )
         }
     }
 
-    private fun launchProcess(): Process {
+    private fun launchProcess(executable: CoreExecutable): Process {
         val home = homeDirectory.apply { mkdirs() }
         val logs = File(applicationContext.filesDir, "logs").apply { mkdirs() }
         val apiKey = preferences.getString(KEY_API_KEY, null)
@@ -500,7 +583,7 @@ class CoreRuntime(
         preferences.edit { putInt(KEY_ACTIVE_GUI_PORT, activeGuiPort) }
 
         val arguments = mutableListOf(
-            installer.binaryFile.absolutePath,
+            executable.file.absolutePath,
             "serve",
             "--home=${home.absolutePath}",
             "--gui-address=$guiAddress",
@@ -613,27 +696,43 @@ class CoreRuntime(
 
     private fun currentPid(): Long? {
         val rememberedPid = preferences.getLong(KEY_PID, -1L).takeIf { it > 0 }
-        if (rememberedPid != null && isCoreProcess(rememberedPid)) {
+        val rememberedPath = preferences.getString(KEY_EXECUTABLE_PATH, null)
+        if (rememberedPid != null && isCoreProcess(rememberedPid, rememberedPath)) {
             return rememberedPid
         }
         return findCorePid()?.also { pid ->
-            preferences.edit { putLong(KEY_PID, pid) }
+            val path = processCommand(pid)
+            preferences.edit {
+                putLong(KEY_PID, pid)
+                putString(KEY_EXECUTABLE_PATH, path)
+            }
         }
     }
 
     private fun findCorePid(): Long? = runCatching {
+        val knownPaths = coreRegistry.knownExecutablePaths()
         File("/proc").listFiles()
             ?.asSequence()
             ?.filter { entry -> entry.isDirectory && entry.name.all(Char::isDigit) }
             ?.mapNotNull { entry -> entry.name.toLongOrNull() }
-            ?.firstOrNull(::isCoreProcess)
+            ?.firstOrNull { pid -> processCommand(pid) in knownPaths }
     }.getOrNull()
 
-    private fun isCoreProcess(pid: Long): Boolean = runCatching {
+    private fun processCommand(pid: Long): String? = runCatching {
         File("/proc/$pid/cmdline")
             .readText()
-            .substringBefore('\u0000') == installer.binaryFile.absolutePath
-    }.getOrDefault(false)
+            .substringBefore('\u0000')
+            .takeIf(String::isNotBlank)
+    }.getOrNull()
+
+    private fun isCoreProcess(pid: Long, expectedPath: String?): Boolean {
+        val command = processCommand(pid) ?: return false
+        return if (expectedPath != null) {
+            command == expectedPath
+        } else {
+            command in coreRegistry.knownExecutablePaths()
+        }
+    }
 
     private fun readRssBytes(pid: Long?): Long? {
         if (pid == null) return null
@@ -650,8 +749,24 @@ class CoreRuntime(
 
     private fun killRememberedProcessIfOwned() {
         val pid = currentPid() ?: return
-        if (isCoreProcess(pid)) {
+        val expectedPath = preferences.getString(KEY_EXECUTABLE_PATH, null)
+        if (isCoreProcess(pid, expectedPath)) {
             android.os.Process.killProcess(pid.toInt())
+        }
+    }
+
+    private fun rememberProcess(executable: CoreExecutable) {
+        preferences.edit {
+            putString(KEY_EXECUTABLE_PATH, executable.file.absolutePath)
+            putString(KEY_RUNNING_CORE_ID, executable.id)
+        }
+    }
+
+    private fun clearProcessRecord() {
+        preferences.edit {
+            remove(KEY_PID)
+            remove(KEY_EXECUTABLE_PATH)
+            remove(KEY_RUNNING_CORE_ID)
         }
     }
 
@@ -855,6 +970,8 @@ class CoreRuntime(
         private const val PREFERENCES = "core_runtime"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_PID = "pid"
+        private const val KEY_EXECUTABLE_PATH = "executable_path"
+        private const val KEY_RUNNING_CORE_ID = "running_core_id"
         private const val KEY_GUI_PORT = "gui_port"
         private const val KEY_ACTIVE_GUI_PORT = "active_gui_port"
         private const val KEY_GUI_PORT_CONFLICT_BEHAVIOR = "gui_port_conflict_behavior"

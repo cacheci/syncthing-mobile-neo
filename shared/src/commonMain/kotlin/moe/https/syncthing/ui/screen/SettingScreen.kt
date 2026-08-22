@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import moe.https.syncthing.core.CoreAvailability
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.ui.component.CheckableInputValueRow
@@ -34,6 +36,7 @@ import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.TextWithOptionField
+import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
 import moe.https.syncthing.ui.util.ListenAddressListItem
@@ -44,13 +47,14 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import kotlin.collections.plus
 
 @Composable
 internal fun SettingScreen(
@@ -62,6 +66,7 @@ internal fun SettingScreen(
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
     onEditingStoragePermission: () -> Unit,
+    onEditingCores: () -> Unit,
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
 ) {
@@ -130,6 +135,7 @@ internal fun SettingScreen(
             onEditingDiscoverServers = onEditingDiscoverServers,
             onEditingListenAddresses = onEditingListenAddresses,
             onEditingStoragePermission = onEditingStoragePermission,
+            onEditingCores = onEditingCores,
         )
 
         InfoSwitchCard( title = "关于" ) {
@@ -162,6 +168,7 @@ private fun SettingForm(
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
     onEditingStoragePermission: () -> Unit,
+    onEditingCores: () -> Unit,
     settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
@@ -489,6 +496,13 @@ private fun SettingForm(
             enabled = false, // TODO
         )
     }
+
+    InfoSwitchCard(title = "核心设置") {
+        ArrowPreference(
+            title = "核心选择",
+            onClick = onEditingCores,
+        )
+    }
 }
 
 @Composable
@@ -688,6 +702,69 @@ internal fun SettingStoragePermissionPage(
                 title = "授权公共目录访问权限",
                 onClick = onRequestPermission,
             )
+        }
+    }
+}
+
+@Composable
+internal fun SettingCoreSelectScreen(
+    uiState: CoreUiState,
+    snackbarHostState: SnackbarHostState,
+    onCoreSelected: (String) -> Unit,
+    onImportCore: () -> Unit,
+    onCoreDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LaunchedEffect(uiState.operationMessage) {
+        uiState.operationMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    Column(modifier = modifier.fillMaxSize().padding(20.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp, start = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "Syncthing 核心")
+            IconButton(
+                onClick = onImportCore,
+                enabled = uiState.canImportCore,
+                content = {
+                    Icon(
+                        modifier = Modifier.size(20.dp),
+                        contentDescription = "导入核心",
+                        imageVector = MiuixIcons.Add,
+                    )
+                },
+            )
+        }
+
+        if (!uiState.availableCores.isEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    itemsIndexed(
+                        items = uiState.availableCores,
+                        key = { _, option -> option.id },
+                    ) { _, option ->
+                        val available = option.availability == CoreAvailability.AVAILABLE
+                        val selected = option.id == uiState.selectedCoreId
+                        CheckableInputValueRow(
+                            state = selected,
+                            value = if (option.internal) "内置核心" else (option.version + (option.unavailableReason?: "")),
+                            onValueChange = {},
+                            valueValidator = { available },
+                            onStateChange = { if (!selected && available) onCoreSelected(option.id) },
+                            enabled = uiState.canSelectCore,
+                            readOnly = true,
+                            onDelete = if (option.internal || selected) null else {{onCoreDelete(option.id)}},
+                        )
+                    }
+                }
+            }
         }
     }
 }

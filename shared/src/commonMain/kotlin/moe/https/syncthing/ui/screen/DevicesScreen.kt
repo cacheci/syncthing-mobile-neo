@@ -220,8 +220,8 @@ private fun RemoteDeviceCard(
                     }
                     if (device.discoveredAddresses.isNotEmpty()) {
                         MultipleValueRow(
-                            "发现地址",
-                            device.discoveredAddresses,
+                            label = "发现地址",
+                            values = device.discoveredAddresses,
                         )
                     }
                 }

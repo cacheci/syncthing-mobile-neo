@@ -8,6 +8,10 @@ interface CoreController {
     fun start()
 
     fun stop()
+
+    suspend fun selectCore(id: String)
+
+    suspend fun deleteCore(id: String)
 }
 
 interface DevicesController {

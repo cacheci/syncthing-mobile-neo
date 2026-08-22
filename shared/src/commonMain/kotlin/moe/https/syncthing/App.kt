@@ -39,6 +39,7 @@ import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
+import moe.https.syncthing.ui.screen.SettingCoreSelectScreen
 import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
 import moe.https.syncthing.ui.screen.SettingEditListenScreen
 import moe.https.syncthing.ui.screen.SettingScreen
@@ -118,6 +119,7 @@ fun App(
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val plainPageSnackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
     val mainScrollBehavior = MiuixScrollBehavior()
 
@@ -138,6 +140,7 @@ fun App(
         devicesUiState.isLoading,
         foldersUiState.isLoading,
         settingUiState.isLoading,
+        logUiState.isLoading,
     ) {
         val ready = when (requestedPageMain) {
             AppPage.DEVICES -> !devicesUiState.isLoading
@@ -176,6 +179,7 @@ fun App(
             AppPage.DEVICES -> devicesViewModel.refresh()
             AppPage.FOLDERS -> foldersViewModel.refresh()
             AppPage.SETTINGS -> settingViewModel.refresh()
+            AppPage.LOGS -> logViewModel.refresh()
             else -> currentPageMain = targetPage
         }
     }
@@ -297,21 +301,21 @@ fun App(
                             )
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.CORE,
-                                onClick = { currentPageMain = AppPage.CORE },
+                                onClick = { requestSwitchToPageMain( AppPage.CORE) },
                                 icon = MiuixIcons.Home,
                                 label = AppPage.CORE.title,
                             )
                             if ( developerModeEnabled ) {
                                 NavigationBarItem(
                                     selected = currentPageMain == AppPage.LOGS,
-                                    onClick = { currentPageMain = AppPage.LOGS },
+                                    onClick = { requestSwitchToPageMain( AppPage.LOGS) },
                                     icon = MiuixIcons.Notes,
                                     label = AppPage.LOGS.title,
                                 )
                             } else {
                                 NavigationBarItem(
                                     selected = currentPageMain == AppPage.WEBUI,
-                                    onClick = { currentPageMain = AppPage.WEBUI },
+                                    onClick = { requestSwitchToPageMain( AppPage.WEBUI) },
                                     icon = MiuixIcons.HorizontalSplit,
                                     label = AppPage.WEBUI.title,
                                 )
@@ -393,10 +397,14 @@ fun App(
                                         currentPagePlain = AppSubPage.SETTINGS_DISCOVERY_EDIT
                                         navController.navigate(PLAIN_PAGE_ROUTE)
                                     },
+                                    onEditingCores = {
+                                        currentPagePlain = AppSubPage.SETTINGS_CORE_MANAGE
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
                                     onChangeToLicence = {
                                         currentPagePlain = AppSubPage.LICENCE
                                         navController.navigate(PLAIN_PAGE_ROUTE)
-                                    }
+                                    },
                                 )
 
                                 AppPage.CORE -> CoreScreen(
@@ -406,7 +414,6 @@ fun App(
                                     } else {
                                         coreViewModel::onStartClicked
                                     },
-                                    onImportCore = coreViewModel::onImportCoreClicked,
                                     snackbarHostState = snackbarHostState,
                                     developerModeEnabled = developerModeEnabled,
                                     onModifyDeveloperMode = onModifyDeveloperMode,
@@ -515,6 +522,9 @@ fun App(
                             }
                         )
                     },
+                    snackbarHost = {
+                        SnackbarHost(state = plainPageSnackbarHostState)
+                    },
                 ) { padding ->
                     Box (
                         modifier = Modifier
@@ -590,6 +600,16 @@ fun App(
                                     settingViewModel = settingViewModel,
                                 )
                             }
+
+                            AppSubPage.SETTINGS_CORE_MANAGE -> {
+                                SettingCoreSelectScreen(
+                                    uiState = coreUiState,
+                                    snackbarHostState = plainPageSnackbarHostState,
+                                    onCoreSelected = coreViewModel::onCoreSelected,
+                                    onImportCore = coreViewModel::onImportCoreClicked,
+                                    onCoreDelete = coreViewModel::onCoreDelete,
+                                )
+                            }
                         }
                     }
                 }
@@ -619,4 +639,5 @@ private enum class AppSubPage(val title: String) {
     SETTINGS_LISTEN_EDIT("监听地址"),
     SETTINGS_DISCOVERY_EDIT("发现服务器"),
     SETTINGS_STORAGE_PERMISSION("存储权限"),
+    SETTINGS_CORE_MANAGE("核心管理"),
 }

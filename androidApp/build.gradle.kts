@@ -1,4 +1,12 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.OutputDirectory
+
+abstract class BuildBuiltInSyncthingTask : Exec() {
+    @get:OutputDirectory
+    abstract val jniLibsDirectory: DirectoryProperty
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,9 +14,15 @@ plugins {
     alias(libs.plugins.jetbrains.compose)
 }
 
+val syncthingVersion = libs.versions.syncthing.version.get()
+val syncthingCommit = libs.versions.syncthing.commit.get()
+val generatedSyncthingJniLibs = layout.buildDirectory.dir("generated/syncthing/jniLibs")
+val buildSyncthingScript = layout.projectDirectory.file("build-syncthing.py")
+
 android {
     namespace = "moe.https.syncthing"
     compileSdk = 37
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         applicationId = "moe.https.syncthing"
@@ -16,6 +30,8 @@ android {
         targetSdk = 28
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "SYNCTHING_VERSION", "\"$syncthingVersion\"")
+        buildConfigField("String", "SYNCTHING_COMMIT", "\"$syncthingCommit\"")
 
         ndk {
             //noinspection ChromeOsAbiSupport
@@ -35,6 +51,7 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        jniLibs.useLegacyPackaging = true
     }
 
     lint {
@@ -53,9 +70,67 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.google.material)
     implementation(libs.ui)
     implementation(libs.bcrypt)
     implementation(libs.quickie.bundled)
     debugImplementation(libs.ui.tooling)
+}
+
+val syncthingSource = rootProject.layout.projectDirectory.dir("third_party/syncthing")
+val configuredPython = providers.gradleProperty("syncthing.pythonExecutable")
+    .orElse(providers.environmentVariable("PYTHON"))
+    .orNull
+val inheritedPath = providers.environmentVariable("PATH").orNull.orEmpty()
+val pythonExecutable = sequenceOf(configuredPython)
+    .filterNotNull()
+    .plus(
+        inheritedPath.split(File.pathSeparatorChar)
+            .asSequence()
+            .filter(String::isNotBlank)
+            .flatMap { directory ->
+                sequenceOf("python3", "python", "python.exe")
+                    .map { executable -> File(directory, executable) }
+            }
+            .filter(File::isFile)
+            .map(File::getAbsolutePath),
+    )
+    .plus(
+        sequenceOf(
+            "/usr/bin/python3",
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3",
+        ).filter { candidate -> File(candidate).isFile },
+    )
+    .firstOrNull()
+    ?: "python3"
+
+val buildBuiltInSyncthing = tasks.register<BuildBuiltInSyncthingTask>("buildBuiltInSyncthing") {
+    group = "build"
+    description = "为 Android ARM64 编译内置 Syncthing 核心"
+    jniLibsDirectory.set(generatedSyncthingJniLibs)
+    inputs.file(buildSyncthingScript)
+    inputs.dir(syncthingSource)
+    inputs.property("syncthingVersion", syncthingVersion)
+    inputs.property("syncthingCommit", syncthingCommit)
+    inputs.property("ndkVersion", libs.versions.ndk)
+    inputs.property("goVersion", libs.versions.go)
+    inputs.property("minSdk", 28)
+    workingDir(rootProject.layout.projectDirectory)
+    environment("PYTHONDONTWRITEBYTECODE", "1")
+    commandLine(
+        pythonExecutable,
+        buildSyncthingScript.asFile.absolutePath,
+        "--project-dir", rootProject.layout.projectDirectory.asFile.absolutePath,
+        "--source-dir", syncthingSource.asFile.absolutePath,
+        "--output-dir", jniLibsDirectory.get().asFile.absolutePath,
+    )
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(
+            buildBuiltInSyncthing,
+            BuildBuiltInSyncthingTask::jniLibsDirectory,
+        )
+    }
 }

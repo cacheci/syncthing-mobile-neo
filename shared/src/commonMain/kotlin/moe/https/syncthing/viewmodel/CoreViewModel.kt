@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import moe.https.syncthing.core.CoreController
 import moe.https.syncthing.ui.model.CoreUiEffect
 import moe.https.syncthing.ui.model.CoreUiState
@@ -41,6 +42,18 @@ class CoreViewModel(
 
     fun onImportCoreClicked() {
         mutableEffects.tryEmit(CoreUiEffect.OpenCorePicker)
+    }
+
+    fun onCoreSelected(id: String) {
+        viewModelScope.launch {
+            controller.selectCore(id)
+        }
+    }
+
+    fun onCoreDelete(id: String) {
+        viewModelScope.launch {
+            controller.deleteCore(id)
+        }
     }
 
     companion object {

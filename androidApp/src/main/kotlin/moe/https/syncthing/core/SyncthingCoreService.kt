@@ -218,6 +218,10 @@ class SyncthingCoreService : Service() {
         private const val INITIAL_BACKOFF_MILLIS = 1_000L
         private const val MAX_BACKOFF_MILLIS = 30_000L
         private const val STABLE_SESSION_MILLIS = 60_000L
+
+        internal fun isDesiredRunning(context: android.content.Context): Boolean =
+            context.getSharedPreferences(PREFERENCES, android.content.Context.MODE_PRIVATE)
+                .getBoolean(KEY_DESIRED_RUNNING, false)
     }
 }
 

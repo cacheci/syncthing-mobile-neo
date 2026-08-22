@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.OutputDirectory
+import java.util.Properties
 
 abstract class BuildBuiltInSyncthingTask : Exec() {
     @get:OutputDirectory
@@ -18,6 +19,15 @@ val syncthingVersion = libs.versions.syncthing.version.get()
 val syncthingCommit = libs.versions.syncthing.commit.get()
 val generatedSyncthingJniLibs = layout.buildDirectory.dir("generated/syncthing/jniLibs")
 val buildSyncthingScript = layout.projectDirectory.file("build-syncthing.py")
+val localProperties = Properties().apply {
+    runCatching {
+        rootProject.file("local.properties").reader(Charsets.UTF_8).use(::load)
+    }
+}
+val keystorePath: String? = localProperties.getProperty("KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH")
+val keystorePassword: String? = localProperties.getProperty("KEYSTORE_PASS") ?: System.getenv("KEYSTORE_PASS")
+val keyAliasName: String? = localProperties.getProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+val keyPasswordValue: String? = localProperties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
 
 android {
     namespace = "moe.https.syncthing"
@@ -56,6 +66,30 @@ android {
 
     lint {
         disable += "ExpiredTargetSdkVersion"
+    }
+
+    if (keystorePath != null) {
+        signingConfigs {
+            create("shared") {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                keyAlias = keyAliasName
+                keyPassword = keyPasswordValue
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName(if (keystorePath != null) "shared" else "debug")
+        }
+        getByName("debug") {
+            if (keystorePath != null) {
+                signingConfig = signingConfigs.getByName("shared")
+            }
+        }
     }
 }
 

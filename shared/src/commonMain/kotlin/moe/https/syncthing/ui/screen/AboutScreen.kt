@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fitInside
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,12 +31,8 @@ import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -92,9 +86,9 @@ internal fun AboutScreen(
         item {
             AboutCard (
                 title = "查看源代码",
-                endText = "example.com",
+                endText = "Github",
                 summary = "MIT Licence",
-                onClick = { uriHandler.openUri("https://example.com") },
+                onClick = { uriHandler.openUri("https://github.com/cacheci/syncthing-mobile-neo") },
                 onShowLicence = {
                     showLicenceType = LicenceText.MIT
                     showLicenceOverlay = true

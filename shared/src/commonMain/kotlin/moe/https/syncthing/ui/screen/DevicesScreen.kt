@@ -43,6 +43,7 @@ import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.MultipleValueRow
+import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.model.DevicesUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -124,9 +125,9 @@ private fun RemoteDeviceCard(
     var foldContentStatus by rememberSaveable { mutableStateOf(false) }
 
     val statusColor = if (device.connected) {
-        Color(0xFF2E7D32)
+        StatusColor.OK.color
     } else {
-        MiuixTheme.colorScheme.onSurfaceVariantSummary
+        StatusColor.DOWN.color
     }
 
     Card(
@@ -279,7 +280,7 @@ private fun LocalDeviceCard(
                 ) {
                     Text(
                         text = "●",
-                        color = Color(0xFF2E7D32),
+                        color = StatusColor.OK.color,
                     )
                     Text(
                         text = "本机",
@@ -356,7 +357,7 @@ private fun LocalDeviceCard(
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("●", color = Color(0xFF2E7D32))
+                                Text("●", color = StatusColor.OK.color)
                                 Text(item.method, modifier = Modifier.weight(1f))
                             }
                         }
@@ -404,7 +405,7 @@ private fun LocalDeviceCard(
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("●", color = Color(0xFF2E7D32))
+                                Text("●", color = StatusColor.OK.color)
                                 Text(item.address, modifier = Modifier.weight(1f))
                             }
                         }
@@ -437,8 +438,8 @@ private fun countToColouredString( status: List<SyncthingDiscoveryStatus>? ): Pa
     val total = status.count()
 
     return "$succeeded/$total 在线" to when (succeeded) {
-        total -> Color(0xFF2E7D32)
-        0 -> MiuixTheme.colorScheme.error
+        total -> StatusColor.OK.color
+        0 -> StatusColor.FAIL.color
         else -> MiuixTheme.colorScheme.primary
     }
 }

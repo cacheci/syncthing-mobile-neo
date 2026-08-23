@@ -53,9 +53,6 @@ import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_qr
 import moe.https.syncthing.platform.rememberClipboard
-import moe.https.syncthing.ui.model.CoreUiState
-import moe.https.syncthing.ui.util.formatBytes
-import moe.https.syncthing.ui.util.formatDuration
 import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -523,10 +520,17 @@ internal fun DeleteBox(
 
 @Composable
 fun CoreState.displayColor(): Color = when (this) {
-    CoreState.RUNNING -> Color(0xFF2E7D32)
-    CoreState.FAILED -> MiuixTheme.colorScheme.error
+    CoreState.RUNNING -> StatusColor.OK.color
+    CoreState.FAILED -> StatusColor.FAIL.color
     CoreState.STARTING,
     CoreState.STOPPING,
-    CoreState.INSTALLING -> Color(0xFFB26A00)
-    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+    CoreState.INSTALLING -> StatusColor.PENDING.color
+    else -> StatusColor.DOWN.color
+}
+
+internal enum class StatusColor ( val color: Color ){
+    OK(Color(0xFF2E7D32)),
+    FAIL(Color(0xFFFF3728)),
+    PENDING(Color(0xFFB26A00)),
+    DOWN(Color(0xFF666666)),
 }

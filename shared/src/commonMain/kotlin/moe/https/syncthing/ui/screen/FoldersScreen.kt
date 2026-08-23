@@ -39,6 +39,7 @@ import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.util.formatBytes
 import top.yukonga.miuix.kmp.basic.Card
@@ -611,10 +612,10 @@ private fun SyncthingFolder.statusName(): String = when {
 
 @Composable
 private fun SyncthingFolder.statusColor(): Color = when {
-    paused -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-    pullErrors > 0 || state == "error" -> MiuixTheme.colorScheme.error
-    state == "idle" && needFiles == 0L -> Color(0xFF2E7D32)
-    else -> Color(0xFFF57C00)
+    paused -> StatusColor.DOWN.color
+    pullErrors > 0 || state == "error" -> StatusColor.FAIL.color
+    state == "idle" && needFiles == 0L -> StatusColor.OK.color
+    else -> StatusColor.PENDING.color
 }
 
 private fun SyncthingFolder.typeName(): String = when (type) {

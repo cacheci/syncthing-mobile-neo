@@ -396,7 +396,7 @@ internal fun AddFolderScreen(
                     } else {
                         null
                     },
-                    items = listOf("不启用", "回收站版本控制", "简易版本控制"), // 只做这三个
+                    items = listOf("不启用", "回收站版本控制", "简易版本控制"), // TODO: 先只做这三个
                     selectedIndex = versioning.ordinal,
                     enabled = !isSubmitting && existingFolder?.versioningSupported != false,
                     onSelectedIndexChange = { selectedIndex ->
@@ -404,9 +404,8 @@ internal fun AddFolderScreen(
                     },
                 )
 
-                // 回收站版本控制
                 AnimatedVisibility(
-                    visible = versioning == NewFolderConfiguration.Versioning.TRASHCAN,
+                    visible = versioning != NewFolderConfiguration.Versioning.NONE,
                     enter = expandVertically(
                         animationSpec = tween(durationMillis = 300)
                     ),
@@ -414,69 +413,54 @@ internal fun AddFolderScreen(
                         animationSpec = tween(durationMillis = 300)
                     ),
                 ) {
-                    Column {
-                        InputValueRow(
-                            label = "回收站保留时长（天）",
-                            value = cleanoutDays,
-                            valueLabel = "永久",
-                            allowEdit = !isSubmitting,
-                            onValueChange = { cleanoutDays = it },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
+                    InputValueRow(
+                        label = "回收站保留时长（天）",
+                        value = cleanoutDays,
+                        valueLabel = "永久",
+                        allowEdit = !isSubmitting,
+                        onValueChange = { cleanoutDays = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
 
-                        // TODO: 历史版本路径（先不做）
+                    InputValueRow(
+                        label = "历史版本路径",
+                        value = "",
+                        valueLabel = ".stversions",
+                        allowEdit = false,
+                        onValueChange = {  },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    ) // TODO: 历史版本路径
 
-                        InputValueRow(
-                            label = "定期清除间隔（秒）",
-                            value = cleanupIntervalSeconds,
-                            valueLabel = "3600",
-                            allowEdit = !isSubmitting,
-                            onValueChange = { cleanupIntervalSeconds = it },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
+                    // 简易版本控制
+                    AnimatedVisibility(
+                        visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
+                        enter = expandVertically(
+                            animationSpec = tween(durationMillis = 300)
+                        ),
+                        exit = shrinkVertically(
+                            animationSpec = tween(durationMillis = 300)
+                        ),
+                    ) {
+                        Column {
+                            InputValueRow(
+                                label = "保留版本数量",
+                                value = keepVersions,
+                                valueLabel = "5",
+                                allowEdit = !isSubmitting,
+                                onValueChange = { keepVersions = it },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                        }
                     }
-                }
 
-                // 简易版本控制
-                AnimatedVisibility(
-                    visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
-                    enter = expandVertically(
-                        animationSpec = tween(durationMillis = 300)
-                    ),
-                    exit = shrinkVertically(
-                        animationSpec = tween(durationMillis = 300)
-                    ),
-                ) {
-                    Column {
-                        InputValueRow(
-                            label = "删除文件保留时长（天）",
-                            value = cleanoutDays,
-                            valueLabel = "永久",
-                            allowEdit = !isSubmitting,
-                            onValueChange = { cleanoutDays = it },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-
-                        InputValueRow(
-                            label = "保留版本数量",
-                            value = keepVersions,
-                            valueLabel = "5",
-                            allowEdit = !isSubmitting,
-                            onValueChange = { keepVersions = it },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-
-                        // TODO: 历史版本路径（先不做）
-
-                        InputValueRow(
-                            label = "定期清除间隔（秒）",
-                            value = cleanupIntervalSeconds,
-                            valueLabel = "禁用",
-                            allowEdit = !isSubmitting,
-                            onValueChange = { cleanupIntervalSeconds = it },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                    }
+                    InputValueRow(
+                        label = "定期清除间隔（秒）",
+                        value = cleanupIntervalSeconds,
+                        valueLabel = "3600",
+                        allowEdit = !isSubmitting,
+                        onValueChange = { cleanupIntervalSeconds = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
                 }
             }
         )
@@ -492,7 +476,7 @@ internal fun AddFolderScreen(
                     onCheckedChange = {},
                 )
             }
-        )
+        ) // TODO: .stignore 编辑
 
         InfoSwitchCard(
             title = "同步控制",

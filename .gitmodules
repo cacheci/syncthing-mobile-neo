@@ -1,3 +1,6 @@
 [submodule "third_party/syncthing"]
 	path = third_party/syncthing
 	url = https://github.com/syncthing/syncthing.git
+[submodule "third_party/scripta"]
+	path = third_party/scripta
+	url = https://github.com/cacheci/scripta.git

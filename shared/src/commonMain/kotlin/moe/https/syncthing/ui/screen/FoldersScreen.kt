@@ -4,15 +4,22 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,7 +36,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.DpSize
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.FolderDeviceConfiguration
 import moe.https.syncthing.core.NewFolderConfiguration
@@ -47,16 +58,28 @@ import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.util.formatBytes
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.Help
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import top.yukonga.scripta.editor.CodeEditor
+import top.yukonga.scripta.editor.EditorColors
+import top.yukonga.scripta.editor.EditorLanguage
+import top.yukonga.scripta.editor.EditorSymbol
+import top.yukonga.scripta.editor.rememberSaveableCodeEditorController
 
 @Composable
 internal fun FoldersScreen(
@@ -246,6 +269,16 @@ internal fun AddFolderScreen(
     var cleanupIntervalSeconds by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioningCleanupIntervalSeconds?.toString() ?: "3600")
     }
+    var ignorePatternsEnabled by remember(existingFolder) {
+        mutableStateOf(false)
+    }
+    val initialIgnoreText = existingFolder?.ignorePatterns?.joinToString("\n").orEmpty()
+    var acceptedIgnoreText by rememberSaveable(existingFolder?.id) {
+        mutableStateOf(initialIgnoreText)
+    }
+    val ignoreEditorController = rememberSaveableCodeEditorController(
+        initialText = initialIgnoreText,
+    )
     var fsWatcherEnabled by remember(existingFolder) {
         mutableStateOf(existingFolder?.fsWatcherEnabled ?: true)
     }
@@ -299,12 +332,14 @@ internal fun AddFolderScreen(
             }
         }
     }
-    val canSubmit = label.trim().isNotBlank() &&
-        folderId.trim().isNotBlank() &&
+    val canSubmit = folderId.trim().isNotBlank() &&
         numericValuesValid &&
         cleanupIntervalValid &&
         untrustedDevicePasswordsValid &&
         !isSubmitting
+
+    var showEditorBottomSheet by remember { mutableStateOf(false) }
+    var showStIgnoreHelp by remember { mutableStateOf(false) }
 
     LaunchedEffect(folderPickerError) {
         folderPickerError?.let { snackbarHostState.showSnackbar(it) }
@@ -468,15 +503,34 @@ internal fun AddFolderScreen(
         InfoSwitchCard(
             title = "忽略模式",
             content = {
-                InfoSwitch(
-                    title = "使用忽略模式",
-                    summary = "暂未支持编辑 .stignore",
-                    checked = false,
-                    enabled = false,
-                    onCheckedChange = {},
-                )
+                if (isEditingFolder) {
+                    ArrowPreference(
+                        title = "编辑忽略文件",
+                        onClick = {
+                            ignoreEditorController.setDocument(acceptedIgnoreText)
+                            showEditorBottomSheet = true
+                        }
+                    )
+                } else {
+                    InfoSwitch(
+                        title = "使用忽略模式",
+                        summary = "启用 .stignore",
+                        checked = ignorePatternsEnabled,
+                        enabled = !isSubmitting,
+                        onCheckedChange = { ignorePatternsEnabled = it },
+                    )
+                }
+
+                existingFolder?.ignoreError?.let { error ->
+                    Text(
+                        text = "读取 .stignore 时出错：$error",
+                        color = MiuixTheme.colorScheme.error,
+                        style = MiuixTheme.textStyles.main,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
             }
-        ) // TODO: .stignore 编辑
+        )
 
         InfoSwitchCard(
             title = "同步控制",
@@ -545,6 +599,16 @@ internal fun AddFolderScreen(
                         versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,
                         versioningKeep = keepVersions.toIntOrNull() ?: 5,
                         versioningCleanupIntervalSeconds = cleanupIntervalSeconds.toIntOrNull() ?: 3600,
+                        ignorePatterns = if (isEditingFolder) {
+                            acceptedIgnoreText.toIgnorePatternLines()
+                        } else {
+                            emptyList()
+                        },
+                        updateIgnorePatterns = if (isEditingFolder) {
+                            acceptedIgnoreText != initialIgnoreText
+                        } else {
+                            ignorePatternsEnabled
+                        },
                         fsWatcherEnabled = fsWatcherEnabled,
                         rescanIntervalSeconds = rescanIntervalSeconds.toIntOrNull() ?: 3600,
                         type = folderType,
@@ -562,6 +626,203 @@ internal fun AddFolderScreen(
             },
         )
     }
+
+    OverlayBottomSheet(
+        title = "编辑忽略文件",
+        show = showEditorBottomSheet,
+        allowDismiss = true,
+        enableNestedScroll = false,
+        defaultWindowInsetsPadding = false,
+        insideMargin = DpSize.Zero,
+        onDismissRequest = { showEditorBottomSheet = false },
+        onDismissFinished = { showEditorBottomSheet = false },
+        startAction = {
+            IconButton(
+                modifier = Modifier.padding(start = 20.dp),
+                onClick = {
+                    ignoreEditorController.setDocument(acceptedIgnoreText)
+                    showEditorBottomSheet = false
+                },
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Close,
+                    contentDescription = "取消",
+                    tint = MiuixTheme.colorScheme.onBackground,
+                )
+            }
+        },
+        endAction = {
+            IconButton(
+                modifier = Modifier.padding(end = 20.dp),
+                onClick = {
+                    acceptedIgnoreText = ignoreEditorController.getText()
+                    showEditorBottomSheet = false
+                },
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Ok,
+                    contentDescription = "确定",
+                    tint = MiuixTheme.colorScheme.onBackground,
+                )
+            }
+        },
+    ) {
+        Column {
+            Column (
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row (
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("请输入要忽略的内容，每行一条。")
+
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                                onClick = { showStIgnoreHelp = true },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Help,
+                            contentDescription = "确定",
+                            tint = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                        )
+                    }
+                }
+
+                if (showStIgnoreHelp) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "(?d)",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("此前缀表示，如果文件阻止删除目录则文件可被删除")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "(?i)",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("此前缀表示，后面的模式在匹配时不区分大小写")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = " !  ",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("此前缀表示给定条件的反转（即不排除）")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = " *  ",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("单级通配符（仅匹配单层文件夹）")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = " ** ",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("多级通配符（用以匹配多层文件夹）")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = " // ",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("注释，在行首使用")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "#include",
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixTheme.colorScheme.surface)
+                                .padding(4.dp)
+                        )
+                        Text("从指定文件加载忽略模式")
+                    }
+                    TextButton(
+                        text = "确定",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showStIgnoreHelp = false }
+                    )
+                }
+            }
+
+            if (!showStIgnoreHelp) {
+                Text(
+                    text = ".stignore",
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center,
+                    modifier= Modifier
+                        .fillMaxWidth()
+                        .background(MiuixTheme.colorScheme.secondaryContainer)
+                        .padding(4.dp)
+                )
+                CodeEditor(
+                    controller = ignoreEditorController,
+                    language = EditorLanguage.PlainText,
+                    colors = if (isSystemInDarkTheme()) EditorColors.Default else EditorColors.Light,
+                    symbols = listOf(
+                        EditorSymbol(label = "*"),
+                        EditorSymbol(label = "**"),
+                        EditorSymbol(label = "!"),
+                        EditorSymbol(label = "//"),
+                        EditorSymbol(label = "(?d)"),
+                        EditorSymbol(label = "(?i)"),
+                        EditorSymbol(label = "#include", value = "#include "),
+                    ),
+                    windowInsetsEnabled = false,
+                    readOnly = isSubmitting,
+                    softWrap = true,
+                    overscrollEnabled = false,
+                    autoClosePairs = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(320.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun String.toIgnorePatternLines(): List<String> {
+    val normalized = replace("\r\n", "\n").replace('\r', '\n')
+    return if (normalized.isEmpty()) emptyList() else normalized.split('\n')
 }
 
 @Composable

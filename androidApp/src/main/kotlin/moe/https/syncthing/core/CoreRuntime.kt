@@ -210,6 +210,7 @@ class CoreRuntime(
         FoldersSnapshot(
             folders = restClient.configuredFolders().map { folder ->
                 val status = restClient.folderStatus(folder.id)
+                val ignores = restClient.folderIgnores(folder.id)
                 SyncthingFolder(
                     id = folder.id,
                     label = folder.label,
@@ -224,6 +225,8 @@ class CoreRuntime(
                     versioningCleanoutDays = folder.versioning.cleanoutDays,
                     versioningKeep = folder.versioning.keep,
                     versioningCleanupIntervalSeconds = folder.versioning.cleanupIntervalSeconds,
+                    ignorePatterns = ignores.patterns,
+                    ignoreError = ignores.error,
                     devices = folder.devices,
                     state = status.state,
                     localFiles = status.localFiles,
@@ -240,12 +243,18 @@ class CoreRuntime(
         configuration: NewFolderConfiguration,
     ) = withContext(Dispatchers.IO) {
         restClient.addFolder(configuration)
+        if (configuration.updateIgnorePatterns) {
+            restClient.updateFolderIgnores(configuration.folderId, configuration.ignorePatterns)
+        }
     }
 
     override suspend fun updateFolder(
         configuration: NewFolderConfiguration,
     ) = withContext(Dispatchers.IO) {
         restClient.updateFolder(configuration)
+        if (configuration.updateIgnorePatterns) {
+            restClient.updateFolderIgnores(configuration.folderId, configuration.ignorePatterns)
+        }
     }
 
     override suspend fun loadSetting(): SettingSnapshot = withContext(Dispatchers.IO) {

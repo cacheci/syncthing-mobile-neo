@@ -152,6 +152,40 @@ internal class SyncthingRestClient(
         )
     }
 
+    fun folderIgnores(folderId: String): RestFolderIgnores {
+        val encodedFolderId = URLEncoder.encode(folderId, Charsets.UTF_8.name())
+        val response = request("/rest/db/ignores?folder=$encodedFolderId")
+        val ignores = response.optJSONArray("ignore")
+        val errorValue = response.opt("error")
+        return RestFolderIgnores(
+            patterns = if (ignores == null) {
+                emptyList()
+            } else {
+                buildList {
+                    repeat(ignores.length()) { index ->
+                        add(ignores.optString(index))
+                    }
+                }
+            },
+            error = if (errorValue == null || errorValue == JSONObject.NULL) {
+                null
+            } else {
+                errorValue.toString().takeIf(String::isNotBlank)
+            },
+        )
+    }
+
+    fun updateFolderIgnores(folderId: String, ignorePatterns: List<String>) {
+        val encodedFolderId = URLEncoder.encode(folderId, Charsets.UTF_8.name())
+        requestBody(
+            path = "/rest/db/ignores?folder=$encodedFolderId",
+            method = "POST",
+            body = JSONObject()
+                .put("ignore", ignorePatterns.toJsonArray())
+                .toString(),
+        )
+    }
+
     fun connections(): Map<String, RestConnection> {
         val json = request("/rest/system/connections")
         val connections = json.optJSONObject("connections") ?: return emptyMap()
@@ -510,6 +544,11 @@ internal class SyncthingRestClient(
         val needFiles: Long,
         val needBytes: Long,
         val pullErrors: Long,
+    )
+
+    data class RestFolderIgnores(
+        val patterns: List<String>,
+        val error: String?,
     )
 
     companion object {

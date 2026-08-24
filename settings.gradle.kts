@@ -19,5 +19,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "syncthingG"
 
+includeBuild("third_party/scripta")
+
 include(":shared")
 include(":androidApp")

@@ -119,7 +119,7 @@ internal class SyncthingRestClient(
     fun addFolder(configuration: NewFolderConfiguration) {
         val folder = request("/rest/config/defaults/folder")
         applyFolderConfiguration(folder, configuration)
-        folder.put("path", defaultFolderPath(configuration.folderId))
+        folder.put("path", configuration.path)
         requestBody(
             path = "/rest/config/folders",
             method = "POST",
@@ -131,6 +131,7 @@ internal class SyncthingRestClient(
         val encodedFolderId = encodePathSegment(configuration.folderId)
         val folder = request("/rest/config/folders/$encodedFolderId")
         applyFolderConfiguration(folder, configuration)
+        folder.put("path", configuration.path)
         requestBody(
             path = "/rest/config/folders/$encodedFolderId",
             method = "PUT",

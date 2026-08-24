@@ -32,6 +32,7 @@ data class NewFolderConfiguration(
     val folderId: String,
     val label: String,
     val group: String,
+    val path: String,
     val versioning: Versioning,
     val updateVersioning: Boolean,
     val versioningCleanoutDays: Int,

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import moe.https.syncthing.core.CoreState
@@ -35,6 +36,8 @@ import moe.https.syncthing.core.NewFolderConfiguration
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.defaultFolderPath
+import moe.https.syncthing.platform.FolderPickerResult
+import moe.https.syncthing.platform.rememberFolderPicker
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
@@ -46,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
@@ -219,12 +223,17 @@ internal fun AddFolderScreen(
     isSubmitting: Boolean,
     devices: List<SyncthingDevice>,
     existingFolder: SyncthingFolder? = null,
+    snackbarHostState: SnackbarHostState,
     onConfirm: (NewFolderConfiguration) -> Unit,
 ) {
     val isEditingFolder = (existingFolder != null)
     var label by remember(existingFolder) { mutableStateOf(existingFolder?.label.orEmpty()) }
     var group by remember(existingFolder) { mutableStateOf(existingFolder?.group.orEmpty()) }
     var folderId by remember(existingFolder) { mutableStateOf(existingFolder?.id.orEmpty()) }
+    var selectedFolderPath by remember(existingFolder) {
+        mutableStateOf(existingFolder?.path)
+    }
+    var folderPickerError by remember(existingFolder) { mutableStateOf<String?>(null) }
     var versioning by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioning ?: NewFolderConfiguration.Versioning.NONE)
     }
@@ -276,12 +285,31 @@ internal fun AddFolderScreen(
     val untrustedDevicePasswordsValid = remoteDevices
         .filter { it.untrusted && it.id in selectedDeviceIds }
         .all { device -> devicePasswords[device.id].orEmpty().isNotBlank() }
+    val defaultPath = if (folderId.isBlank()) null else {
+        defaultFolderPath(folderId.trim())
+    }
+    val displayedFolderPath = selectedFolderPath ?: defaultPath
+    val openFolderPicker = rememberFolderPicker { result ->
+        when (result) {
+            FolderPickerResult.Cancelled -> Unit
+            is FolderPickerResult.Error -> folderPickerError = result.message
+            is FolderPickerResult.Selected -> {
+                selectedFolderPath = result.path
+                folderPickerError = null
+            }
+        }
+    }
     val canSubmit = label.trim().isNotBlank() &&
         folderId.trim().isNotBlank() &&
         numericValuesValid &&
         cleanupIntervalValid &&
         untrustedDevicePasswordsValid &&
         !isSubmitting
+
+    LaunchedEffect(folderPickerError) {
+        folderPickerError?.let { snackbarHostState.showSnackbar(it) }
+        folderPickerError = null
+    }
 
     Column(
         modifier = modifier
@@ -318,14 +346,9 @@ internal fun AddFolderScreen(
 
                 ArrowPreference(
                     title = "文件夹位置",
-                    summary = existingFolder?.path ?: if (folderId.isBlank()) {
-                        "~/syncfolders/{folderId}"
-                    } else {
-                        defaultFolderPath(folderId.trim())
-                    },
-                    onClick = null,
-                    enabled = false,
-                    // TODO: 先不做
+                    summary = displayedFolderPath,
+                    onClick = openFolderPicker,
+                    enabled = !isSubmitting,
                 )
             }
         )
@@ -335,8 +358,9 @@ internal fun AddFolderScreen(
             content = {
                 if (remoteDevices.isEmpty()) {
                     Text(
-                        text = "暂无可共享的远程设备",
-                        color = MiuixTheme.colorScheme.onBackground,
+                        text = "无设备",
+                        color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
                     )
                 } else {
@@ -495,7 +519,7 @@ internal fun AddFolderScreen(
 
                 WindowDropdownPreference(
                     title = "同步方向",
-                    items = listOf("双向", "单向下载", "单向上传"), // TODO: 不做 "单向加密下载"
+                    items = listOf("双向", "单向下载", "单向上传"), // TODO: 先不做 "单向加密下载"
                     selectedIndex = folderType.ordinal,
                     enabled = !isSubmitting,
                     onSelectedIndexChange = { selectedIndex ->
@@ -531,6 +555,7 @@ internal fun AddFolderScreen(
                         folderId = folderId,
                         label = label,
                         group = group,
+                        path = selectedFolderPath ?: defaultFolderPath(folderId.trim()),
                         versioning = versioning,
                         updateVersioning = existingFolder?.versioningSupported != false,
                         versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,

@@ -568,6 +568,7 @@ fun App(
                                     isSubmitting = foldersUiState.isLoading,
                                     devices = devicesUiState.devices,
                                     existingFolder = editingFolder,
+                                    snackbarHostState = plainPageSnackbarHostState,
                                     onConfirm = { configuration ->
                                         if (editingFolder == null) foldersViewModel.addFolder(
                                             configuration

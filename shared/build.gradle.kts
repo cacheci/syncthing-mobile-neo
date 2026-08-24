@@ -38,6 +38,10 @@ kotlin {
             implementation(libs.ktor.http)
             implementation(libs.uri.kmp)
         }
+
+        androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+        }
     }
 }
 

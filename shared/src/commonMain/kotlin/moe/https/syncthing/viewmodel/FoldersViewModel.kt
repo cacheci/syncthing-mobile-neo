@@ -63,6 +63,7 @@ class FoldersViewModel(
             folderId = configuration.folderId.trim(),
             label = configuration.label.trim(),
             group = configuration.group.trim(),
+            path = configuration.path.trim(),
             devices = configuration.devices.map { device ->
                 device.copy(deviceId = device.deviceId.trim())
             },
@@ -71,6 +72,7 @@ class FoldersViewModel(
         val validationMessage = when {
             normalizedConfiguration.folderId.isBlank() -> "文件夹 ID 不能为空"
             normalizedConfiguration.label.isBlank() -> "文件夹名称不能为空"
+            normalizedConfiguration.path.isBlank() -> "文件夹路径不能为空"
             normalizedConfiguration.versioningCleanoutDays < 0 ||
                 normalizedConfiguration.versioningKeep < 0 ||
                 normalizedConfiguration.versioningCleanupIntervalSeconds < 0 ||

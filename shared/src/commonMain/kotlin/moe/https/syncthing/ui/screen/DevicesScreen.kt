@@ -453,9 +453,9 @@ private fun countToColouredString( status: List<SyncthingListenAddress>? ): Pair
     val total = status.size
 
     return "$succeeded/$total 在线" to when (succeeded) {
-        total -> Color(0xFF2E7D32)
-        0 -> MiuixTheme.colorScheme.error
-        else -> MiuixTheme.colorScheme.primary
+        total -> StatusColor.OK.color
+        0 -> StatusColor.FAIL.color
+        else -> StatusColor.DOWN.color
     }
 }
 

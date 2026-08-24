@@ -37,7 +37,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.ktor.http)
             implementation(libs.uri.kmp)
-            implementation("scripta:editor")
+            implementation(libs.editor)
         }
 
         androidMain.dependencies {

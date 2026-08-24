@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -340,6 +341,8 @@ internal fun AddFolderScreen(
 
     var showEditorBottomSheet by remember { mutableStateOf(false) }
     var showStIgnoreHelp by remember { mutableStateOf(false) }
+
+    val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(folderPickerError) {
         folderPickerError?.let { snackbarHostState.showSnackbar(it) }
@@ -667,123 +670,54 @@ internal fun AddFolderScreen(
             }
         },
     ) {
-        Column {
-            Column (
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+        Column (
+            modifier = Modifier.padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row (
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row (
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                Text("请输入要忽略的内容，每行一条。")
+
+                if ( !showStIgnoreHelp ) Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                            onClick = { showStIgnoreHelp = true },
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text("请输入要忽略的内容，每行一条。")
-
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                                onClick = { showStIgnoreHelp = true },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = MiuixIcons.Help,
-                            contentDescription = "确定",
-                            tint = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
-                        )
-                    }
-                }
-
-                if (showStIgnoreHelp) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "(?d)",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("此前缀表示，如果文件阻止删除目录则文件可被删除")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "(?i)",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("此前缀表示，后面的模式在匹配时不区分大小写")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = " !  ",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("此前缀表示给定条件的反转（即不排除）")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = " *  ",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("单级通配符（仅匹配单层文件夹）")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = " ** ",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("多级通配符（用以匹配多层文件夹）")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = " // ",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("注释，在行首使用")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "#include",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MiuixTheme.colorScheme.surface)
-                                .padding(4.dp)
-                        )
-                        Text("从指定文件加载忽略模式")
-                    }
-                    TextButton(
-                        text = "确定",
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { showStIgnoreHelp = false }
+                    Icon(
+                        imageVector = MiuixIcons.Help,
+                        contentDescription = "确定",
+                        tint = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
                     )
                 }
             }
 
-            if (!showStIgnoreHelp) {
+            if (showStIgnoreHelp) {
+                StIgnoreHelpItem("(?d)", "此前缀表示，如果文件阻止删除目录则文件可被删除")
+                StIgnoreHelpItem("(?i)", "此前缀表示，后面的模式在匹配时不区分大小写")
+                StIgnoreHelpItem(" !  ", "此前缀表示给定条件的反转（即不排除）")
+                StIgnoreHelpItem(" *  ", "单级通配符（仅匹配单层文件夹）")
+                StIgnoreHelpItem(" ** ", "多级通配符（用以匹配多层文件夹）")
+                StIgnoreHelpItem(" // ", "注释，在行首使用")
+                StIgnoreHelpItem("#include", "从指定文件加载忽略模式")
+                ArrowPreference(
+                    title = "查看完整帮助",
+                    onClick = { uriHandler.openUri("https://docs.syncthing.net/users/ignoring") }
+                )
+                TextButton(
+                    text = "确定",
+                    modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                    onClick = { showStIgnoreHelp = false }
+                )
+            } else {
                 Text(
                     text = ".stignore",
                     fontFamily = FontFamily.Monospace,
@@ -817,6 +751,26 @@ internal fun AddFolderScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun StIgnoreHelpItem(item: String, text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 20.dp)
+    ) {
+        Text(
+            text = item,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MiuixTheme.colorScheme.surface)
+                .padding(4.dp)
+        )
+        Text(text)
     }
 }
 

@@ -1,8 +1,15 @@
+import com.android.build.api.variant.impl.VariantOutputImpl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.OutputDirectory
 import java.util.Properties
+
+/** 提交总数，用作 versionCode（等价于 `git rev-list --count HEAD`）。 */
+fun Project.getGitVersionCode(): Int =
+    providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+    }.standardOutput.asText.get().trim().toInt()
 
 abstract class BuildBuiltInSyncthingTask : Exec() {
     @get:OutputDirectory
@@ -17,6 +24,7 @@ plugins {
 
 val syncthingVersion = libs.versions.syncthing.version.get()
 val syncthingCommit = libs.versions.syncthing.commit.get()
+val androidArch = "arm64-v8a"
 val generatedSyncthingJniLibs = layout.buildDirectory.dir("generated/syncthing/jniLibs")
 val buildSyncthingScript = layout.projectDirectory.file("build-syncthing.py")
 val localProperties = Properties().apply {
@@ -38,14 +46,14 @@ android {
         applicationId = "moe.https.syncthing"
         minSdk = 28
         targetSdk = 28
-        versionCode = 1
+        versionCode = getGitVersionCode()
         versionName = "0.1.0"
         buildConfigField("String", "SYNCTHING_VERSION", "\"$syncthingVersion\"")
         buildConfigField("String", "SYNCTHING_COMMIT", "\"$syncthingCommit\"")
 
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters += "arm64-v8a"
+            abiFilters += androidArch
         }
     }
 
@@ -166,5 +174,14 @@ androidComponents {
             buildBuiltInSyncthing,
             BuildBuiltInSyncthingTask::jniLibsDirectory,
         )
+        if (variant.buildType == "release") {
+            variant.outputs.forEach { output ->
+                (output as? VariantOutputImpl)?.outputFileName?.set(
+                    output.versionName.zip(output.versionCode) { versionName, versionCode ->
+                        "android_${androidArch}_${versionName}(${versionCode}).apk"
+                    },
+                )
+            }
+        }
     }
 }

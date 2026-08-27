@@ -69,6 +69,7 @@ internal fun SettingScreen(
     onEditingCores: () -> Unit,
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
+    onRedirectingToDeveloperPage: () -> Unit,
 ) {
     var developerModeVisible by remember { mutableStateOf(developerModeEnabled) }
     val settingAvailable = uiState.settingRaw != null && uiState.accessMode != null
@@ -136,6 +137,7 @@ internal fun SettingScreen(
             onEditingListenAddresses = onEditingListenAddresses,
             onEditingStoragePermission = onEditingStoragePermission,
             onEditingCores = onEditingCores,
+            onRedirectingToDeveloperPage = onRedirectingToDeveloperPage,
         )
 
         InfoSwitchCard( title = "关于" ) {
@@ -168,6 +170,7 @@ private fun SettingForm(
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
     onEditingStoragePermission: () -> Unit,
+    onRedirectingToDeveloperPage: () -> Unit,
     onEditingCores: () -> Unit,
     settingAvailable: Boolean,
 ) {
@@ -197,6 +200,10 @@ private fun SettingForm(
                 checked = developerModeEnabled,
                 enabled = true,
                 onCheckedChange = { onModifyDeveloperMode() }
+            )
+            ArrowPreference(
+                title = "开发者选项",
+                onClick = onRedirectingToDeveloperPage,
             )
         }
     }

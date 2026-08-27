@@ -35,6 +35,7 @@ import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
 import moe.https.syncthing.ui.screen.AddFolderScreen
 import moe.https.syncthing.ui.screen.CoreScreen
+import moe.https.syncthing.ui.screen.DevSettingPage
 import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
@@ -66,7 +67,6 @@ import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
-import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Scan
@@ -124,12 +124,8 @@ fun App(
     val mainScrollBehavior = MiuixScrollBehavior()
 
     DisposableEffect(currentPageMain) {
-        logViewModel.onPageVisibilityChanged(currentPageMain == AppPage.LOGS)
-        onDispose {
-            if (currentPageMain == AppPage.LOGS) {
-                logViewModel.onPageVisibilityChanged(false)
-            }
-        }
+        logViewModel.onPageVisibilityChanged(false)
+        onDispose { }
     }
 
     LaunchedEffect(
@@ -179,7 +175,6 @@ fun App(
             AppPage.DEVICES -> devicesViewModel.refresh()
             AppPage.FOLDERS -> foldersViewModel.refresh()
             AppPage.SETTINGS -> settingViewModel.refresh()
-            AppPage.LOGS -> logViewModel.refresh()
             else -> currentPageMain = targetPage
         }
     }
@@ -221,11 +216,7 @@ fun App(
                         AdaptiveTopAppBar(
                             title = currentPageMain.title,
                             showTopAppBar = true,
-                            scrollBehavior = if (currentPageMain != AppPage.LOGS) {
-                                mainScrollBehavior
-                            } else {
-                                MiuixScrollBehavior()
-                            },
+                            scrollBehavior = mainScrollBehavior,
                             actions = {
                                 if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
                                     IconButton(
@@ -305,21 +296,12 @@ fun App(
                                 icon = MiuixIcons.Home,
                                 label = AppPage.CORE.title,
                             )
-                            if ( developerModeEnabled ) {
-                                NavigationBarItem(
-                                    selected = currentPageMain == AppPage.LOGS,
-                                    onClick = { requestSwitchToPageMain( AppPage.LOGS) },
-                                    icon = MiuixIcons.Notes,
-                                    label = AppPage.LOGS.title,
-                                )
-                            } else {
-                                NavigationBarItem(
-                                    selected = currentPageMain == AppPage.WEBUI,
-                                    onClick = { requestSwitchToPageMain( AppPage.WEBUI) },
-                                    icon = MiuixIcons.HorizontalSplit,
-                                    label = AppPage.WEBUI.title,
-                                )
-                            }
+                            NavigationBarItem(
+                                selected = currentPageMain == AppPage.WEBUI,
+                                onClick = { requestSwitchToPageMain( AppPage.WEBUI) },
+                                icon = MiuixIcons.HorizontalSplit,
+                                label = AppPage.WEBUI.title,
+                            )
                             NavigationBarItem(
                                 selected = currentPageMain == AppPage.SETTINGS,
                                 onClick = { requestSwitchToPageMain(AppPage.SETTINGS) },
@@ -405,6 +387,10 @@ fun App(
                                         currentPagePlain = AppSubPage.LICENCE
                                         navController.navigate(PLAIN_PAGE_ROUTE)
                                     },
+                                    onRedirectingToDeveloperPage = {
+                                        currentPagePlain = AppSubPage.DEV
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    }
                                 )
 
                                 AppPage.CORE -> CoreScreen(
@@ -417,11 +403,6 @@ fun App(
                                     snackbarHostState = snackbarHostState,
                                     developerModeEnabled = developerModeEnabled,
                                     onModifyDeveloperMode = onModifyDeveloperMode,
-                                )
-
-                                AppPage.LOGS -> LogScreen(
-                                    uiState = logUiState,
-                                    onSourceSelected = logViewModel::onSourceSelected,
                                 )
 
                                 AppPage.WEBUI -> WebviewScreen(
@@ -611,6 +592,19 @@ fun App(
                                     onCoreDelete = coreViewModel::onCoreDelete,
                                 )
                             }
+
+                            AppSubPage.DEV -> {
+                                DevSettingPage(
+                                    requestSwitchToPageMain = { appPage ->
+                                        requestSwitchToPageMain(appPage)
+                                        navController.navigate(MAIN_PAGE_ROUTE)
+                                    },
+                                    requestSwitchToPagePlain = { appSubPage ->
+                                        currentPagePlain = appSubPage
+                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -622,16 +616,15 @@ fun App(
 private const val MAIN_PAGE_ROUTE = "main"
 private const val PLAIN_PAGE_ROUTE = "devices/add"
 
-private enum class AppPage(val title: String) {
+internal enum class AppPage(val title: String) {
     DEVICES("连接"),
     FOLDERS("文件夹"),
     CORE("Syncthing"),
     WEBUI("WebUI"),
-    LOGS("日志"),
     SETTINGS("设置"),
 }
 
-private enum class AppSubPage(val title: String) {
+internal enum class AppSubPage(val title: String) {
     DEBUG("DEBUG*"),
     DEVICE_ADD("设备"),
     FOLDER_ADD("文件夹"),
@@ -641,4 +634,5 @@ private enum class AppSubPage(val title: String) {
     SETTINGS_DISCOVERY_EDIT("发现服务器"),
     SETTINGS_STORAGE_PERMISSION("存储权限"),
     SETTINGS_CORE_MANAGE("核心管理"),
+    DEV("开发者设置"),
 }

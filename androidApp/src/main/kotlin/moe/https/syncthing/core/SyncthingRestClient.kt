@@ -6,6 +6,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
+import java.time.Instant
 import java.time.LocalDateTime
 
 internal class SyncthingRestClient(
@@ -90,6 +91,25 @@ internal class SyncthingRestClient(
                 )
             }
         }
+    }
+
+    fun pendingDevices(): List<SyncthingPendingDevice> {
+        val json = request("/rest/cluster/pending/devices")
+        return buildList {
+            val deviceIds = json.keys()
+            while (deviceIds.hasNext()) {
+                val deviceId = deviceIds.next()
+                val pendingDevice = json.optJSONObject(deviceId) ?: continue
+                add(
+                    SyncthingPendingDevice(
+                        id = deviceId,
+                        name = pendingDevice.optString("name").takeIf(String::isNotBlank),
+                        address = pendingDevice.optString("address").takeIf(String::isNotBlank),
+                        detectedAt = pendingDevice.optString("time").takeIf(String::isNotBlank),
+                    ),
+                )
+            }
+        }.sortedByDescending { it.detectedAt.orEmpty() }
     }
 
     fun configuredFolders(): List<RestFolder> {
@@ -271,6 +291,37 @@ internal class SyncthingRestClient(
     fun deleteDevice(deviceId: String) {
         val encodedDeviceId = encodePathSegment(deviceId)
         request("/rest/config/devices/$encodedDeviceId", method = "DELETE")
+    }
+
+    fun dismissPendingDevice(deviceId: String) {
+        val encodedDeviceId = encodePathSegment(deviceId)
+        request("/rest/cluster/pending/devices?device=$encodedDeviceId", method = "DELETE")
+    }
+
+    fun ignorePendingDevice(device: SyncthingPendingDevice) {
+        val configuration = request("/rest/config")
+        val ignoredDevices = configuration.optJSONArray("remoteIgnoredDevices") ?: JSONArray().also {
+            configuration.put("remoteIgnoredDevices", it)
+        }
+        val alreadyIgnored = (0 until ignoredDevices.length()).any { index ->
+            ignoredDevices.optJSONObject(index)?.optString("deviceID") == device.id
+        }
+        if (alreadyIgnored) {
+            dismissPendingDevice(device.id)
+            return
+        }
+        ignoredDevices.put(
+            JSONObject()
+                .put("deviceID", device.id)
+                .put("name", device.name.orEmpty())
+                .put("address", device.address.orEmpty())
+                .put("time", Instant.now().toString()),
+        )
+        requestBody(
+            path = "/rest/config",
+            method = "PUT",
+            body = configuration.toString(),
+        )
     }
 
     fun setting(

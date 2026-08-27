@@ -16,10 +16,13 @@ interface CoreController {
 
 interface DevicesController {
     suspend fun loadDevices(): DevicesSnapshot
+    suspend fun loadPendingDevices(): List<SyncthingPendingDevice>
 
     suspend fun addDevice(configuration: NewDeviceConfiguration)
     suspend fun updateDevice(configuration: NewDeviceConfiguration)
     suspend fun deleteDevice(deviceId: String)
+    suspend fun dismissPendingDevice(deviceId: String)
+    suspend fun ignorePendingDevice(device: SyncthingPendingDevice)
 }
 
 interface FoldersController {

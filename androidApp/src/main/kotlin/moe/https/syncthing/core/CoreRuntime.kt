@@ -178,6 +178,7 @@ class CoreRuntime(
         }
         DevicesSnapshot(
             devices = devices,
+            pendingDevices = restClient.pendingDevices(),
             localInfo = SyncthingLocalInfo(
                 discoveryEnabled = status.discoveryEnabled,
                 discoveryStatus = status.discoveryStatus.map { discoveryStatus ->
@@ -196,6 +197,10 @@ class CoreRuntime(
         )
     }
 
+    override suspend fun loadPendingDevices(): List<SyncthingPendingDevice> = withContext(Dispatchers.IO) {
+        restClient.pendingDevices()
+    }
+
     override suspend fun addDevice(
         configuration: NewDeviceConfiguration,
     ) = withContext(Dispatchers.IO) {
@@ -208,6 +213,14 @@ class CoreRuntime(
 
     override suspend fun deleteDevice(deviceId: String) = withContext(Dispatchers.IO) {
         restClient.deleteDevice(deviceId)
+    }
+
+    override suspend fun dismissPendingDevice(deviceId: String) = withContext(Dispatchers.IO) {
+        restClient.dismissPendingDevice(deviceId)
+    }
+
+    override suspend fun ignorePendingDevice(device: SyncthingPendingDevice) = withContext(Dispatchers.IO) {
+        restClient.ignorePendingDevice(device)
     }
 
     override suspend fun loadFolders(): FoldersSnapshot = withContext(Dispatchers.IO) {

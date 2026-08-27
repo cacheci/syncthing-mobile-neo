@@ -23,6 +23,13 @@ data class SyncthingDevice(
     val untrusted: Boolean = false,
 )
 
+data class SyncthingPendingDevice(
+    val id: String,
+    val name: String?,
+    val address: String?,
+    val detectedAt: String?,
+)
+
 data class NewDeviceConfiguration(
     val deviceId: String,
     val name: String,
@@ -61,5 +68,6 @@ data class SyncthingListenAddress(
 
 data class DevicesSnapshot(
     val devices: List<SyncthingDevice>,
+    val pendingDevices: List<SyncthingPendingDevice>,
     val localInfo: SyncthingLocalInfo,
 )

@@ -26,6 +26,7 @@ import kotlinx.serialization.Serializable
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
+import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
@@ -106,6 +107,7 @@ fun App(
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var requestedPageMain by remember { mutableStateOf(AppPage.CORE) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
+    var pendingDeviceToAdd by remember { mutableStateOf<SyncthingPendingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -196,6 +198,8 @@ fun App(
                                 if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
                                     IconButton(
                                         onClick = {
+                                            editingDevice = null
+                                            pendingDeviceToAdd = null
                                             navigateTo(AppSubPage.DEVICE_ADD)
                                         },
                                         content = {
@@ -311,9 +315,17 @@ fun App(
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
                                     onRefresh = devicesViewModel::refresh,
+                                    onAddPendingDevice = { device ->
+                                        editingDevice = null
+                                        pendingDeviceToAdd = device
+                                        navigateTo(AppSubPage.DEVICE_ADD)
+                                    },
+                                    onDismissPendingDevice = devicesViewModel::dismissPendingDevice,
+                                    onIgnorePendingDevice = devicesViewModel::ignorePendingDevice,
                                     onDeleteDevice = devicesViewModel::deleteDevice,
                                     onEditDevice = { device ->
                                         editingDevice = device
+                                        pendingDeviceToAdd = null
                                         navigateTo(AppSubPage.DEVICE_ADD)
                                     },
                                 )
@@ -391,6 +403,10 @@ fun App(
             entry<AppRoute.Plain>(swipeDismiss = swipeBackDirection) { route ->
                 val currentPagePlain = route.page
                 val navigateBack = {
+                    if (currentPagePlain == AppSubPage.DEVICE_ADD) {
+                        editingDevice = null
+                        pendingDeviceToAdd = null
+                    }
                     navController.pop()
                     Unit
                 }
@@ -426,7 +442,7 @@ fun App(
                             actions = {
                                 when (currentPagePlain) {
                                     AppSubPage.DEVICE_ADD -> {
-                                        if ( editingDevice == null ) {
+                                        if ( editingDevice == null && pendingDeviceToAdd == null ) {
                                             IconButton(
                                                 onClick = {
                                                     onScanQrCode()
@@ -498,6 +514,7 @@ fun App(
                                 AddDeviceScreen(
                                     isSubmitting = devicesUiState.isLoading,
                                     existingDevice = editingDevice,
+                                    pendingDevice = pendingDeviceToAdd,
                                     scannedDeviceId = scannedDeviceId,
                                     onConfirm = { configuration ->
                                         if (editingDevice == null) devicesViewModel.addDevice(
@@ -505,6 +522,7 @@ fun App(
                                         )
                                         else devicesViewModel.updateDevice(configuration)
                                         editingDevice = null
+                                        pendingDeviceToAdd = null
                                         navigateBack()
                                     },
                                 )

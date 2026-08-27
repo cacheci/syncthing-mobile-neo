@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.https.syncthing.core.DevicesController
 import moe.https.syncthing.core.NewDeviceConfiguration
+import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.ui.model.DevicesUiState
 import moe.https.syncthing.ui.model.updateFrom
 
@@ -79,6 +80,53 @@ class DevicesViewModel(
                     mutableUiState.update {
                         it.copy(
                             isLoading = false,
+                            errorMessage = error.message
+                                ?.takeIf(String::isNotBlank)
+                                ?: error.javaClass.simpleName,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun dismissPendingDevice(deviceId: String) {
+        updatePendingDevice {
+            controller.dismissPendingDevice(deviceId)
+        }
+    }
+
+    fun ignorePendingDevice(device: SyncthingPendingDevice) {
+        updatePendingDevice {
+            controller.ignorePendingDevice(device)
+        }
+    }
+
+    private fun updatePendingDevice(
+        operation: suspend () -> Unit,
+    ) {
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                if (mutableUiState.value.isPendingDeviceActionInProgress) return@withLock
+
+                mutableUiState.update {
+                    it.copy(isPendingDeviceActionInProgress = true, errorMessage = null)
+                }
+                try {
+                    operation()
+                    val pendingDevices = controller.loadPendingDevices()
+                    mutableUiState.update {
+                        it.copy(
+                            pendingDevices = pendingDevices,
+                            isPendingDeviceActionInProgress = false,
+                        )
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    mutableUiState.update {
+                        it.copy(
+                            isPendingDeviceActionInProgress = false,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
                                 ?: error.javaClass.simpleName,

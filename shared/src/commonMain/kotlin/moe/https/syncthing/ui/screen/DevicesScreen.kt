@@ -179,7 +179,6 @@ private fun NewDeviceCard(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ),
-                //TODO
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text("●", color = MiuixTheme.colorScheme.onPrimary)

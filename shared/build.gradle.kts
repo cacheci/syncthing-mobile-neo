@@ -17,7 +17,7 @@ kotlin {
         androidResources.enable = true
 
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
 
@@ -28,11 +28,11 @@ kotlin {
             implementation(libs.foundation)
             implementation(libs.ui)
             implementation(libs.compose.components.resources)
-            implementation(libs.androidx.navigation.compose)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.miuix.ui)
             implementation(libs.miuix.icons)
             implementation(libs.miuix.preference)
+            implementation(libs.miuix.nav)
             implementation(libs.qrose)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.ktor.http)

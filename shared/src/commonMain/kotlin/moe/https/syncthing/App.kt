@@ -1,8 +1,6 @@
 package moe.https.syncthing
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -20,13 +18,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.serialization.Serializable
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
@@ -72,6 +68,11 @@ import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
+import top.yukonga.miuix.kmp.nav.core.NavKey
+import top.yukonga.miuix.kmp.nav.core.rememberNavController
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -104,24 +105,17 @@ fun App(
     val settingUiState by settingViewModel.uiState.collectAsState()
     var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
     var requestedPageMain by remember { mutableStateOf(AppPage.CORE) }
-    var currentPagePlain by rememberSaveable(
-        stateSaver = Saver(
-            save = { page -> page.name },
-            restore = { pageName ->
-                AppSubPage.entries.firstOrNull { page -> page.name == pageName }
-                    ?: AppSubPage.DEBUG
-            },
-        ),
-    ) {
-        mutableStateOf(AppSubPage.DEBUG)
-    }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val plainPageSnackbarHostState = remember { SnackbarHostState() }
-    val navController = rememberNavController()
+    val navController = rememberNavController<AppRoute>(AppRoute.Main)
     val mainScrollBehavior = MiuixScrollBehavior()
+
+    fun navigateTo(page: AppSubPage) {
+        navController.push(AppRoute.Plain(page))
+    }
 
     DisposableEffect(currentPageMain) {
         logViewModel.onPageVisibilityChanged(false)
@@ -182,35 +176,16 @@ fun App(
     MiuixTheme(
         colors = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
     ) {
-        NavHost(
+        val swipeBackDirection = when (LocalLayoutDirection.current) {
+            LayoutDirection.Ltr -> NavSwipeDirection.LeftToRight
+            LayoutDirection.Rtl -> NavSwipeDirection.RightToLeft
+        }
+
+        NavDisplay(
             navController = navController,
-            startDestination = MAIN_PAGE_ROUTE,
-            enterTransition = {
-                slideIntoContainer(
-                    towards = SlideDirection.Start,
-                    animationSpec = tween(300),
-                )
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    towards = SlideDirection.Start,
-                    animationSpec = tween(300),
-                )
-            },
-            popEnterTransition = {
-                slideIntoContainer(
-                    towards = SlideDirection.End,
-                    animationSpec = tween(300),
-                )
-            },
-            popExitTransition = {
-                slideOutOfContainer(
-                    towards = SlideDirection.End,
-                    animationSpec = tween(300),
-                )
-            },
+            effects = NavDisplayEffects(blockInputDuringTransition = true),
         ) {
-            composable(MAIN_PAGE_ROUTE) {
+            entry<AppRoute.Main> {
                 Scaffold(
                     topBar = {
                         AdaptiveTopAppBar(
@@ -221,8 +196,7 @@ fun App(
                                 if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
                                     IconButton(
                                         onClick = {
-                                            currentPagePlain = AppSubPage.DEVICE_ADD
-                                            navController.navigate(PLAIN_PAGE_ROUTE)
+                                            navigateTo(AppSubPage.DEVICE_ADD)
                                         },
                                         content = {
                                             Icon(
@@ -261,8 +235,7 @@ fun App(
                                         onClick = {
                                             editingFolder = null
                                             devicesViewModel.refresh()
-                                            currentPagePlain = AppSubPage.FOLDER_ADD
-                                            navController.navigate(PLAIN_PAGE_ROUTE)
+                                            navigateTo(AppSubPage.FOLDER_ADD)
                                         },
                                         content = {
                                             Icon(
@@ -340,8 +313,7 @@ fun App(
                                     onRefresh = devicesViewModel::refresh,
                                     onEditDevice = { device ->
                                         editingDevice = device
-                                        currentPagePlain = AppSubPage.DEVICE_ADD
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.DEVICE_ADD)
                                     },
                                 )
 
@@ -353,8 +325,7 @@ fun App(
                                     onEditFolder = { folder ->
                                         editingFolder = folder
                                         devicesViewModel.refresh()
-                                        currentPagePlain = AppSubPage.FOLDER_ADD
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.FOLDER_ADD)
                                     },
                                 )
 
@@ -364,32 +335,25 @@ fun App(
                                     developerModeEnabled = developerModeEnabled,
                                     onModifyDeveloperMode = onModifyDeveloperMode,
                                     onChangeToAbout = {
-                                        currentPagePlain = AppSubPage.ABOUT
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.ABOUT)
                                     },
                                     onEditingStoragePermission = {
-                                        currentPagePlain = AppSubPage.SETTINGS_STORAGE_PERMISSION
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.SETTINGS_STORAGE_PERMISSION)
                                     },
                                     onEditingListenAddresses = {
-                                        currentPagePlain = AppSubPage.SETTINGS_LISTEN_EDIT
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.SETTINGS_LISTEN_EDIT)
                                     },
                                     onEditingDiscoverServers = {
-                                        currentPagePlain = AppSubPage.SETTINGS_DISCOVERY_EDIT
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.SETTINGS_DISCOVERY_EDIT)
                                     },
                                     onEditingCores = {
-                                        currentPagePlain = AppSubPage.SETTINGS_CORE_MANAGE
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.SETTINGS_CORE_MANAGE)
                                     },
                                     onChangeToLicence = {
-                                        currentPagePlain = AppSubPage.LICENCE
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.LICENCE)
                                     },
                                     onRedirectingToDeveloperPage = {
-                                        currentPagePlain = AppSubPage.DEV
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        navigateTo(AppSubPage.DEV)
                                     }
                                 )
 
@@ -423,9 +387,10 @@ fun App(
                 }
             }
 
-            composable(PLAIN_PAGE_ROUTE) {
+            entry<AppRoute.Plain>(swipeDismiss = swipeBackDirection) { route ->
+                val currentPagePlain = route.page
                 val navigateBack = {
-                    navController.popBackStack()
+                    navController.pop()
                     Unit
                 }
 
@@ -597,11 +562,12 @@ fun App(
                                 DevSettingPage(
                                     requestSwitchToPageMain = { appPage ->
                                         requestSwitchToPageMain(appPage)
-                                        navController.navigate(MAIN_PAGE_ROUTE)
+                                        navController.popUntil { it is AppRoute.Main }
                                     },
                                     requestSwitchToPagePlain = { appSubPage ->
-                                        currentPagePlain = appSubPage
-                                        navController.navigate(PLAIN_PAGE_ROUTE)
+                                        if (appSubPage != currentPagePlain) {
+                                            navigateTo(appSubPage)
+                                        }
                                     },
                                 )
                             }
@@ -613,8 +579,14 @@ fun App(
     }
 }
 
-private const val MAIN_PAGE_ROUTE = "main"
-private const val PLAIN_PAGE_ROUTE = "devices/add"
+@Serializable
+private sealed interface AppRoute : NavKey {
+    @Serializable
+    data object Main : AppRoute
+
+    @Serializable
+    data class Plain(val page: AppSubPage) : AppRoute
+}
 
 internal enum class AppPage(val title: String) {
     DEVICES("连接"),
@@ -624,6 +596,7 @@ internal enum class AppPage(val title: String) {
     SETTINGS("设置"),
 }
 
+@Serializable
 internal enum class AppSubPage(val title: String) {
     DEBUG("DEBUG*"),
     DEVICE_ADD("设备"),

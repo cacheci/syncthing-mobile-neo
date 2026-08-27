@@ -19,6 +19,7 @@ interface DevicesController {
 
     suspend fun addDevice(configuration: NewDeviceConfiguration)
     suspend fun updateDevice(configuration: NewDeviceConfiguration)
+    suspend fun deleteDevice(deviceId: String)
 }
 
 interface FoldersController {

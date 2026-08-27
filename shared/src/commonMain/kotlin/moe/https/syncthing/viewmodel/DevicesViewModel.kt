@@ -58,6 +58,37 @@ class DevicesViewModel(
         saveDevice(configuration, true)
     }
 
+    fun deleteDevice(deviceId: String) {
+        val normalizedDeviceId = deviceId.trim()
+        if (normalizedDeviceId.isBlank()) {
+            mutableUiState.update { it.copy(errorMessage = "设备 ID 不能为空") }
+            return
+        }
+
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                if (mutableUiState.value.isLoading) return@withLock
+
+                mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+                try {
+                    controller.deleteDevice(normalizedDeviceId)
+                    mutableUiState.value = mutableUiState.value.updateFrom(controller.loadDevices())
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    mutableUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error.message
+                                ?.takeIf(String::isNotBlank)
+                                ?: error.javaClass.simpleName,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun saveDevice(configuration: NewDeviceConfiguration, updating: Boolean) {
         val normalizedConfiguration = configuration.copy(
             deviceId = configuration.deviceId.trim(),

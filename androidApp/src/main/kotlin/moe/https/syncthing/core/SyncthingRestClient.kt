@@ -268,6 +268,11 @@ internal class SyncthingRestClient(
         requestBody("/rest/config/devices/${configuration.deviceId}", method = "PUT", body = device.toString())
     }
 
+    fun deleteDevice(deviceId: String) {
+        val encodedDeviceId = encodePathSegment(deviceId)
+        request("/rest/config/devices/$encodedDeviceId", method = "DELETE")
+    }
+
     fun setting(
         guiPortConflictBehavior: SettingConfiguration.GuiPortConflictBehavior,
         localDeviceId: String,

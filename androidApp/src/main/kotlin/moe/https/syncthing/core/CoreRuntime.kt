@@ -206,6 +206,10 @@ class CoreRuntime(
         restClient.updateDevice(configuration)
     }
 
+    override suspend fun deleteDevice(deviceId: String) = withContext(Dispatchers.IO) {
+        restClient.deleteDevice(deviceId)
+    }
+
     override suspend fun loadFolders(): FoldersSnapshot = withContext(Dispatchers.IO) {
         FoldersSnapshot(
             folders = restClient.configuredFolders().map { folder ->

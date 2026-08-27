@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.NewDeviceConfiguration
 import moe.https.syncthing.core.SyncthingDevice
@@ -52,6 +54,7 @@ import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -64,6 +67,7 @@ internal fun DevicesScreen(
     coreState: CoreState,
     topAppBarScrollBehavior: ScrollBehavior,
     onRefresh: () -> Unit,
+    onDeleteDevice: (String) -> Unit,
     onEditDevice: (SyncthingDevice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -107,7 +111,17 @@ internal fun DevicesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 uiState.devices.forEach { device ->
-                    if (device.isLocal) LocalDeviceCard(device, uiState.localInfo) else RemoteDeviceCard(device, onEditDevice)
+                    key(device.id) {
+                        if (device.isLocal) {
+                            LocalDeviceCard(device, uiState.localInfo)
+                        } else {
+                            RemoteDeviceCard(
+                                device = device,
+                                onDeleteDevice = onDeleteDevice,
+                                onEditDevice = onEditDevice,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -118,11 +132,14 @@ internal fun DevicesScreen(
 @Composable
 private fun RemoteDeviceCard(
     device: SyncthingDevice,
+    onDeleteDevice: (String) -> Unit,
     onEditDevice: (SyncthingDevice) -> Unit,
 ) {
     var holdDown by rememberSaveable { mutableStateOf(false) }
     var showShareOverlay by rememberSaveable { mutableStateOf(false) }
+    var showDeleteOverlay by rememberSaveable { mutableStateOf(false) }
     var foldContentStatus by rememberSaveable { mutableStateOf(false) }
+    var foldSettingContentStatus by rememberSaveable { mutableStateOf(false) }
 
     val statusColor = if (device.connected) {
         StatusColor.OK.color
@@ -142,8 +159,18 @@ private fun RemoteDeviceCard(
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .combinedClickable(
-                        onLongClick = { onEditDevice(device) },
-                        onClick = { foldContentStatus = !foldContentStatus },
+                        onLongClick = {
+                            if (foldSettingContentStatus && foldContentStatus) {
+                                foldContentStatus = false
+                            }
+                            foldSettingContentStatus = !foldSettingContentStatus
+                        },
+                        onClick = {
+                            if (foldSettingContentStatus && foldContentStatus) {
+                                foldSettingContentStatus = false
+                            }
+                            foldContentStatus = !foldContentStatus
+                        },
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ),
@@ -174,18 +201,29 @@ private fun RemoteDeviceCard(
                     modifier = Modifier.weight(0.3f),
                 )
             }
+
+            AnimatedVisibility(
+                visible = foldContentStatus || foldSettingContentStatus,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)
+                )
+            ) {
+                HorizontalDivider()
+            }
+
             AnimatedVisibility(
                 visible = foldContentStatus,
                 enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300)  // 展开动画时长
+                    animationSpec = tween(durationMillis = 300)
                 ),
                 exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 300)  // 折叠动画时长
+                    animationSpec = tween(durationMillis = 300)
                 )
             ) {
                 Column ( verticalArrangement = Arrangement.spacedBy(10.dp) ) {
-                    HorizontalDivider()
-
                     MultipleValueRow(
                         label = "设备 ID",
                         values = listOf(device.id),
@@ -227,6 +265,38 @@ private fun RemoteDeviceCard(
                     }
                 }
             }
+
+            AnimatedVisibility(
+                visible = foldSettingContentStatus,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)
+                )
+            ) {
+                Row (
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    TextButton(
+                        modifier = Modifier.weight(0.45f).padding(end = 5.dp),
+                        text = "删除",
+                        onClick = { showDeleteOverlay = true },
+                        colors = TextButtonColors(
+                            color = MiuixTheme.colorScheme.secondaryContainer,
+                            disabledColor = MiuixTheme.colorScheme.surface,
+                            textColor = MiuixTheme.colorScheme.error,
+                            disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                        )
+                    )
+                    TextButton(
+                        modifier = Modifier.weight(0.45f).padding(start = 5.dp),
+                        text = "编辑",
+                        onClick = { onEditDevice(device) },
+                    )
+                }
+            }
         }
     }
 
@@ -237,6 +307,46 @@ private fun RemoteDeviceCard(
         onDismissFinished = { holdDown = false },
         deviceID = device.id,
     )
+
+    OverlayDialog(
+        show = showDeleteOverlay,
+        title = "删除设备",
+        onDismissRequest = { showDeleteOverlay = false },
+        onDismissFinished = { holdDown = false },
+    ) {
+        Column {
+            Text(
+                text = "确定要删除设备 “${device.name?.toCharArray()?.joinToString("\u200B") ?: ""}” 吗？删除该设备不会删除从该设备同步的文件夹。",
+                fontSize = 16.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    text = "取消",
+                    onClick = { showDeleteOverlay = false },
+                )
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    text = "删除",
+                    onClick = {
+                        showDeleteOverlay = false
+                        foldSettingContentStatus = false
+                        onDeleteDevice(device.id)
+                    },
+                    colors = TextButtonColors(
+                        color = MiuixTheme.colorScheme.secondaryContainer,
+                        disabledColor = MiuixTheme.colorScheme.surface,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                    ),
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -311,6 +311,7 @@ fun App(
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
                                     onRefresh = devicesViewModel::refresh,
+                                    onDeleteDevice = devicesViewModel::deleteDevice,
                                     onEditDevice = { device ->
                                         editingDevice = device
                                         navigateTo(AppSubPage.DEVICE_ADD)

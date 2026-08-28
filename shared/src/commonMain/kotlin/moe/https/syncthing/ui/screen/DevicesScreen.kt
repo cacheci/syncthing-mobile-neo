@@ -300,8 +300,8 @@ private fun RemoteDeviceCard(
                 Column ( verticalArrangement = Arrangement.spacedBy(10.dp) ) {
                     MultipleValueRow(
                         label = "设备 ID",
-                        values = listOf(device.id),
-                        textAlign = TextAlign.Start,
+                        values = listOf(device.id.take(7)),
+                        color = MiuixTheme.colorScheme.primary,
                         onClick = {showShareOverlay = true},
                     )
                     MultipleValueRow(
@@ -487,8 +487,8 @@ private fun LocalDeviceCard(
 
                     MultipleValueRow(
                         label = "设备 ID",
-                        values = listOf(device.id),
-                        textAlign = TextAlign.Start,
+                        values = listOf(device.id.take(7)),
+                        color = MiuixTheme.colorScheme.primary,
                         onClick = { showShareOverlay = true },
                     )
 

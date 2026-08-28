@@ -37,6 +37,7 @@ interface FoldersController {
 
 interface SettingController {
     suspend fun loadSetting(): SettingSnapshot
+    suspend fun pingDiscoveryServer(address: String): Long
 
     suspend fun saveSetting(configuration: SettingConfiguration): SettingSaveResult
 }

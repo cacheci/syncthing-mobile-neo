@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +37,7 @@ import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.MessageCard
+import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.model.SettingFormState
@@ -42,6 +45,7 @@ import moe.https.syncthing.ui.model.SettingUiState
 import moe.https.syncthing.ui.util.ListenAddressListItem
 import moe.https.syncthing.ui.util.SettingProtocolStack
 import moe.https.syncthing.ui.util.UriProtocolStack
+import moe.https.syncthing.viewmodel.DiscoveryServerPingState
 import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -54,6 +58,7 @@ import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.collections.plus
 
 @Composable
@@ -587,7 +592,7 @@ internal fun SettingEditListenScreen(
                         state = item.enabled,
                         value = item.uri,
                         valueLabel = "必填",
-                        singleLine = false,
+                        singleLine = true,
                         onValueChange = { result ->
                             settingViewModel.listenAddressSettingUnsaved = settingViewModel.listenAddressSettingUnsaved.copy(
                                 relays = settingViewModel.listenAddressSettingUnsaved.relays.mapIndexed { itemIndex, item2 ->
@@ -623,6 +628,17 @@ internal fun SettingEditDiscoveryScreen(
     settingViewModel: SettingViewModel
 ) {
     Column ( modifier = modifier.fillMaxSize().padding(20.dp) ) {
+        Card (modifier = Modifier.padding(bottom = 16.dp)) {
+            Text(
+                "Syncthing 依赖发现服务器来查找互联网上某处的其他设备。" +
+                "任何人都可以运行发现服务器，并将 Syncthing 实例指向该服务器。" +
+                "Syncthing 项目也维护着一个供公众使用的全球集群。" +
+                "请确保要同步的设备使用了相同的发现服务器，或它们能通过其他方式相互发现，例如设置固定的 IP 或使用局域网设备发现。",
+                style = MiuixTheme.textStyles.paragraph,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp, start = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -651,12 +667,14 @@ internal fun SettingEditDiscoveryScreen(
                     .weight(1f),
             ) {
                 itemsIndexed(settingViewModel.discoveryAddressSettingUnsaved) { index, item ->
+                    val pingState = settingViewModel.discoveryServerPingState(item.uri)
                     CheckableInputValueRow(
                         state = item.enabled,
                         value = item.uri,
                         valueLabel = "必填",
-                        singleLine = false,
+                        singleLine = true,
                         onValueChange = { result ->
+                            settingViewModel.clearDiscoveryServerPingState(item.uri)
                             settingViewModel.discoveryAddressSettingUnsaved =
                                 settingViewModel.discoveryAddressSettingUnsaved.mapIndexed { itemIndex, currentItem ->
                                     if (itemIndex == index) {
@@ -677,13 +695,49 @@ internal fun SettingEditDiscoveryScreen(
                                 }
                         },
                         onDelete = {
+                            settingViewModel.clearDiscoveryServerPingState(item.uri)
                             settingViewModel.discoveryAddressSettingUnsaved =
                                     settingViewModel.discoveryAddressSettingUnsaved.filterIndexed { itemIndex, _ ->
                                         itemIndex != index
                                     }
                         },
                         valueValidator = { true }
-                    )
+                    ) {
+                        Row (
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    enabled = pingState != DiscoveryServerPingState.InProgress &&
+                                        item.uri.isNotBlank(),
+                                    onClick = { settingViewModel.pingDiscoveryServer(item.uri) },
+                                ),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "延迟",
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                when (pingState) {
+                                    DiscoveryServerPingState.InProgress -> "···"
+                                    is DiscoveryServerPingState.Success -> "${pingState.latencyMillis} ms"
+                                    is DiscoveryServerPingState.Failure -> "失败"
+                                    null -> "—"
+                                },
+                                style = MiuixTheme.textStyles.body2,
+                                color = when (pingState) {
+                                    is DiscoveryServerPingState.Success -> {
+                                        if (pingState.latencyMillis < 100) StatusColor.OK.color else StatusColor.PENDING.color
+                                    }
+                                    is DiscoveryServerPingState.Failure -> MiuixTheme.colorScheme.error
+                                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }

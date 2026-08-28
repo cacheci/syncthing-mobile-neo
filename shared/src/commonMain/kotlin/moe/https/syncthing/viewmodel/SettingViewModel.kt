@@ -1,6 +1,7 @@
 package moe.https.syncthing.viewmodel
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -32,6 +33,12 @@ import moe.https.syncthing.ui.util.SettingProtocolStack
 import moe.https.syncthing.ui.util.UriProtocolStack
 import kotlin.time.Duration.Companion.milliseconds
 
+sealed interface DiscoveryServerPingState {
+    data object InProgress : DiscoveryServerPingState
+    data class Success(val latencyMillis: Long) : DiscoveryServerPingState
+    data class Failure(val message: String) : DiscoveryServerPingState
+}
+
 class SettingViewModel(
     private val controller: SettingController,
     private val appSettingsStorage: AppSettingPrivateStorage,
@@ -39,6 +46,7 @@ class SettingViewModel(
     private val mutableUiState = MutableStateFlow(SettingUiState())
     val uiState: StateFlow<SettingUiState> = mutableUiState.asStateFlow()
     private val operationMutex = Mutex()
+    private val discoveryServerPingStates = mutableStateMapOf<String, DiscoveryServerPingState>()
     var listenAddressSettingUnsaved by mutableStateOf( loadSavedListenSetting() )
     var discoveryAddressSettingUnsaved by mutableStateOf( loadSavedDiscoverySetting() )
     var addressProtocolStack by mutableStateOf(
@@ -57,6 +65,41 @@ class SettingViewModel(
             SettingProtocolStack.DUAL -> UriProtocolStack.DUAL
         }
     )
+
+    fun discoveryServerPingState(address: String): DiscoveryServerPingState? =
+        discoveryServerPingStates[address.trim()]
+
+    fun pingDiscoveryServer(address: String) {
+        val normalizedAddress = address.trim()
+        if (normalizedAddress.isBlank()) {
+            discoveryServerPingStates[normalizedAddress] = DiscoveryServerPingState.Failure(
+                "Discovery 地址不能为空",
+            )
+            return
+        }
+        if (discoveryServerPingStates[normalizedAddress] == DiscoveryServerPingState.InProgress) {
+            return
+        }
+
+        discoveryServerPingStates[normalizedAddress] = DiscoveryServerPingState.InProgress
+        viewModelScope.launch {
+            try {
+                val latencyMillis = controller.pingDiscoveryServer(normalizedAddress)
+                discoveryServerPingStates[normalizedAddress] =
+                    DiscoveryServerPingState.Success(latencyMillis)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                discoveryServerPingStates[normalizedAddress] = DiscoveryServerPingState.Failure(
+                    error.userMessage(),
+                )
+            }
+        }
+    }
+
+    fun clearDiscoveryServerPingState(address: String) {
+        discoveryServerPingStates.remove(address.trim())
+    }
 
 
     fun onCoreUnavailable() {

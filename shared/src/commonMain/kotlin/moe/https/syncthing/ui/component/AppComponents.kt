@@ -404,15 +404,19 @@ internal fun CheckableInputValueRow(
     singleLine: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(),
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    content: (@Composable () -> Unit)? = null,
 ) {
 
     var isEditing by remember { mutableStateOf(false) }
     val valueValid = valueValidator(value)
     val canDelete = onDelete != null && enabled && (!state || !valueValid)
 
-    Column ( horizontalAlignment = Alignment.CenterHorizontally ) {
+    Column (
+        modifier = Modifier.padding(top = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -434,7 +438,7 @@ internal fun CheckableInputValueRow(
                         color = if (enabled) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
                     ),
                     onValueChange = onValueChange,
-                    readOnly = readOnly,
+                    readOnly = readOnly || state,
                     singleLine = singleLine,
                     keyboardOptions = keyboardOptions,
                     visualTransformation = visualTransformation,
@@ -463,6 +467,17 @@ internal fun CheckableInputValueRow(
             ) {
                 DeleteBox(enabled = true, onDelete = { onDelete?.invoke() })
             }
+        }
+
+        if (content != null) {
+            Row(
+                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                content()
+            }
+        } else {
+            Box( modifier = Modifier.padding(vertical = 6.dp))
         }
 
         HorizontalDivider( modifier = Modifier.fillMaxWidth( 0.85f ) )

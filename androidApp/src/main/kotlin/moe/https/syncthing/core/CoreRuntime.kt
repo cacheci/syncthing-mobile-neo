@@ -25,10 +25,12 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NoRouteToHostException
 import java.net.ServerSocket
+import java.net.Socket
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.net.UnknownServiceException
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -319,6 +321,23 @@ class CoreRuntime(
                 guiListenAddress = loadProtocolStack().guiListenAddress,
             ),
         )
+    }
+
+    override suspend fun pingDiscoveryServer(address: String): Long = withContext(Dispatchers.IO) {
+        val url = URL(address.trim())
+        val host = url.host.takeIf(String::isNotBlank)
+            ?: throw IllegalArgumentException("Discovery 地址缺少主机名")
+        val port = when {
+            url.port > 0 -> url.port
+            url.defaultPort > 0 -> url.defaultPort
+            else -> throw IllegalArgumentException("Discovery 地址缺少有效端口")
+        }
+        Socket().use { socket ->
+            val startedAt = SystemClock.elapsedRealtimeNanos()
+            socket.connect(InetSocketAddress(host, port), DISCOVERY_PING_TIMEOUT_MILLIS)
+            val elapsedNanos = SystemClock.elapsedRealtimeNanos() - startedAt
+            (elapsedNanos + NANOSECONDS_PER_MILLISECOND - 1) / NANOSECONDS_PER_MILLISECOND
+        }
     }
 
     override suspend fun saveSetting(
@@ -1026,6 +1045,8 @@ class CoreRuntime(
         private const val CONNECTION_RETRY_LOG_INTERVAL = 10
         private const val STATUS_POLL_INTERVAL_MILLIS = 2_000L
         private const val STATUS_FAILURE_LOG_INTERVAL = 15
+        private const val DISCOVERY_PING_TIMEOUT_MILLIS = 1_000
+        private const val NANOSECONDS_PER_MILLISECOND = 1_000_000L
         private const val STOP_TIMEOUT_SECONDS = 5L
         private const val FORCE_TIMEOUT_SECONDS = 2L
         private const val STOP_POLL_COUNT = 10

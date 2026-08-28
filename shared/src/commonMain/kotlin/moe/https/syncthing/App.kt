@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -75,9 +74,9 @@ import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavController
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
 @Composable
 fun App(
@@ -116,6 +115,12 @@ fun App(
     val plainPageSnackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController<AppRoute>(AppRoute.Main)
     val mainScrollBehavior = MiuixScrollBehavior()
+
+    val controller = remember {
+        ThemeController(
+            ColorSchemeMode.System,
+        )
+    }
 
     fun navigateTo(page: AppSubPage) {
         navController.push(AppRoute.Plain(page))
@@ -178,7 +183,7 @@ fun App(
     }
 
     MiuixTheme(
-        colors = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+        controller = controller,
     ) {
         val swipeBackDirection = when (LocalLayoutDirection.current) {
             LayoutDirection.Ltr -> NavSwipeDirection.LeftToRight

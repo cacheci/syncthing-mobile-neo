@@ -7,6 +7,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,12 +27,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreAvailability
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
+import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CheckableInputValueRow
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
@@ -51,10 +54,14 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
@@ -89,6 +96,7 @@ internal fun SettingScreen(
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
     ) {
+        // TODO: 异步加载
         when {
             uiState.isLoading && !settingAvailable -> MessageCard(
                 title = "正在读取设置",
@@ -747,22 +755,54 @@ internal fun SettingEditDiscoveryScreen(
 @Composable
 internal fun SettingStoragePermissionPage(
     onRequestPermission: () -> Unit,
+    navigateBack: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MessageCard(
-            title = "公共目录访问权限",
-            message = "若希望同步公有存储中的文件夹，请启用公共目录访问权限。"
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBehavior = MiuixScrollBehavior()
+
+    Scaffold(
+        topBar = { AdaptiveTopAppBar(
+            title = "DEBUG*",
+            showTopAppBar = true,
+            isWideScreen = false,
+            scrollBehavior = scrollBehavior,
+            navigationIcon = {
+                IconButton( onClick = navigateBack ) {
+                    Icon(
+                        imageVector = MiuixIcons.Back,
+                        contentDescription = "返回",
+                    )
+                }
+            },
+        ) },
+        snackbarHost = {
+            SnackbarHost(state = snackbarHostState)
+        },
+    ) { padding ->
+        Box (
+            modifier = Modifier
+                .padding(padding)
+                .nestedScroll(
+                    scrollBehavior.nestedScrollConnection,
+                )
         ) {
-            ArrowPreference(
-                title = "授权公共目录访问权限",
-                onClick = onRequestPermission,
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                MessageCard(
+                    title = "公共目录访问权限",
+                    message = "若希望同步公有存储中的文件夹，请启用公共目录访问权限。"
+                ) {
+                    ArrowPreference(
+                        title = "授权公共目录访问权限",
+                        onClick = onRequestPermission,
+                    )
+                }
+            }
         }
     }
 }

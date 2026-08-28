@@ -38,6 +38,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -52,6 +53,7 @@ import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.core.defaultFolderPath
 import moe.https.syncthing.platform.FolderPickerResult
 import moe.https.syncthing.platform.rememberFolderPicker
+import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
@@ -65,8 +67,11 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -329,8 +334,8 @@ internal fun AddFolderScreen(
     devices: List<SyncthingDevice>,
     existingFolder: SyncthingFolder? = null,
     pendingFolder: SyncthingPendingFolder? = null,
-    snackbarHostState: SnackbarHostState,
     onConfirm: (NewFolderConfiguration) -> Unit,
+    navigateBack: () -> Unit,
 ) {
     val isEditingFolder = (existingFolder != null)
     val isAddingRemote = (pendingFolder != null)
@@ -433,411 +438,460 @@ internal fun AddFolderScreen(
 
     val uriHandler = LocalUriHandler.current
 
-    LaunchedEffect(folderPickerError) {
-        folderPickerError?.let { snackbarHostState.showSnackbar(it) }
-        folderPickerError = null
-    }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBehavior = MiuixScrollBehavior()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 20.dp, horizontal = 20.dp),
-    ) {
-        InfoSwitchCard(
-            title = "文件夹",
-            content = {
-                InputValueRow(
-                    label = "文件夹 ID",
-                    value = folderId,
-                    valueLabel = "必填，唯一",
-                    allowEdit = !isSubmitting && !isEditingFolder && !isAddingRemote,
-                    onValueChange = { folderId = it },
-                )
-
-                InputValueRow(
-                    label = "名称",
-                    value = label,
-                    valueLabel = "可选",
-                    allowEdit = !isSubmitting,
-                    onValueChange = { label = it },
-                )
-
-                InputValueRow(
-                    label = "文件夹组",
-                    value = group,
-                    valueLabel = "可选",
-                    allowEdit = !isSubmitting,
-                    onValueChange = { group = it },
-                )
-
-                ArrowPreference(
-                    title = "文件夹位置",
-                    summary = displayedFolderPath,
-                    onClick = openFolderPicker,
-                    enabled = !isSubmitting,
+    Scaffold(
+        topBar = { AdaptiveTopAppBar(
+            title = "DEBUG*",
+            showTopAppBar = true,
+            isWideScreen = false,
+            scrollBehavior = scrollBehavior,
+            navigationIcon = {
+                IconButton(onClick = navigateBack) {
+                    Icon(
+                        imageVector = MiuixIcons.Close,
+                        contentDescription = "取消",
+                    )
+                }
+            },
+            actions = {
+                IconButton(
+                    enabled = canSubmit,
+                    onClick = {
+                        onConfirm(
+                            NewFolderConfiguration(
+                                folderId = folderId,
+                                label = label,
+                                group = group,
+                                path = selectedFolderPath ?: defaultFolderPath(folderId.trim()),
+                                versioning = versioning,
+                                updateVersioning = existingFolder?.versioningSupported != false,
+                                versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,
+                                versioningKeep = keepVersions.toIntOrNull() ?: 5,
+                                versioningCleanupIntervalSeconds = cleanupIntervalSeconds.toIntOrNull() ?: 3600,
+                                ignorePatterns = if (isEditingFolder) {
+                                    acceptedIgnoreText.toIgnorePatternLines()
+                                } else {
+                                    emptyList()
+                                },
+                                updateIgnorePatterns = if (isEditingFolder) {
+                                    acceptedIgnoreText != initialIgnoreText
+                                } else {
+                                    ignorePatternsEnabled
+                                },
+                                fsWatcherEnabled = fsWatcherEnabled,
+                                rescanIntervalSeconds = rescanIntervalSeconds.toIntOrNull() ?: 3600,
+                                type = folderType,
+                                devices = remoteDevices
+                                    .filter { it.id in selectedDeviceIds }
+                                    .map { device ->
+                                        FolderDeviceConfiguration(
+                                            deviceId = device.id,
+                                            encryptionPassword = devicePasswords[device.id].orEmpty(),
+                                        )
+                                    },
+                                availableDeviceIds = remoteDeviceIds.toSet(),
+                            ),
+                        )
+                    },
+                    content = {
+                        Icon(
+                            contentDescription = if (isEditingFolder) "保存" else "添加",
+                            imageVector = MiuixIcons.Ok,
+                            tint = if (canSubmit) {
+                                MiuixTheme.colorScheme.onSurface
+                            } else MiuixTheme.colorScheme.disabledOnSurface
+                        )
+                    },
                 )
             }
-        )
+        ) },
+        snackbarHost = {
+            SnackbarHost(state = snackbarHostState)
+        },
+    ) { padding ->
+        Box (
+            modifier = Modifier
+                .padding(padding)
+                .nestedScroll(
+                    scrollBehavior.nestedScrollConnection,
+                )
+        ) {
+            LaunchedEffect(folderPickerError) {
+                folderPickerError?.let { snackbarHostState.showSnackbar(it) }
+                folderPickerError = null
+            }
 
-        InfoSwitchCard(
-            title = "设备",
-            content = {
-                if (remoteDevices.isEmpty()) {
-                    Text(
-                        text = "无设备",
-                        color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-                    )
-                } else {
-                    remoteDevices.forEach { device ->
-                        AddFolderDevices(
-                            device = device,
-                            isSubmitting = isSubmitting,
-                            selected = device.id in selectedDeviceIds,
-                            encryptionPassword = devicePasswords[device.id].orEmpty(),
-                            onSelectedChange = { selected ->
-                                selectedDeviceIds = if (selected) {
-                                    selectedDeviceIds + device.id
-                                } else {
-                                    selectedDeviceIds - device.id
-                                }
-                            },
-                            onEncryptionPasswordChange = { password ->
-                                devicePasswords = devicePasswords + (device.id to password)
-                            },
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 20.dp, horizontal = 20.dp),
+            )
+            {
+                InfoSwitchCard(
+                    title = "文件夹",
+                    content = {
+                        InputValueRow(
+                            label = "文件夹 ID",
+                            value = folderId,
+                            valueLabel = "必填，唯一",
+                            allowEdit = !isSubmitting && !isEditingFolder && !isAddingRemote,
+                            onValueChange = { folderId = it },
+                        )
+
+                        InputValueRow(
+                            label = "名称",
+                            value = label,
+                            valueLabel = "可选",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { label = it },
+                        )
+
+                        InputValueRow(
+                            label = "文件夹组",
+                            value = group,
+                            valueLabel = "可选",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { group = it },
+                        )
+
+                        ArrowPreference(
+                            title = "文件夹位置",
+                            summary = displayedFolderPath,
+                            onClick = openFolderPicker,
+                            enabled = !isSubmitting,
                         )
                     }
-                }
-            }
-        )
-
-        InfoSwitchCard(
-            title = "版本控制",
-            content = {
-                WindowDropdownPreference(
-                    title = "文件版本控制",
-                    summary = if (existingFolder?.versioningSupported == false) {
-                        "当前版本控制类型暂不支持编辑"
-                    } else {
-                        null
-                    },
-                    items = listOf("不启用", "回收站版本控制", "简易版本控制"), // TODO: 先只做这三个
-                    selectedIndex = versioning.ordinal,
-                    enabled = !isSubmitting && existingFolder?.versioningSupported != false,
-                    onSelectedIndexChange = { selectedIndex ->
-                        versioning = NewFolderConfiguration.Versioning.entries[selectedIndex]
-                    },
                 )
 
-                AnimatedVisibility(
-                    visible = versioning != NewFolderConfiguration.Versioning.NONE,
-                    enter = expandVertically(
-                        animationSpec = tween(durationMillis = 300)
-                    ),
-                    exit = shrinkVertically(
-                        animationSpec = tween(durationMillis = 300)
-                    ),
-                ) {
-                    InputValueRow(
-                        label = "回收站保留时长（天）",
-                        value = cleanoutDays,
-                        valueLabel = "永久",
-                        allowEdit = !isSubmitting,
-                        onValueChange = { cleanoutDays = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    )
+                InfoSwitchCard(
+                    title = "设备",
+                    content = {
+                        if (remoteDevices.isEmpty()) {
+                            Text(
+                                text = "无设备",
+                                color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                            )
+                        } else {
+                            remoteDevices.forEach { device ->
+                                AddFolderDevices(
+                                    device = device,
+                                    isSubmitting = isSubmitting,
+                                    selected = device.id in selectedDeviceIds,
+                                    encryptionPassword = devicePasswords[device.id].orEmpty(),
+                                    onSelectedChange = { selected ->
+                                        selectedDeviceIds = if (selected) {
+                                            selectedDeviceIds + device.id
+                                        } else {
+                                            selectedDeviceIds - device.id
+                                        }
+                                    },
+                                    onEncryptionPasswordChange = { password ->
+                                        devicePasswords = devicePasswords + (device.id to password)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                )
 
-                    InputValueRow(
-                        label = "历史版本路径",
-                        value = "",
-                        valueLabel = ".stversions",
-                        allowEdit = false,
-                        onValueChange = {  },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    ) // TODO: 历史版本路径
+                InfoSwitchCard(
+                    title = "版本控制",
+                    content = {
+                        WindowDropdownPreference(
+                            title = "文件版本控制",
+                            summary = if (existingFolder?.versioningSupported == false) {
+                                "当前版本控制类型暂不支持编辑"
+                            } else {
+                                null
+                            },
+                            items = listOf("不启用", "回收站版本控制", "简易版本控制"), // TODO: 先只做这三个
+                            selectedIndex = versioning.ordinal,
+                            enabled = !isSubmitting && existingFolder?.versioningSupported != false,
+                            onSelectedIndexChange = { selectedIndex ->
+                                versioning = NewFolderConfiguration.Versioning.entries[selectedIndex]
+                            },
+                        )
 
-                    // 简易版本控制
-                    AnimatedVisibility(
-                        visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
-                        enter = expandVertically(
-                            animationSpec = tween(durationMillis = 300)
-                        ),
-                        exit = shrinkVertically(
-                            animationSpec = tween(durationMillis = 300)
-                        ),
-                    ) {
-                        Column {
+                        AnimatedVisibility(
+                            visible = versioning != NewFolderConfiguration.Versioning.NONE,
+                            enter = expandVertically(
+                                animationSpec = tween(durationMillis = 300)
+                            ),
+                            exit = shrinkVertically(
+                                animationSpec = tween(durationMillis = 300)
+                            ),
+                        ) {
                             InputValueRow(
-                                label = "保留版本数量",
-                                value = keepVersions,
-                                valueLabel = "5",
+                                label = "回收站保留时长（天）",
+                                value = cleanoutDays,
+                                valueLabel = "永久",
                                 allowEdit = !isSubmitting,
-                                onValueChange = { keepVersions = it },
+                                onValueChange = { cleanoutDays = it },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+
+                            InputValueRow(
+                                label = "历史版本路径",
+                                value = "",
+                                valueLabel = ".stversions",
+                                allowEdit = false,
+                                onValueChange = {  },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            ) // TODO: 历史版本路径
+
+                            // 简易版本控制
+                            AnimatedVisibility(
+                                visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
+                                enter = expandVertically(
+                                    animationSpec = tween(durationMillis = 300)
+                                ),
+                                exit = shrinkVertically(
+                                    animationSpec = tween(durationMillis = 300)
+                                ),
+                            ) {
+                                Column {
+                                    InputValueRow(
+                                        label = "保留版本数量",
+                                        value = keepVersions,
+                                        valueLabel = "5",
+                                        allowEdit = !isSubmitting,
+                                        onValueChange = { keepVersions = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    )
+                                }
+                            }
+
+                            InputValueRow(
+                                label = "定期清除间隔（秒）",
+                                value = cleanupIntervalSeconds,
+                                valueLabel = "3600",
+                                allowEdit = !isSubmitting,
+                                onValueChange = { cleanupIntervalSeconds = it },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             )
                         }
                     }
+                )
 
-                    InputValueRow(
-                        label = "定期清除间隔（秒）",
-                        value = cleanupIntervalSeconds,
-                        valueLabel = "3600",
-                        allowEdit = !isSubmitting,
-                        onValueChange = { cleanupIntervalSeconds = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    )
-                }
-            }
-        )
-
-        InfoSwitchCard(
-            title = "忽略模式",
-            content = {
-                if (isEditingFolder) {
-                    ArrowPreference(
-                        title = "编辑忽略文件",
-                        onClick = {
-                            ignoreEditorController.setDocument(acceptedIgnoreText)
-                            showEditorBottomSheet = true
+                InfoSwitchCard(
+                    title = "忽略模式",
+                    content = {
+                        if (isEditingFolder) {
+                            ArrowPreference(
+                                title = "编辑忽略文件",
+                                onClick = {
+                                    ignoreEditorController.setDocument(acceptedIgnoreText)
+                                    showEditorBottomSheet = true
+                                }
+                            )
+                        } else {
+                            InfoSwitch(
+                                title = "使用忽略模式",
+                                summary = "启用 .stignore",
+                                checked = ignorePatternsEnabled,
+                                enabled = !isSubmitting,
+                                onCheckedChange = { ignorePatternsEnabled = it },
+                            )
                         }
-                    )
-                } else {
-                    InfoSwitch(
-                        title = "使用忽略模式",
-                        summary = "启用 .stignore",
-                        checked = ignorePatternsEnabled,
-                        enabled = !isSubmitting,
-                        onCheckedChange = { ignorePatternsEnabled = it },
-                    )
-                }
 
-                existingFolder?.ignoreError?.let { error ->
+                        existingFolder?.ignoreError?.let { error ->
+                            Text(
+                                text = "读取 .stignore 时出错：$error",
+                                color = MiuixTheme.colorScheme.error,
+                                style = MiuixTheme.textStyles.main,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                )
+
+                InfoSwitchCard(
+                    title = "同步控制",
+                    content = {
+
+                        WindowDropdownPreference(
+                            title = "文件变化检测",
+                            items = listOf("监听并定期扫描", "定期扫描"),
+                            selectedIndex = if (fsWatcherEnabled) 0 else 1,
+                            enabled = !isSubmitting,
+                            onSelectedIndexChange = { selectedIndex ->
+                                fsWatcherEnabled = selectedIndex == 0
+                            },
+                        )
+
+                        InputValueRow(
+                            label = "重新扫描间隔（秒）",
+                            value = rescanIntervalSeconds,
+                            valueLabel = "3600",
+                            allowEdit = !isSubmitting,
+                            onValueChange = { rescanIntervalSeconds = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+
+                        WindowDropdownPreference(
+                            title = "同步方向",
+                            items = listOf("双向", "单向下载", "单向上传"), // TODO: 先不做 "单向加密下载"
+                            selectedIndex = folderType.ordinal,
+                            enabled = !isSubmitting,
+                            onSelectedIndexChange = { selectedIndex ->
+                                folderType = NewFolderConfiguration.Type.entries[selectedIndex]
+                            },
+                        )
+                    }
+
+                )
+
+                if (!numericValuesValid || !cleanupIntervalValid || !untrustedDevicePasswordsValid) {
                     Text(
-                        text = "读取 .stignore 时出错：$error",
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+                        text = when {
+                            !cleanupIntervalValid -> "定期清除间隔不能超过一年。"
+                            !numericValuesValid -> "时间和数量设置必须是非负整数。"
+                            else -> "与不受信任设备共享时必须设置加密密码。"
+                        },
                         color = MiuixTheme.colorScheme.error,
                         style = MiuixTheme.textStyles.main,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
-            }
-        )
 
-        InfoSwitchCard(
-            title = "同步控制",
-            content = {
-
-                WindowDropdownPreference(
-                    title = "文件变化检测",
-                    items = listOf("监听并定期扫描", "定期扫描"),
-                    selectedIndex = if (fsWatcherEnabled) 0 else 1,
-                    enabled = !isSubmitting,
-                    onSelectedIndexChange = { selectedIndex ->
-                        fsWatcherEnabled = selectedIndex == 0
-                    },
-                )
-
-                InputValueRow(
-                    label = "重新扫描间隔（秒）",
-                    value = rescanIntervalSeconds,
-                    valueLabel = "3600",
-                    allowEdit = !isSubmitting,
-                    onValueChange = { rescanIntervalSeconds = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-
-                WindowDropdownPreference(
-                    title = "同步方向",
-                    items = listOf("双向", "单向下载", "单向上传"), // TODO: 先不做 "单向加密下载"
-                    selectedIndex = folderType.ordinal,
-                    enabled = !isSubmitting,
-                    onSelectedIndexChange = { selectedIndex ->
-                        folderType = NewFolderConfiguration.Type.entries[selectedIndex]
-                    },
-                )
-            }
-
-        )
-
-        if (!numericValuesValid || !cleanupIntervalValid || !untrustedDevicePasswordsValid) {
-            Text(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
-                text = when {
-                    !cleanupIntervalValid -> "定期清除间隔不能超过一年。"
-                    !numericValuesValid -> "时间和数量设置必须是非负整数。"
-                    else -> "与不受信任设备共享时必须设置加密密码。"
-                },
-                color = MiuixTheme.colorScheme.error,
-                style = MiuixTheme.textStyles.main,
-            )
-        }
-
-        TextButton(
-            text = if (isEditingFolder) "保存" else "添加",
-            enabled = canSubmit,
-            modifier = Modifier
-                .padding(horizontal = 10.dp, vertical = 16.dp)
-                .fillMaxWidth(),
-            onClick = {
-                onConfirm(
-                    NewFolderConfiguration(
-                        folderId = folderId,
-                        label = label,
-                        group = group,
-                        path = selectedFolderPath ?: defaultFolderPath(folderId.trim()),
-                        versioning = versioning,
-                        updateVersioning = existingFolder?.versioningSupported != false,
-                        versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,
-                        versioningKeep = keepVersions.toIntOrNull() ?: 5,
-                        versioningCleanupIntervalSeconds = cleanupIntervalSeconds.toIntOrNull() ?: 3600,
-                        ignorePatterns = if (isEditingFolder) {
-                            acceptedIgnoreText.toIgnorePatternLines()
-                        } else {
-                            emptyList()
-                        },
-                        updateIgnorePatterns = if (isEditingFolder) {
-                            acceptedIgnoreText != initialIgnoreText
-                        } else {
-                            ignorePatternsEnabled
-                        },
-                        fsWatcherEnabled = fsWatcherEnabled,
-                        rescanIntervalSeconds = rescanIntervalSeconds.toIntOrNull() ?: 3600,
-                        type = folderType,
-                        devices = remoteDevices
-                            .filter { it.id in selectedDeviceIds }
-                            .map { device ->
-                                FolderDeviceConfiguration(
-                                    deviceId = device.id,
-                                    encryptionPassword = devicePasswords[device.id].orEmpty(),
-                                )
-                            },
-                        availableDeviceIds = remoteDeviceIds.toSet(),
-                    ),
-                )
-            },
-        )
-    }
-
-    OverlayBottomSheet(
-        title = "编辑忽略文件",
-        show = showEditorBottomSheet,
-        allowDismiss = true,
-        enableNestedScroll = false,
-        defaultWindowInsetsPadding = false,
-        insideMargin = DpSize.Zero,
-        onDismissRequest = { showEditorBottomSheet = false },
-        onDismissFinished = { showEditorBottomSheet = false },
-        startAction = {
-            IconButton(
-                modifier = Modifier.padding(start = 20.dp),
-                onClick = {
-                    ignoreEditorController.setDocument(acceptedIgnoreText)
-                    showEditorBottomSheet = false
-                },
-            ) {
-                Icon(
-                    imageVector = MiuixIcons.Close,
-                    contentDescription = "取消",
-                    tint = MiuixTheme.colorScheme.onBackground,
-                )
-            }
-        },
-        endAction = {
-            IconButton(
-                modifier = Modifier.padding(end = 20.dp),
-                onClick = {
-                    acceptedIgnoreText = ignoreEditorController.getText()
-                    showEditorBottomSheet = false
-                },
-            ) {
-                Icon(
-                    imageVector = MiuixIcons.Ok,
-                    contentDescription = "确定",
-                    tint = MiuixTheme.colorScheme.onBackground,
-                )
-            }
-        },
-    ) {
-        Column (
-            modifier = Modifier.padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row (
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("请输入要忽略的内容，每行一条。")
-
-                if ( !showStIgnoreHelp ) Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                            onClick = { showStIgnoreHelp = true },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Help,
-                        contentDescription = "确定",
-                        tint = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
-                    )
-                }
-            }
-
-            if (showStIgnoreHelp) {
-                StIgnoreHelpItem("(?d)", "此前缀表示，如果文件阻止删除目录则文件可被删除")
-                StIgnoreHelpItem("(?i)", "此前缀表示，后面的模式在匹配时不区分大小写")
-                StIgnoreHelpItem(" !  ", "此前缀表示给定条件的反转（即不排除）")
-                StIgnoreHelpItem(" *  ", "单级通配符（仅匹配单层文件夹）")
-                StIgnoreHelpItem(" ** ", "多级通配符（用以匹配多层文件夹）")
-                StIgnoreHelpItem(" // ", "注释，在行首使用")
-                StIgnoreHelpItem("#include", "从指定文件加载忽略模式")
-                ArrowPreference(
-                    title = "查看完整帮助",
-                    onClick = { uriHandler.openUri("https://docs.syncthing.net/users/ignoring") }
-                )
                 TextButton(
-                    text = "确定",
-                    modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
-                    onClick = { showStIgnoreHelp = false }
-                )
-            } else {
-                Text(
-                    text = ".stignore",
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center,
-                    modifier= Modifier
-                        .fillMaxWidth()
-                        .background(MiuixTheme.colorScheme.secondaryContainer)
-                        .padding(4.dp)
-                )
-                CodeEditor(
-                    controller = ignoreEditorController,
-                    language = EditorLanguage.PlainText,
-                    colors = if (isSystemInDarkTheme()) EditorColors.Default else EditorColors.Light,
-                    symbols = listOf(
-                        EditorSymbol(label = "*"),
-                        EditorSymbol(label = "**"),
-                        EditorSymbol(label = "!"),
-                        EditorSymbol(label = "//"),
-                        EditorSymbol(label = "(?d)"),
-                        EditorSymbol(label = "(?i)"),
-                        EditorSymbol(label = "#include", value = "#include "),
-                    ),
-                    windowInsetsEnabled = false,
-                    readOnly = isSubmitting,
-                    softWrap = true,
-                    overscrollEnabled = false,
-                    autoClosePairs = false,
+                    text = if (isEditingFolder) "保存" else "添加",
+                    enabled = canSubmit,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(320.dp)
+                        .padding(horizontal = 10.dp, vertical = 16.dp)
+                        .fillMaxWidth(),
+                    onClick = {
+
+                    },
                 )
+            }
+
+            OverlayBottomSheet(
+                title = "编辑忽略文件",
+                show = showEditorBottomSheet,
+                allowDismiss = true,
+                enableNestedScroll = false,
+                defaultWindowInsetsPadding = false,
+                insideMargin = DpSize.Zero,
+                onDismissRequest = { showEditorBottomSheet = false },
+                onDismissFinished = { showEditorBottomSheet = false },
+                startAction = {
+                    IconButton(
+                        modifier = Modifier.padding(start = 20.dp),
+                        onClick = {
+                            ignoreEditorController.setDocument(acceptedIgnoreText)
+                            showEditorBottomSheet = false
+                        },
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Close,
+                            contentDescription = "取消",
+                            tint = MiuixTheme.colorScheme.onBackground,
+                        )
+                    }
+                },
+                endAction = {
+                    IconButton(
+                        modifier = Modifier.padding(end = 20.dp),
+                        onClick = {
+                            acceptedIgnoreText = ignoreEditorController.getText()
+                            showEditorBottomSheet = false
+                        },
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Ok,
+                            contentDescription = "确定",
+                            tint = MiuixTheme.colorScheme.onBackground,
+                        )
+                    }
+                },
+            ) {
+                Column (
+                    modifier = Modifier.padding(bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row (
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("请输入要忽略的内容，每行一条。")
+
+                        if ( !showStIgnoreHelp ) Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    role = Role.Button,
+                                    onClick = { showStIgnoreHelp = true },
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.Help,
+                                contentDescription = "确定",
+                                tint = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                            )
+                        }
+                    }
+
+                    if (showStIgnoreHelp) {
+                        StIgnoreHelpItem("(?d)", "此前缀表示，如果文件阻止删除目录则文件可被删除")
+                        StIgnoreHelpItem("(?i)", "此前缀表示，后面的模式在匹配时不区分大小写")
+                        StIgnoreHelpItem(" !  ", "此前缀表示给定条件的反转（即不排除）")
+                        StIgnoreHelpItem(" *  ", "单级通配符（仅匹配单层文件夹）")
+                        StIgnoreHelpItem(" ** ", "多级通配符（用以匹配多层文件夹）")
+                        StIgnoreHelpItem(" // ", "注释，在行首使用")
+                        StIgnoreHelpItem("#include", "从指定文件加载忽略模式")
+                        ArrowPreference(
+                            title = "查看完整帮助",
+                            onClick = { uriHandler.openUri("https://docs.syncthing.net/users/ignoring") }
+                        )
+                        TextButton(
+                            text = "确定",
+                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                            onClick = { showStIgnoreHelp = false }
+                        )
+                    } else {
+                        Text(
+                            text = ".stignore",
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center,
+                            modifier= Modifier
+                                .fillMaxWidth()
+                                .background(MiuixTheme.colorScheme.secondaryContainer)
+                                .padding(4.dp)
+                        )
+                        CodeEditor(
+                            controller = ignoreEditorController,
+                            language = EditorLanguage.PlainText,
+                            colors = if (isSystemInDarkTheme()) EditorColors.Default else EditorColors.Light,
+                            symbols = listOf(
+                                EditorSymbol(label = "*"),
+                                EditorSymbol(label = "**"),
+                                EditorSymbol(label = "!"),
+                                EditorSymbol(label = "//"),
+                                EditorSymbol(label = "(?d)"),
+                                EditorSymbol(label = "(?i)"),
+                                EditorSymbol(label = "#include", value = "#include "),
+                            ),
+                            windowInsetsEnabled = false,
+                            readOnly = isSubmitting,
+                            softWrap = true,
+                            overscrollEnabled = false,
+                            autoClosePairs = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(320.dp)
+                        )
+                    }
+                }
             }
         }
     }

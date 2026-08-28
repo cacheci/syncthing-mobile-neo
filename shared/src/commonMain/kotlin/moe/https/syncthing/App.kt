@@ -59,14 +59,11 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Link
-import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
@@ -432,186 +429,137 @@ fun App(
                     Unit
                 }
 
-                Scaffold(
-                    topBar = {
-                        AdaptiveTopAppBar(
-                            title = currentPagePlain.title,
-                            showTopAppBar = true,
-                            isWideScreen = false,
-                            scrollBehavior = mainScrollBehavior,
-                            navigationIcon = {
-                                when (currentPagePlain) {
-                                    AppSubPage.FOLDER_ADD,
-                                    AppSubPage.DEVICE_ADD -> {
-                                        IconButton(onClick = navigateBack) {
-                                            Icon(
-                                                imageVector = MiuixIcons.Close,
-                                                contentDescription = "取消",
-                                            )
-                                        }
-                                    }
-                                    else -> {
+                when (currentPagePlain) {
+                    AppSubPage.DEBUG -> {
+                        LogScreen(
+                            uiState = logUiState,
+                            onSourceSelected = logViewModel::onSourceSelected,
+                            navigateBack = navigateBack,
+                        )
+                    }
+                    AppSubPage.SETTINGS_STORAGE_PERMISSION -> {
+                        SettingStoragePermissionPage(
+                            onRequestPermission = onRequestPublicStorageAccess,
+                            navigateBack = navigateBack,
+                        )
+                    }
+
+                    AppSubPage.DEVICE_ADD -> {
+                        AddDeviceScreen(
+                            isSubmitting = devicesUiState.isLoading,
+                            existingDevice = editingDevice,
+                            pendingDevice = pendingDeviceToAdd,
+                            scannedDeviceId = scannedDeviceId,
+                            onScanQrCode = onScanQrCode,
+                            onConfirm = { configuration ->
+                                if (editingDevice == null) devicesViewModel.addDevice(
+                                    configuration
+                                )
+                                else devicesViewModel.updateDevice(configuration)
+                                editingDevice = null
+                                pendingDeviceToAdd = null
+                                navigateBack()
+                            },
+                            navigateBack = navigateBack,
+                        )
+                    }
+
+                    AppSubPage.FOLDER_ADD -> {
+                        AddFolderScreen(
+                            isSubmitting = foldersUiState.isLoading,
+                            devices = devicesUiState.devices,
+                            existingFolder = editingFolder,
+                            pendingFolder = pendingFolderToAdd,
+                            onConfirm = { configuration ->
+                                if (editingFolder == null) foldersViewModel.addFolder(
+                                    configuration
+                                )
+                                else foldersViewModel.updateFolder(configuration)
+                                editingFolder = null
+                                pendingFolderToAdd = null
+                                navigateBack()
+                            },
+                            navigateBack = navigateBack,
+                        )
+                    }
+
+                    AppSubPage.DEV -> {
+                        DevSettingPage(
+                            requestSwitchToPageMain = { appPage ->
+                                requestSwitchToPageMain(appPage)
+                                navController.popUntil { it is AppRoute.Main }
+                            },
+                            requestSwitchToPagePlain = { appSubPage ->
+                                if (appSubPage != currentPagePlain) {
+                                    navigateTo(appSubPage)
+                                }
+                            },
+                            navigateBack = navigateBack,
+                        )
+                    }
+
+                    else -> {
+                        Scaffold(
+                            topBar = {
+                                AdaptiveTopAppBar(
+                                    title = currentPagePlain.title,
+                                    showTopAppBar = true,
+                                    isWideScreen = false,
+                                    scrollBehavior = mainScrollBehavior,
+                                    navigationIcon = {
                                         IconButton(onClick = navigateBack) {
                                             Icon(
                                                 imageVector = MiuixIcons.Back,
                                                 contentDescription = "返回",
                                             )
                                         }
-                                    }
-                                }
+                                    },
+                                )
                             },
-                            actions = {
+                            snackbarHost = {
+                                SnackbarHost(state = plainPageSnackbarHostState)
+                            },
+                        ) { padding ->
+                            Box (
+                                modifier = Modifier
+                                    .padding(padding)
+                                    .nestedScroll(
+                                        mainScrollBehavior.nestedScrollConnection,
+                                    )
+                            ) {
                                 when (currentPagePlain) {
-                                    AppSubPage.DEVICE_ADD -> {
-                                        if ( editingDevice == null && pendingDeviceToAdd == null ) {
-                                            IconButton(
-                                                onClick = {
-                                                    onScanQrCode()
-                                                },
-                                                content = {
-                                                    Icon(
-                                                        contentDescription = "扫描二维码",
-                                                        imageVector = MiuixIcons.Scan
-                                                    )
-                                                },
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                // TODO
-                                            },
-                                            content = {
-                                                Icon(
-                                                    contentDescription = "保存",
-                                                    imageVector = MiuixIcons.Ok
-                                                )
-                                            },
+                                    AppSubPage.ABOUT -> {
+                                        AboutScreen(
+                                            versionName = versionName,
                                         )
                                     }
-                                    AppSubPage.FOLDER_ADD -> {
-                                        IconButton(
-                                            onClick = {
-                                                // TODO
-                                            },
-                                            content = {
-                                                Icon(
-                                                    contentDescription = "保存",
-                                                    imageVector = MiuixIcons.Ok
-                                                )
-                                            },
+
+                                    AppSubPage.LICENCE -> {
+                                        LicenceScreen()
+                                    }
+
+                                    AppSubPage.SETTINGS_LISTEN_EDIT -> {
+                                        SettingEditListenScreen(
+                                            settingViewModel = settingViewModel,
                                         )
                                     }
-                                    else -> {}
+
+                                    AppSubPage.SETTINGS_DISCOVERY_EDIT -> {
+                                        SettingEditDiscoveryScreen(
+                                            settingViewModel = settingViewModel,
+                                        )
+                                    }
+
+                                    AppSubPage.SETTINGS_CORE_MANAGE -> {
+                                        SettingCoreSelectScreen(
+                                            uiState = coreUiState,
+                                            snackbarHostState = plainPageSnackbarHostState,
+                                            onCoreSelected = coreViewModel::onCoreSelected,
+                                            onImportCore = coreViewModel::onImportCoreClicked,
+                                            onCoreDelete = coreViewModel::onCoreDelete,
+                                        )
+                                    }
                                 }
-                            }
-                        )
-                    },
-                    snackbarHost = {
-                        SnackbarHost(state = plainPageSnackbarHostState)
-                    },
-                ) { padding ->
-                    Box (
-                        modifier = Modifier
-                            .padding(padding)
-                            .nestedScroll(
-                            mainScrollBehavior.nestedScrollConnection,
-                        )
-                    ) {
-                        when (currentPagePlain) {
-                            AppSubPage.DEBUG -> {
-                                LogScreen(
-                                    uiState = logUiState,
-                                    onSourceSelected = logViewModel::onSourceSelected,
-                                )
-                            }
-
-                            AppSubPage.SETTINGS_STORAGE_PERMISSION -> {
-                                SettingStoragePermissionPage(
-                                    onRequestPermission = onRequestPublicStorageAccess,
-                                )
-                            }
-
-                            AppSubPage.DEVICE_ADD -> {
-                                AddDeviceScreen(
-                                    isSubmitting = devicesUiState.isLoading,
-                                    existingDevice = editingDevice,
-                                    pendingDevice = pendingDeviceToAdd,
-                                    scannedDeviceId = scannedDeviceId,
-                                    onConfirm = { configuration ->
-                                        if (editingDevice == null) devicesViewModel.addDevice(
-                                            configuration
-                                        )
-                                        else devicesViewModel.updateDevice(configuration)
-                                        editingDevice = null
-                                        pendingDeviceToAdd = null
-                                        navigateBack()
-                                    },
-                                )
-                            }
-
-                            AppSubPage.FOLDER_ADD -> {
-                                AddFolderScreen(
-                                    isSubmitting = foldersUiState.isLoading,
-                                    devices = devicesUiState.devices,
-                                    existingFolder = editingFolder,
-                                    pendingFolder = pendingFolderToAdd,
-                                    snackbarHostState = plainPageSnackbarHostState,
-                                    onConfirm = { configuration ->
-                                        if (editingFolder == null) foldersViewModel.addFolder(
-                                            configuration
-                                        )
-                                        else foldersViewModel.updateFolder(configuration)
-                                        editingFolder = null
-                                        pendingFolderToAdd = null
-                                        navigateBack()
-                                    },
-                                )
-                            }
-
-                            AppSubPage.ABOUT -> {
-                                AboutScreen(
-                                    versionName = versionName,
-                                )
-                            }
-
-                            AppSubPage.LICENCE -> {
-                                LicenceScreen()
-                            }
-
-                            AppSubPage.SETTINGS_LISTEN_EDIT -> {
-                                SettingEditListenScreen(
-                                    settingViewModel = settingViewModel,
-                                )
-                            }
-
-                            AppSubPage.SETTINGS_DISCOVERY_EDIT -> {
-                                SettingEditDiscoveryScreen(
-                                    settingViewModel = settingViewModel,
-                                )
-                            }
-
-                            AppSubPage.SETTINGS_CORE_MANAGE -> {
-                                SettingCoreSelectScreen(
-                                    uiState = coreUiState,
-                                    snackbarHostState = plainPageSnackbarHostState,
-                                    onCoreSelected = coreViewModel::onCoreSelected,
-                                    onImportCore = coreViewModel::onImportCoreClicked,
-                                    onCoreDelete = coreViewModel::onCoreDelete,
-                                )
-                            }
-
-                            AppSubPage.DEV -> {
-                                DevSettingPage(
-                                    requestSwitchToPageMain = { appPage ->
-                                        requestSwitchToPageMain(appPage)
-                                        navController.popUntil { it is AppRoute.Main }
-                                    },
-                                    requestSwitchToPagePlain = { appSubPage ->
-                                        if (appSubPage != currentPagePlain) {
-                                            navigateTo(appSubPage)
-                                        }
-                                    },
-                                )
                             }
                         }
                     }

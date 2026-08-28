@@ -253,8 +253,14 @@ class CoreRuntime(
                     pullErrors = status.pullErrors,
                 )
             },
+            pendingFolders = restClient.pendingFolders(),
         )
     }
+
+    override suspend fun loadPendingFolders(): List<SyncthingPendingFolder> =
+        withContext(Dispatchers.IO) {
+            restClient.pendingFolders()
+        }
 
     override suspend fun addFolder(
         configuration: NewFolderConfiguration,
@@ -272,6 +278,18 @@ class CoreRuntime(
         if (configuration.updateIgnorePatterns) {
             restClient.updateFolderIgnores(configuration.folderId, configuration.ignorePatterns)
         }
+    }
+
+    override suspend fun dismissPendingFolder(
+        folder: SyncthingPendingFolder,
+    ) = withContext(Dispatchers.IO) {
+        restClient.dismissPendingFolder(folder)
+    }
+
+    override suspend fun ignorePendingFolder(
+        folder: SyncthingPendingFolder,
+    ) = withContext(Dispatchers.IO) {
+        restClient.ignorePendingFolder(folder)
     }
 
     override suspend fun loadSetting(): SettingSnapshot = withContext(Dispatchers.IO) {

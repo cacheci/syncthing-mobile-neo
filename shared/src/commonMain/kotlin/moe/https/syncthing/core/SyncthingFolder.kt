@@ -25,6 +25,14 @@ data class SyncthingFolder(
     val pullErrors: Long,
 )
 
+data class SyncthingPendingFolder(
+    val id: String,
+    val name: String,
+    val source: String,
+    val sourceName: String,
+    val detectedAt: String?,
+)
+
 data class FolderDeviceConfiguration(
     val deviceId: String,
     val encryptionPassword: String,
@@ -63,6 +71,7 @@ data class NewFolderConfiguration(
 
 data class FoldersSnapshot(
     val folders: List<SyncthingFolder>,
+    val pendingFolders: List<SyncthingPendingFolder>,
 )
 
 fun defaultFolderPath(folderId: String): String =

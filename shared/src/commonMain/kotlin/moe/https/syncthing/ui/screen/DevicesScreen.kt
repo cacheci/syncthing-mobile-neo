@@ -4,11 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -50,6 +46,7 @@ import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.MultipleValueRow
+import moe.https.syncthing.ui.component.PendingCard
 import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.model.DevicesUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -156,93 +153,51 @@ private fun NewDeviceCard(
     onDismiss: () -> Unit,
     onIgnore: () -> Unit,
 ) {
-    var foldContentStatus by rememberSaveable { mutableStateOf(true) }
-
-    Card (
-        pressFeedbackType = PressFeedbackType.Sink,
-    ) {
+    PendingCard(title = "新设备：${device.name ?: device.address ?: "未知设备"}") {
         Column (
-            modifier = Modifier.fillMaxWidth().border(
-                width = if (isSystemInDarkTheme()) 1.5.dp else 0.dp,
-                color = Color(0xFFE18F29),
-                shape = RoundedCornerShape(16.dp)
-            ),
+            modifier = Modifier.padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row (
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF6C435))
-                    .padding(16.dp)
-                    .combinedClickable(
-                        onLongClick = { },
-                        onClick = { foldContentStatus = !foldContentStatus },
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("●", color = MiuixTheme.colorScheme.onPrimary)
-                Text(
-                    text = "新设备：${device.name ?: device.address ?: "未知设备"}",
-                    color = MiuixTheme.colorScheme.onPrimary,
-                )
-            }
+            MultipleValueRow(
+                label = "设备 ID",
+                values = listOf(device.id),
+                textAlign = TextAlign.Start,
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
+            MultipleValueRow(
+                label = "连接地址",
+                values = listOf(device.address ?: "—"),
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
 
-            AnimatedVisibility(
-                visible = foldContentStatus,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300)
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 300)
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Column (
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    MultipleValueRow(
-                        label = "设备 ID",
-                        values = listOf(device.id),
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier.padding(horizontal = 18.dp)
+                TextButton(
+                    modifier = Modifier.weight(0.3f),
+                    text = "黑名单",
+                    enabled = enabled,
+                    onClick = onIgnore,
+                    colors = TextButtonColors(
+                        color = MiuixTheme.colorScheme.secondaryContainer,
+                        disabledColor = MiuixTheme.colorScheme.surface,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
                     )
-                    MultipleValueRow(
-                        label = "连接地址",
-                        values = listOf(device.address ?: "—"),
-                        modifier = Modifier.padding(horizontal = 18.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        TextButton(
-                            modifier = Modifier.weight(0.3f),
-                            text = "黑名单",
-                            enabled = enabled,
-                            onClick = onIgnore,
-                            colors = TextButtonColors(
-                                color = MiuixTheme.colorScheme.secondaryContainer,
-                                disabledColor = MiuixTheme.colorScheme.surface,
-                                textColor = MiuixTheme.colorScheme.error,
-                                disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
-                            )
-                        )
-                        TextButton(
-                            modifier = Modifier.weight(0.3f),
-                            text = "忽略",
-                            enabled = enabled,
-                            onClick = onDismiss,
-                        )
-                        TextButton(
-                            modifier = Modifier.weight(0.3f),
-                            text = "添加",
-                            enabled = enabled,
-                            onClick = onAdd,
-                        )
-                    }
-                }
+                )
+                TextButton(
+                    modifier = Modifier.weight(0.3f),
+                    text = "忽略",
+                    enabled = enabled,
+                    onClick = onDismiss,
+                )
+                TextButton(
+                    modifier = Modifier.weight(0.3f),
+                    text = "添加",
+                    enabled = enabled,
+                    onClick = onAdd,
+                )
             }
         }
     }

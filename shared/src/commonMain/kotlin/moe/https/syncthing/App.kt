@@ -27,6 +27,7 @@ import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingDevice
+import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
@@ -109,6 +110,7 @@ fun App(
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     var pendingDeviceToAdd by remember { mutableStateOf<SyncthingPendingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
+    var pendingFolderToAdd by remember { mutableStateOf<SyncthingPendingFolder?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val plainPageSnackbarHostState = remember { SnackbarHostState() }
@@ -238,6 +240,7 @@ fun App(
                                     IconButton(
                                         onClick = {
                                             editingFolder = null
+                                            pendingFolderToAdd = null
                                             devicesViewModel.refresh()
                                             navigateTo(AppSubPage.FOLDER_ADD)
                                         },
@@ -335,8 +338,17 @@ fun App(
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
                                     onRefresh = foldersViewModel::refresh,
+                                    onAddPendingFolder = { folder ->
+                                        editingFolder = null
+                                        pendingFolderToAdd = folder
+                                        devicesViewModel.refresh()
+                                        navigateTo(AppSubPage.FOLDER_ADD)
+                                    },
+                                    onDismissPendingFolder = foldersViewModel::dismissPendingFolder,
+                                    onIgnorePendingFolder = foldersViewModel::ignorePendingFolder,
                                     onEditFolder = { folder ->
                                         editingFolder = folder
+                                        pendingFolderToAdd = null
                                         devicesViewModel.refresh()
                                         navigateTo(AppSubPage.FOLDER_ADD)
                                     },
@@ -406,6 +418,10 @@ fun App(
                     if (currentPagePlain == AppSubPage.DEVICE_ADD) {
                         editingDevice = null
                         pendingDeviceToAdd = null
+                    }
+                    if (currentPagePlain == AppSubPage.FOLDER_ADD) {
+                        editingFolder = null
+                        pendingFolderToAdd = null
                     }
                     navController.pop()
                     Unit
@@ -533,6 +549,7 @@ fun App(
                                     isSubmitting = foldersUiState.isLoading,
                                     devices = devicesUiState.devices,
                                     existingFolder = editingFolder,
+                                    pendingFolder = pendingFolderToAdd,
                                     snackbarHostState = plainPageSnackbarHostState,
                                     onConfirm = { configuration ->
                                         if (editingFolder == null) foldersViewModel.addFolder(
@@ -540,6 +557,7 @@ fun App(
                                         )
                                         else foldersViewModel.updateFolder(configuration)
                                         editingFolder = null
+                                        pendingFolderToAdd = null
                                         navigateBack()
                                     },
                                 )

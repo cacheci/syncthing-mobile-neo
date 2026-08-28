@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.https.syncthing.core.FoldersController
 import moe.https.syncthing.core.NewFolderConfiguration
+import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.model.updateFrom
 
@@ -56,6 +57,53 @@ class FoldersViewModel(
 
     fun updateFolder(configuration: NewFolderConfiguration) {
         saveFolder(configuration, updating = true)
+    }
+
+    fun dismissPendingFolder(folder: SyncthingPendingFolder) {
+        updatePendingFolder {
+            controller.dismissPendingFolder(folder)
+        }
+    }
+
+    fun ignorePendingFolder(folder: SyncthingPendingFolder) {
+        updatePendingFolder {
+            controller.ignorePendingFolder(folder)
+        }
+    }
+
+    private fun updatePendingFolder(
+        operation: suspend () -> Unit,
+    ) {
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                if (mutableUiState.value.isPendingFolderActionInProgress) return@withLock
+
+                mutableUiState.update {
+                    it.copy(isPendingFolderActionInProgress = true, errorMessage = null)
+                }
+                try {
+                    operation()
+                    val pendingFolders = controller.loadPendingFolders()
+                    mutableUiState.update {
+                        it.copy(
+                            pendingFolders = pendingFolders,
+                            isPendingFolderActionInProgress = false,
+                        )
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    mutableUiState.update {
+                        it.copy(
+                            isPendingFolderActionInProgress = false,
+                            errorMessage = error.message
+                                ?.takeIf(String::isNotBlank)
+                                ?: error.javaClass.simpleName,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun saveFolder(configuration: NewFolderConfiguration, updating: Boolean) {

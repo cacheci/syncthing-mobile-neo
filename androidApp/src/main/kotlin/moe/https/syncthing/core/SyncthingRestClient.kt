@@ -112,6 +112,36 @@ internal class SyncthingRestClient(
         }.sortedByDescending { it.detectedAt.orEmpty() }
     }
 
+    fun pendingFolders(): List<SyncthingPendingFolder> {
+        val json = request("/rest/cluster/pending/folders")
+        val deviceNames = configuredDevices().associate { device ->
+            device.id to (device.name ?: device.id)
+        }
+        return buildList {
+            val folderIds = json.keys()
+            while (folderIds.hasNext()) {
+                val folderId = folderIds.next()
+                val offeredBy = json.optJSONObject(folderId)
+                    ?.optJSONObject("offeredBy")
+                    ?: continue
+                val sourceIds = offeredBy.keys()
+                while (sourceIds.hasNext()) {
+                    val sourceId = sourceIds.next()
+                    val offer = offeredBy.optJSONObject(sourceId) ?: continue
+                    add(
+                        SyncthingPendingFolder(
+                            id = folderId,
+                            name = offer.optString("label").ifBlank { folderId },
+                            source = sourceId,
+                            sourceName = deviceNames[sourceId] ?: sourceId,
+                            detectedAt = offer.optString("time").takeIf(String::isNotBlank),
+                        ),
+                    )
+                }
+            }
+        }.sortedByDescending { it.detectedAt.orEmpty() }
+    }
+
     fun configuredFolders(): List<RestFolder> {
         val array = requestArray("/rest/config/folders")
         return buildList {
@@ -321,6 +351,41 @@ internal class SyncthingRestClient(
             path = "/rest/config",
             method = "PUT",
             body = configuration.toString(),
+        )
+    }
+
+    fun dismissPendingFolder(folder: SyncthingPendingFolder) {
+        val encodedFolderId = encodePathSegment(folder.id)
+        val encodedSourceId = encodePathSegment(folder.source)
+        request(
+            "/rest/cluster/pending/folders?folder=$encodedFolderId&device=$encodedSourceId",
+            method = "DELETE",
+        )
+    }
+
+    fun ignorePendingFolder(folder: SyncthingPendingFolder) {
+        val encodedSourceId = encodePathSegment(folder.source)
+        val device = request("/rest/config/devices/$encodedSourceId")
+        val ignoredFolders = device.optJSONArray("ignoredFolders") ?: JSONArray().also {
+            device.put("ignoredFolders", it)
+        }
+        val alreadyIgnored = (0 until ignoredFolders.length()).any { index ->
+            ignoredFolders.optJSONObject(index)?.optString("id") == folder.id
+        }
+        if (alreadyIgnored) {
+            dismissPendingFolder(folder)
+            return
+        }
+        ignoredFolders.put(
+            JSONObject()
+                .put("id", folder.id)
+                .put("label", folder.name)
+                .put("time", Instant.now().toString()),
+        )
+        requestBody(
+            path = "/rest/config/devices/$encodedSourceId",
+            method = "PUT",
+            body = device.toString(),
         )
     }
 

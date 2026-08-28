@@ -27,9 +27,12 @@ interface DevicesController {
 
 interface FoldersController {
     suspend fun loadFolders(): FoldersSnapshot
+    suspend fun loadPendingFolders(): List<SyncthingPendingFolder>
 
     suspend fun addFolder(configuration: NewFolderConfiguration)
     suspend fun updateFolder(configuration: NewFolderConfiguration)
+    suspend fun dismissPendingFolder(folder: SyncthingPendingFolder)
+    suspend fun ignorePendingFolder(folder: SyncthingPendingFolder)
 }
 
 interface SettingController {

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +48,7 @@ import moe.https.syncthing.core.FolderDeviceConfiguration
 import moe.https.syncthing.core.NewFolderConfiguration
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
+import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.core.defaultFolderPath
 import moe.https.syncthing.platform.FolderPickerResult
 import moe.https.syncthing.platform.rememberFolderPicker
@@ -54,6 +56,8 @@ import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.MultipleValueRow
+import moe.https.syncthing.ui.component.PendingCard
 import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.util.formatBytes
@@ -66,6 +70,7 @@ import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
@@ -88,6 +93,9 @@ internal fun FoldersScreen(
     coreState: CoreState,
     topAppBarScrollBehavior: ScrollBehavior,
     onRefresh: () -> Unit,
+    onAddPendingFolder: (SyncthingPendingFolder) -> Unit,
+    onDismissPendingFolder: (SyncthingPendingFolder) -> Unit,
+    onIgnorePendingFolder: (SyncthingPendingFolder) -> Unit,
     onEditFolder: (SyncthingFolder) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -106,7 +114,7 @@ internal fun FoldersScreen(
                 message = "启动后才能读取文件夹状态。",
             )
 
-            uiState.isLoading && uiState.folders.isEmpty() -> {}
+            uiState.isLoading && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> {}
 
             uiState.errorMessage != null -> CoreNotReadyTakePlace(
                 title = "读取失败",
@@ -114,12 +122,12 @@ internal fun FoldersScreen(
                 isError = true,
             )
 
-            uiState.hasLoaded && uiState.folders.isEmpty() -> CoreNotReadyTakePlace(
+            uiState.hasLoaded && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> CoreNotReadyTakePlace(
                 title = "暂无文件夹",
                 message = "当前还没有配置文件夹。",
             )
 
-            else -> uiState.folders.forEach { folder ->
+            else -> {
                 Column(
                     modifier = modifier
                         .fillMaxSize()
@@ -127,7 +135,22 @@ internal fun FoldersScreen(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    FolderCard(folder, onEditFolder)
+                    uiState.pendingFolders.forEach { folder ->
+                        key("pending:${folder.id}:${folder.source}") {
+                            NewFolderCard(
+                                folder = folder,
+                                enabled = !uiState.isPendingFolderActionInProgress,
+                                onAdd = { onAddPendingFolder(folder) },
+                                onDismiss = { onDismissPendingFolder(folder) },
+                                onIgnore = { onIgnorePendingFolder(folder) },
+                            )
+                        }
+                    }
+                    uiState.folders.forEach { folder ->
+                        key(folder.id) {
+                            FolderCard(folder, onEditFolder)
+                        }
+                    }
                 }
             }
         }
@@ -242,18 +265,82 @@ private fun FolderValueRow(
 }
 
 @Composable
+private fun NewFolderCard(
+    folder: SyncthingPendingFolder,
+    enabled: Boolean,
+    onAdd: () -> Unit,
+    onDismiss: () -> Unit,
+    onIgnore: () -> Unit,
+) {
+    PendingCard(title = "远程文件夹：${folder.name}") {
+        Column (
+            modifier = Modifier.padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            MultipleValueRow(
+                label = "文件夹 ID",
+                values = listOf(folder.id),
+                textAlign = TextAlign.Start,
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
+            MultipleValueRow(
+                label = "共享来源",
+                values = listOf(folder.sourceName),
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    modifier = Modifier.weight(0.3f),
+                    text = "黑名单",
+                    enabled = enabled,
+                    onClick = onIgnore,
+                    colors = TextButtonColors(
+                        color = MiuixTheme.colorScheme.secondaryContainer,
+                        disabledColor = MiuixTheme.colorScheme.surface,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                    )
+                )
+                TextButton(
+                    modifier = Modifier.weight(0.3f),
+                    text = "忽略",
+                    enabled = enabled,
+                    onClick = onDismiss,
+                )
+                TextButton(
+                    modifier = Modifier.weight(0.3f),
+                    text = "添加",
+                    enabled = enabled,
+                    onClick = onAdd,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun AddFolderScreen(
     modifier: Modifier = Modifier,
     isSubmitting: Boolean,
     devices: List<SyncthingDevice>,
     existingFolder: SyncthingFolder? = null,
+    pendingFolder: SyncthingPendingFolder? = null,
     snackbarHostState: SnackbarHostState,
     onConfirm: (NewFolderConfiguration) -> Unit,
 ) {
     val isEditingFolder = (existingFolder != null)
-    var label by remember(existingFolder) { mutableStateOf(existingFolder?.label.orEmpty()) }
+    val isAddingRemote = (pendingFolder != null)
+    var label by remember(existingFolder, pendingFolder) {
+        mutableStateOf(existingFolder?.label ?: pendingFolder?.name.orEmpty())
+    }
     var group by remember(existingFolder) { mutableStateOf(existingFolder?.group.orEmpty()) }
-    var folderId by remember(existingFolder) { mutableStateOf(existingFolder?.id.orEmpty()) }
+    var folderId by remember(existingFolder, pendingFolder) {
+        mutableStateOf(existingFolder?.id ?: pendingFolder?.id.orEmpty())
+    }
     var selectedFolderPath by remember(existingFolder) {
         mutableStateOf(existingFolder?.path)
     }
@@ -297,9 +384,11 @@ internal fun AddFolderScreen(
     }
     val remoteDevices = devices.filterNot { it.isLocal }
     val remoteDeviceIds = remoteDevices.map { it.id }
-    var selectedDeviceIds by remember(existingFolder, remoteDeviceIds) {
+    var selectedDeviceIds by remember(existingFolder, pendingFolder, remoteDeviceIds) {
         mutableStateOf(
-            existingFolder?.devices?.map { it.deviceId }?.toSet() ?: remoteDeviceIds.toSet(),
+            existingFolder?.devices?.map { it.deviceId }?.toSet()
+                ?: pendingFolder?.let { setOf(it.source) }
+                ?: remoteDeviceIds.toSet(),
         )
     }
     var devicePasswords by remember(existingFolder, remoteDeviceIds) {
@@ -362,7 +451,7 @@ internal fun AddFolderScreen(
                     label = "文件夹 ID",
                     value = folderId,
                     valueLabel = "必填，唯一",
-                    allowEdit = !isSubmitting && !isEditingFolder,
+                    allowEdit = !isSubmitting && !isEditingFolder && !isAddingRemote,
                     onValueChange = { folderId = it },
                 )
 

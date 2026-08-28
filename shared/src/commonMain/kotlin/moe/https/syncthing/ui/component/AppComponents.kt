@@ -3,14 +3,19 @@ package moe.https.syncthing.ui.component
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +73,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 
@@ -515,6 +522,58 @@ internal fun DeleteBox(
                         .clip(CircleShape)
                         .background(Color.White),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PendingCard(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    var foldContentStatus by rememberSaveable { mutableStateOf(true) }
+
+    Card (
+        pressFeedbackType = PressFeedbackType.Sink,
+    ) {
+        Column (
+            modifier = Modifier.fillMaxWidth().border(
+                width = if (isSystemInDarkTheme()) 1.5.dp else 0.dp,
+                color = Color(0xFFE18F29),
+                shape = RoundedCornerShape(16.dp)
+            ),
+        ) {
+            Row (
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF6C435))
+                    .padding(16.dp)
+                    .combinedClickable(
+                        onLongClick = { },
+                        onClick = { foldContentStatus = !foldContentStatus },
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("●", color = MiuixTheme.colorScheme.onPrimary)
+                Text(
+                    text = title,
+                    color = MiuixTheme.colorScheme.onPrimary,
+                )
+            }
+
+            AnimatedVisibility(
+                visible = foldContentStatus,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)
+                )
+            ) {
+                content()
             }
         }
     }

@@ -334,7 +334,7 @@ class SettingViewModel(
             relays = listOf(
                 ListenAddressListItem(
                     enabled = true,
-                    uri = "dynamic+relay://relays.syncthing.net/endpoint"
+                    uri = "dynamic+https://relays.syncthing.net/endpoint"
                 )
             )
         ))
@@ -388,11 +388,7 @@ class SettingViewModel(
     }
 
     fun listenRelayAddressValidator(address: String): Boolean {
-        return ( address.startsWith("relay://") || address.startsWith("dynamic+relay://") ) //TODO
-    }
-
-    fun discoveryAddressValidator(address: String): Boolean {
-        return (true) //TODO
+        return ( address.startsWith("relay://") || address.startsWith("dynamic+https://") )
     }
 
     fun ifStackFits(parent: UriProtocolStack, item: UriProtocolStack): Boolean {

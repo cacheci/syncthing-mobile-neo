@@ -682,7 +682,7 @@ internal fun SettingEditDiscoveryScreen(
                                         itemIndex != index
                                     }
                         },
-                        valueValidator = settingViewModel::discoveryAddressValidator
+                        valueValidator = { true }
                     )
                 }
             }

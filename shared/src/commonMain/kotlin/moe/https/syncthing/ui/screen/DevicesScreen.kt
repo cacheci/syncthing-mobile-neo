@@ -637,7 +637,7 @@ private fun countToColouredString( status: List<SyncthingDiscoveryStatus>? ): Pa
     return "$succeeded/$total 在线" to when (succeeded) {
         total -> StatusColor.OK.color
         0 -> StatusColor.FAIL.color
-        else -> MiuixTheme.colorScheme.primary
+        else -> StatusColor.PENDING.color
     }
 }
 
@@ -652,7 +652,7 @@ private fun countToColouredString( status: List<SyncthingListenAddress>? ): Pair
     return "$succeeded/$total 在线" to when (succeeded) {
         total -> StatusColor.OK.color
         0 -> StatusColor.FAIL.color
-        else -> StatusColor.DOWN.color
+        else -> StatusColor.PENDING.color
     }
 }
 

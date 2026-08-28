@@ -1,6 +1,7 @@
 package moe.https.syncthing
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -194,69 +195,75 @@ fun App(
             entry<AppRoute.Main> {
                 Scaffold(
                     topBar = {
-                        AdaptiveTopAppBar(
-                            title = currentPageMain.title,
-                            showTopAppBar = true,
-                            scrollBehavior = mainScrollBehavior,
-                            actions = {
-                                if (currentPageMain == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
-                                    IconButton(
-                                        onClick = {
-                                            editingDevice = null
-                                            pendingDeviceToAdd = null
-                                            navigateTo(AppSubPage.DEVICE_ADD)
-                                        },
-                                        content = {
-                                            Icon(
-                                                contentDescription = "添加设备",
-                                                imageVector = MiuixIcons.Add
-                                            )
-                                        },
-                                    )
-                                }
-                                if ( currentPageMain == AppPage.SETTINGS ) {
-                                    IconButton(
-                                        onClick = settingViewModel::save,
-                                        enabled = settingUiState.isFormValid && !settingUiState.isSaving,
-                                        content = {
-                                            Icon(
-                                                contentDescription = "保存",
-                                                imageVector = MiuixIcons.Send,
-                                                tint = if (settingUiState.isFormValid && !settingUiState.isSaving) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
-                                            )
-                                        }
-                                    )
-                                }
-                                if ( currentPageMain == AppPage.WEBUI && coreUiState.state == CoreState.RUNNING ) {
-                                    IconButton(
-                                        onClick = { webUiReloadToken += 1 },
-                                        content = {
-                                            Icon(
-                                                contentDescription = "刷新",
-                                                imageVector = MiuixIcons.Refresh,
-                                            )
-                                        },
-                                    )
-                                }
-                                if ( currentPageMain == AppPage.FOLDERS && coreUiState.state == CoreState.RUNNING ) {
-                                    IconButton(
-                                        onClick = {
-                                            editingFolder = null
-                                            pendingFolderToAdd = null
-                                            devicesViewModel.refresh()
-                                            navigateTo(AppSubPage.FOLDER_ADD)
-                                        },
-                                        content = {
-                                            Icon(
-                                                contentDescription = "添加文件夹",
-                                                imageVector = MiuixIcons.Add,
-                                            )
-                                        },
-                                    )
-                                }
-                            },
-                            isWideScreen = false,
-                        )
+                        AnimatedContent(
+                            targetState = currentPageMain,
+                            transitionSpec = { fadeIn(tween(durationMillis = 160)) togetherWith fadeOut(tween(durationMillis = 160)) },
+                            label = "MainTopAppBarTransition",
+                        ) { page ->
+                            AdaptiveTopAppBar(
+                                title = page.title,
+                                showTopAppBar = true,
+                                scrollBehavior = mainScrollBehavior,
+                                actions = {
+                                    if (page == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
+                                        IconButton(
+                                            onClick = {
+                                                editingDevice = null
+                                                pendingDeviceToAdd = null
+                                                navigateTo(AppSubPage.DEVICE_ADD)
+                                            },
+                                            content = {
+                                                Icon(
+                                                    contentDescription = "添加设备",
+                                                    imageVector = MiuixIcons.Add
+                                                )
+                                            },
+                                        )
+                                    }
+                                    if (page == AppPage.SETTINGS) {
+                                        IconButton(
+                                            onClick = settingViewModel::save,
+                                            enabled = settingUiState.isFormValid && !settingUiState.isSaving,
+                                            content = {
+                                                Icon(
+                                                    contentDescription = "保存",
+                                                    imageVector = MiuixIcons.Send,
+                                                    tint = if (settingUiState.isFormValid && !settingUiState.isSaving) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
+                                                )
+                                            }
+                                        )
+                                    }
+                                    if (page == AppPage.WEBUI && coreUiState.state == CoreState.RUNNING) {
+                                        IconButton(
+                                            onClick = { webUiReloadToken += 1 },
+                                            content = {
+                                                Icon(
+                                                    contentDescription = "刷新",
+                                                    imageVector = MiuixIcons.Refresh,
+                                                )
+                                            },
+                                        )
+                                    }
+                                    if (page == AppPage.FOLDERS && coreUiState.state == CoreState.RUNNING) {
+                                        IconButton(
+                                            onClick = {
+                                                editingFolder = null
+                                                pendingFolderToAdd = null
+                                                devicesViewModel.refresh()
+                                                navigateTo(AppSubPage.FOLDER_ADD)
+                                            },
+                                            content = {
+                                                Icon(
+                                                    contentDescription = "添加文件夹",
+                                                    imageVector = MiuixIcons.Add,
+                                                )
+                                            },
+                                        )
+                                    }
+                                },
+                                isWideScreen = false,
+                            )
+                        }
                     },
                     bottomBar = {
                         NavigationBar {

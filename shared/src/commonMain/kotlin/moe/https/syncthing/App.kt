@@ -132,8 +132,6 @@ fun App(
     LaunchedEffect(
         requestedPageMain,
         coreUiState.state,
-        settingUiState.errorMessage,
-        settingUiState.successMessage,
         devicesUiState.isLoading,
         foldersUiState.isLoading,
         settingUiState.isLoading,
@@ -153,7 +151,12 @@ fun App(
         if (coreUiState.state != CoreState.RUNNING) {
             settingViewModel.onCoreUnavailable()
         }
+    }
 
+    LaunchedEffect(
+        settingUiState.errorMessage,
+        settingUiState.successMessage,
+    ) {
         when {
             !settingUiState.errorMessage.isNullOrBlank() -> {
                 snackbarHostState.showSnackbar(
@@ -165,6 +168,7 @@ fun App(
                 snackbarHostState.showSnackbar(
                     "保存成功：${settingUiState.successMessage}",
                 )
+                settingViewModel.onSuccessMessageShown()
             }
         }
     }

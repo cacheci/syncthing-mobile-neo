@@ -111,6 +111,10 @@ class SettingViewModel(
         }
     }
 
+    fun onSuccessMessageShown() {
+        mutableUiState.update { it.copy(successMessage = null) }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             operationMutex.withLock {

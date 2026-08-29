@@ -403,16 +403,6 @@ internal fun AddFolderScreen(
                 .orEmpty(),
         )
     }
-    val numericValuesValid = listOf(
-        cleanoutDays,
-        keepVersions,
-        cleanupIntervalSeconds,
-        rescanIntervalSeconds,
-    ).all { value -> value.isBlank() || value.toIntOrNull()?.let { it >= 0 } == true }
-    val cleanupIntervalValid = (cleanupIntervalSeconds.toIntOrNull() ?: 3600) <= 31_536_000
-    val untrustedDevicePasswordsValid = remoteDevices
-        .filter { it.untrusted && it.id in selectedDeviceIds }
-        .all { device -> devicePasswords[device.id].orEmpty().isNotBlank() }
     val defaultPath = if (folderId.isBlank()) null else {
         defaultFolderPath(folderId.trim())
     }
@@ -427,11 +417,20 @@ internal fun AddFolderScreen(
             }
         }
     }
-    val canSubmit = folderId.trim().isNotBlank() &&
-        numericValuesValid &&
-        cleanupIntervalValid &&
-        untrustedDevicePasswordsValid &&
-        !isSubmitting
+    val canSubmit = (
+            (folderId.trim().isNotBlank()) &&
+            (listOf(
+                cleanoutDays,
+                keepVersions,
+                cleanupIntervalSeconds,
+                rescanIntervalSeconds,
+            ).all { value -> (value.toIntWithDefaultForEmpty(0))?.let{ it >= 0 } == true }) &&
+            (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600)?.let{ it <= 31_536_000 } == true) &&
+            (remoteDevices
+                .filter { it.untrusted && it.id in selectedDeviceIds }
+                .all { device -> devicePasswords[device.id].orEmpty().isNotBlank() }) &&
+            (!isSubmitting)
+    )
 
     var showEditorBottomSheet by remember { mutableStateOf(false) }
     var showStIgnoreHelp by remember { mutableStateOf(false) }
@@ -626,54 +625,73 @@ internal fun AddFolderScreen(
                                 animationSpec = tween(durationMillis = 300)
                             ),
                         ) {
-                            InputValueRow(
-                                label = "回收站保留时长（天）",
-                                value = cleanoutDays,
-                                valueLabel = "永久",
-                                allowEdit = !isSubmitting,
-                                onValueChange = { cleanoutDays = it },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            )
+                            Column {
+                                InputValueRow(
+                                    label = "回收站保留时长（天）",
+                                    value = cleanoutDays,
+                                    valueLabel = "永久",
+                                    allowEdit = !isSubmitting,
+                                    onValueChange = { cleanoutDays = it },
+                                    valueValidator = {
+                                        (cleanoutDays.toIntWithDefaultForEmpty(0))
+                                            ?.let{ it >= 0 } == true
+                                    },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                )
 
-                            InputValueRow(
-                                label = "历史版本路径",
-                                value = "",
-                                valueLabel = ".stversions",
-                                allowEdit = false,
-                                onValueChange = {  },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            ) // TODO: 历史版本路径
+                                InputValueRow(
+                                    label = "历史版本路径",
+                                    value = "",
+                                    valueLabel = ".stversions",
+                                    allowEdit = false,
+                                    onValueChange = {  },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                ) // TODO: 历史版本路径
 
-                            // 简易版本控制
-                            AnimatedVisibility(
-                                visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
-                                enter = expandVertically(
-                                    animationSpec = tween(durationMillis = 300)
-                                ),
-                                exit = shrinkVertically(
-                                    animationSpec = tween(durationMillis = 300)
-                                ),
-                            ) {
-                                Column {
-                                    InputValueRow(
-                                        label = "保留版本数量",
-                                        value = keepVersions,
-                                        valueLabel = "5",
-                                        allowEdit = !isSubmitting,
-                                        onValueChange = { keepVersions = it },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    )
+                                // 简易版本控制
+                                AnimatedVisibility(
+                                    visible = versioning == NewFolderConfiguration.Versioning.SIMPLE,
+                                    enter = expandVertically(
+                                        animationSpec = tween(durationMillis = 300)
+                                    ),
+                                    exit = shrinkVertically(
+                                        animationSpec = tween(durationMillis = 300)
+                                    ),
+                                ) {
+                                    Column {
+                                        InputValueRow(
+                                            label = "保留版本数量",
+                                            value = keepVersions,
+                                            valueLabel = "5",
+                                            allowEdit = !isSubmitting,
+                                            onValueChange = { keepVersions = it },
+                                            valueValidator = {
+                                                keepVersions.toIntWithDefaultForEmpty(5)
+                                                    ?.let{ it > 0 } == true
+                                            },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        )
+                                    }
                                 }
-                            }
 
-                            InputValueRow(
-                                label = "定期清除间隔（秒）",
-                                value = cleanupIntervalSeconds,
-                                valueLabel = "3600",
-                                allowEdit = !isSubmitting,
-                                onValueChange = { cleanupIntervalSeconds = it },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            )
+                                InputValueRow(
+                                    label = "定期清除间隔（秒）",
+                                    value = cleanupIntervalSeconds,
+                                    valueLabel = "3600",
+                                    allowEdit = !isSubmitting,
+                                    onValueChange = { cleanupIntervalSeconds = it },
+                                    valueValidator = {
+                                        (
+                                          (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600))
+                                              ?.let{ it >= 0 } == true
+                                        ) && (
+                                          (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600))
+                                              ?.let{ it <= 31_536_000 } == true
+                                        )
+                                    },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                )
+                            }
                         }
                     }
                 )
@@ -730,6 +748,7 @@ internal fun AddFolderScreen(
                             valueLabel = "3600",
                             allowEdit = !isSubmitting,
                             onValueChange = { rescanIntervalSeconds = it },
+                            valueValidator = { rescanIntervalSeconds.toIntWithDefaultForEmpty(3600)?.let{ it >= 0 } == true },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
 
@@ -744,30 +763,6 @@ internal fun AddFolderScreen(
                         )
                     }
 
-                )
-
-                if (!numericValuesValid || !cleanupIntervalValid || !untrustedDevicePasswordsValid) {
-                    Text(
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
-                        text = when {
-                            !cleanupIntervalValid -> "定期清除间隔不能超过一年。"
-                            !numericValuesValid -> "时间和数量设置必须是非负整数。"
-                            else -> "与不受信任设备共享时必须设置加密密码。"
-                        },
-                        color = MiuixTheme.colorScheme.error,
-                        style = MiuixTheme.textStyles.main,
-                    )
-                }
-
-                TextButton(
-                    text = if (isEditingFolder) "保存" else "添加",
-                    enabled = canSubmit,
-                    modifier = Modifier
-                        .padding(horizontal = 10.dp, vertical = 16.dp)
-                        .fillMaxWidth(),
-                    onClick = {
-
-                    },
                 )
             }
 
@@ -952,6 +947,7 @@ private fun AddFolderDevices(
                 label = "共享密码",
                 value = encryptionPassword,
                 onValueChange = onEncryptionPasswordChange,
+                valueValidator = { !(device.untrusted && encryptionPassword.isBlank()) },
                 valueLabel = "无密码",
                 allowEdit = !isSubmitting,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -991,4 +987,8 @@ private fun SyncthingFolder.typeName(): String = when (type) {
     "receiveonly" -> "仅接收"
     "receiveencrypted" -> "接收加密数据"
     else -> type.ifBlank { "未知" }
+}
+
+private fun String.toIntWithDefaultForEmpty( default: Int ): Int? {
+    return if ( isBlank() ) default else toIntOrNull()
 }

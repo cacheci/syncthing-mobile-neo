@@ -176,6 +176,7 @@ internal fun InputValueRow(
     valueLabel: String,
     value: String,
     onValueChange: ((String) -> Unit),
+    valueValidator: (String) -> Boolean = { true },
     singleLine: Boolean = true,
     allowEdit: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(),
@@ -188,6 +189,7 @@ internal fun InputValueRow(
         Text(
             text = label,
             modifier = Modifier.weight(0.5f),
+            color = if (valueValidator(value)) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.error,
             style = MiuixTheme.textStyles.main.copy(
                 fontWeight = FontWeight.Medium,
             )

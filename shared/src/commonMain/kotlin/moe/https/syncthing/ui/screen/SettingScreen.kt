@@ -1017,7 +1017,7 @@ internal fun SettingBackgroundRunningPage(
                         )
                         ArrowPreference(
                             title = "后台进程锁定",
-                            onClick = { showBackgroundLockOverlay = true }, //TODO
+                            onClick = { showBackgroundLockOverlay = true },
                         )
                     }
                 }

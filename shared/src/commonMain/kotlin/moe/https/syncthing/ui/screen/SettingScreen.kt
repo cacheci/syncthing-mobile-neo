@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,10 +63,14 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
@@ -85,6 +90,7 @@ internal fun SettingScreen(
     onEditingCores: () -> Unit,
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
+    onEditingBackgroundPermission: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
 ) {
     var developerModeVisible by remember { mutableStateOf(developerModeEnabled) }
@@ -155,6 +161,7 @@ internal fun SettingScreen(
             onEditingStoragePermission = onEditingStoragePermission,
             onEditingCores = onEditingCores,
             onRedirectingToDeveloperPage = onRedirectingToDeveloperPage,
+            onEditingBackgroundPermission = onEditingBackgroundPermission,
         )
 
         InfoSwitchCard( title = "关于" ) {
@@ -189,6 +196,7 @@ private fun SettingForm(
     onEditingStoragePermission: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
     onEditingCores: () -> Unit,
+    onEditingBackgroundPermission: () -> Unit,
     settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
@@ -512,8 +520,7 @@ private fun SettingForm(
         )
         ArrowPreference(
             title = "后台运行权限",
-            onClick = null,
-            enabled = false, // TODO
+            onClick = onEditingBackgroundPermission,
         )
     }
 
@@ -928,4 +935,120 @@ internal fun SettingCoreSelectScreen(
             }
         }
     }
+}
+
+@Composable
+internal fun SettingBackgroundRunningPage(
+    batteryOptimizationExempt: Boolean,
+    onBatteryOptimizationRequest: () -> Unit,
+    onOpenAppDetailsSettings: () -> Unit,
+    navigateBack: () -> Unit,
+) {
+    var selectedTabIndex by remember { mutableStateOf(BackgroundRunningSystemType.ANDROID) }
+    val scrollBehavior = MiuixScrollBehavior()
+
+    Scaffold(
+        topBar = {
+            AdaptiveTopAppBar(
+                title = "后台运行",
+                showTopAppBar = true,
+                isWideScreen = false,
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = navigateBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Back,
+                            contentDescription = "返回",
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+        ) {
+            var showBackgroundLockOverlay by rememberSaveable { mutableStateOf(false) }
+
+            TabRow(
+                tabs = listOf("Android", "小米"),
+                selectedTabIndex = selectedTabIndex.ordinal,
+                onTabSelected = { index ->
+                    selectedTabIndex = BackgroundRunningSystemType.entries[index]
+                },
+                modifier = Modifier.padding(vertical = 20.dp)
+            )
+
+            when (selectedTabIndex) {
+                BackgroundRunningSystemType.ANDROID -> {
+                    MessageCard(
+                        title = "忽略电池优化",
+                        message = "为确保 Syncthing 在后台持续运行，建议启用忽略电池优化。" +
+                                "若未忽略电池优化，则应用后台运行时可能会被Android系统终止。"
+                    ) {
+                        InfoSwitch(
+                            title = "允许忽略电池优化",
+                            checked = batteryOptimizationExempt,
+                            onCheckedChange = { onBatteryOptimizationRequest() },
+                            enabled = true,
+                        )
+                    }
+                }
+
+                BackgroundRunningSystemType.XIAOMI -> {
+                    MessageCard(
+                        title = "忽略电池优化",
+                        message = "为确保 Syncthing 在后台持续运行，建议启用以下几项设置。"
+                    ) {
+                        InfoSwitch(
+                            title = "允许忽略电池优化",
+                            checked = batteryOptimizationExempt,
+                            onCheckedChange = { onBatteryOptimizationRequest() },
+                            enabled = true,
+                        )
+                        ArrowPreference(
+                            title = "允许应用自启动",
+                            onClick = onOpenAppDetailsSettings,
+                        )
+                        ArrowPreference(
+                            title = "后台进程锁定",
+                            onClick = { showBackgroundLockOverlay = true }, //TODO
+                        )
+                    }
+                }
+            }
+
+            OverlayDialog(
+                title = "后台进程锁定",
+                show = showBackgroundLockOverlay,
+                onDismissRequest = { showBackgroundLockOverlay = false },
+                onDismissFinished = { showBackgroundLockOverlay = false },
+            ) {
+                Column ( verticalArrangement = Arrangement.spacedBy(20.dp) ) {
+                    Text("从屏幕底部向上滑动，或点击屏幕底部的最近任务键，找到本应用并长按，点击🔒后出现锁定标识，即表示锁定成功。")
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "确定",
+                        onClick = { showBackgroundLockOverlay = false },
+                        colors = TextButtonColors(
+                            color = MiuixTheme.colorScheme.primary,
+                            textColor = MiuixTheme.colorScheme.onPrimary,
+                            disabledColor = MiuixTheme.colorScheme.primary,
+                            disabledTextColor = MiuixTheme.colorScheme.disabledOnPrimary,
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class BackgroundRunningSystemType {
+    ANDROID,
+    XIAOMI,
 }

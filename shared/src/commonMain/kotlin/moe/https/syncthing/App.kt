@@ -38,16 +38,17 @@ import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
+import moe.https.syncthing.ui.screen.SettingBackgroundRunningPage
 import moe.https.syncthing.ui.screen.SettingCoreSelectScreen
 import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
 import moe.https.syncthing.ui.screen.SettingEditListenScreen
 import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.ui.screen.SettingStoragePermissionPage
 import moe.https.syncthing.ui.screen.WebviewScreen
-import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
+import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -89,6 +90,9 @@ fun App(
     onScanQrCode: () -> Unit,
     publicStorageAccessGranted: Boolean,
     onRequestPublicStorageAccess: () -> Unit,
+    batteryOptimizationExempt: Boolean,
+    onBatteryOptimizationRequest: () -> Unit,
+    onOpenAppDetailsSettings: () -> Unit,
     scannedDeviceId: String,
     webUiUrlProvider: () -> String,
     webView: @Composable (
@@ -400,6 +404,9 @@ fun App(
                                     onChangeToLicence = {
                                         navigateTo(AppSubPage.LICENCE)
                                     },
+                                    onEditingBackgroundPermission = {
+                                        navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING)
+                                    },
                                     onRedirectingToDeveloperPage = {
                                         navigateTo(AppSubPage.DEV)
                                     }
@@ -533,6 +540,15 @@ fun App(
                         )
                     }
 
+                    AppSubPage.SETTINGS_BACKGROUND_RUNNING -> {
+                        SettingBackgroundRunningPage(
+                            batteryOptimizationExempt = batteryOptimizationExempt,
+                            onBatteryOptimizationRequest = onBatteryOptimizationRequest,
+                            onOpenAppDetailsSettings = onOpenAppDetailsSettings,
+                            navigateBack = navigateBack,
+                        )
+                    }
+
                     else -> {
                         Scaffold(
                             topBar = {
@@ -632,5 +648,6 @@ internal enum class AppSubPage(val title: String) {
     SETTINGS_DISCOVERY_EDIT("发现服务器"),
     SETTINGS_STORAGE_PERMISSION("存储权限"),
     SETTINGS_CORE_MANAGE("核心管理"),
+    SETTINGS_BACKGROUND_RUNNING("后台运行"),
     DEV("开发者设置"),
 }

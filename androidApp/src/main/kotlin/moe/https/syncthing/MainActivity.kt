@@ -1,11 +1,13 @@
 package moe.https.syncthing
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,25 +18,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.g00fy2.quickie.QRResult
 import io.github.g00fy2.quickie.ScanQRCode
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
 import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.model.CoreUiEffect
-import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
+import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
-import androidx.core.net.toUri
+import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
     private var scannedDeviceId by mutableStateOf("")
     private var publicStorageAccessGranted by mutableStateOf(false)
+    private var batteryOptimizationExempt by mutableStateOf(false)
+    private var waitingBatteryOptimizationResult = false
 
     private val scanQrCodeLauncher = registerForActivityResult(ScanQRCode()) { result ->
         if (result is QRResult.QRSuccess) {
@@ -90,9 +96,14 @@ class MainActivity : ComponentActivity() {
         publicStorageAccessGranted = hasPublicStorageAccess()
     }
 
+    private val backgroundSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         publicStorageAccessGranted = hasPublicStorageAccess()
+        batteryOptimizationExempt = isBatteryOptimizationExempt()
         enableEdgeToEdge()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -129,6 +140,9 @@ class MainActivity : ComponentActivity() {
                 },
                 publicStorageAccessGranted = publicStorageAccessGranted,
                 onRequestPublicStorageAccess = ::requestPublicStorageAccess,
+                batteryOptimizationExempt = batteryOptimizationExempt,
+                onBatteryOptimizationRequest = ::batteryOptimizationExemption,
+                onOpenAppDetailsSettings = ::openAppDetailsSettings,
                 scannedDeviceId = scannedDeviceId,
                 webUiUrlProvider = applicationState.coreRuntime::guiUrl,
                 webView = { url, reloadToken, onScroll, modifier ->
@@ -149,6 +163,44 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         publicStorageAccessGranted = hasPublicStorageAccess()
+        batteryOptimizationExempt = isBatteryOptimizationExempt()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus || !waitingBatteryOptimizationResult) return
+
+        waitingBatteryOptimizationResult = false
+        lifecycleScope.launch {
+            delay(500.milliseconds)
+            batteryOptimizationExempt = isBatteryOptimizationExempt()
+            delay(500.milliseconds)
+            batteryOptimizationExempt = isBatteryOptimizationExempt()
+        }
+    }
+
+    private fun isBatteryOptimizationExempt(): Boolean =
+        getSystemService(PowerManager::class.java)
+            .isIgnoringBatteryOptimizations(packageName)
+
+    @SuppressLint("BatteryLife")
+    private fun batteryOptimizationExemption() {
+        waitingBatteryOptimizationResult = true
+        backgroundSettingsLauncher.launch(
+            Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                "package:$packageName".toUri(),
+            ),
+        )
+    }
+
+    private fun openAppDetailsSettings() {
+        backgroundSettingsLauncher.launch(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                "package:$packageName".toUri(),
+            ),
+        )
     }
 
     private fun hasPublicStorageAccess(): Boolean =

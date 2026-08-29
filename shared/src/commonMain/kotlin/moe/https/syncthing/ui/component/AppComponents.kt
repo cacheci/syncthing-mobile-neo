@@ -239,13 +239,14 @@ internal fun InfoSwitchCard(
 
 @Composable
 internal fun MessageCard(
+    modifier: Modifier = Modifier,
     title: String,
     message: String,
     isError: Boolean = false,
     content: @Composable () -> Unit = {},
 ) {
     Card(
-        modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth(),
+        modifier = modifier.padding(bottom = 12.dp).fillMaxWidth(),
         colors = if (isError) {
             CardDefaults.defaultColors(
                 color = MiuixTheme.colorScheme.errorContainer,

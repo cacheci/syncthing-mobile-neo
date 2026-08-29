@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 onScanQrCode = {
                     scanQrCodeLauncher.launch(null)
                 },
+                publicStorageAccessGranted = publicStorageAccessGranted,
                 onRequestPublicStorageAccess = ::requestPublicStorageAccess,
                 scannedDeviceId = scannedDeviceId,
                 webUiUrlProvider = applicationState.coreRuntime::guiUrl,

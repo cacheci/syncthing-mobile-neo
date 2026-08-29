@@ -87,6 +87,7 @@ fun App(
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
     onScanQrCode: () -> Unit,
+    publicStorageAccessGranted: Boolean,
     onRequestPublicStorageAccess: () -> Unit,
     scannedDeviceId: String,
     webUiUrlProvider: () -> String,
@@ -108,6 +109,8 @@ fun App(
     var pendingDeviceToAdd by remember { mutableStateOf<SyncthingPendingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
     var pendingFolderToAdd by remember { mutableStateOf<SyncthingPendingFolder?>(null) }
+    var selectedFolderPath by remember { mutableStateOf<String?>(null) }
+    var folderPathChooserFolderId by remember { mutableStateOf<String?>(null) }
     var webUiReloadToken by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val plainPageSnackbarHostState = remember { SnackbarHostState() }
@@ -253,6 +256,8 @@ fun App(
                                             onClick = {
                                                 editingFolder = null
                                                 pendingFolderToAdd = null
+                                                selectedFolderPath = null
+                                                folderPathChooserFolderId = null
                                                 devicesViewModel.refresh()
                                                 navigateTo(AppSubPage.FOLDER_ADD)
                                             },
@@ -354,6 +359,8 @@ fun App(
                                     onAddPendingFolder = { folder ->
                                         editingFolder = null
                                         pendingFolderToAdd = folder
+                                        selectedFolderPath = null
+                                        folderPathChooserFolderId = null
                                         devicesViewModel.refresh()
                                         navigateTo(AppSubPage.FOLDER_ADD)
                                     },
@@ -362,6 +369,8 @@ fun App(
                                     onEditFolder = { folder ->
                                         editingFolder = folder
                                         pendingFolderToAdd = null
+                                        selectedFolderPath = folder.path
+                                        folderPathChooserFolderId = null
                                         devicesViewModel.refresh()
                                         navigateTo(AppSubPage.FOLDER_ADD)
                                     },
@@ -376,6 +385,7 @@ fun App(
                                         navigateTo(AppSubPage.ABOUT)
                                     },
                                     onEditingStoragePermission = {
+                                        folderPathChooserFolderId = null
                                         navigateTo(AppSubPage.SETTINGS_STORAGE_PERMISSION)
                                     },
                                     onEditingListenAddresses = {
@@ -435,6 +445,10 @@ fun App(
                     if (currentPagePlain == AppSubPage.FOLDER_ADD) {
                         editingFolder = null
                         pendingFolderToAdd = null
+                        selectedFolderPath = null
+                    }
+                    if (currentPagePlain == AppSubPage.SETTINGS_STORAGE_PERMISSION) {
+                        folderPathChooserFolderId = null
                     }
                     navController.pop()
                     Unit
@@ -450,7 +464,11 @@ fun App(
                     }
                     AppSubPage.SETTINGS_STORAGE_PERMISSION -> {
                         SettingStoragePermissionPage(
+                            granted = publicStorageAccessGranted,
                             onRequestPermission = onRequestPublicStorageAccess,
+                            folderId = folderPathChooserFolderId,
+                            selectedFolderPath = selectedFolderPath,
+                            onFolderPathSelected = { selectedFolderPath = it },
                             navigateBack = navigateBack,
                         )
                     }
@@ -481,6 +499,7 @@ fun App(
                             devices = devicesUiState.devices,
                             existingFolder = editingFolder,
                             pendingFolder = pendingFolderToAdd,
+                            selectedFolderPath = selectedFolderPath,
                             onConfirm = { configuration ->
                                 if (editingFolder == null) foldersViewModel.addFolder(
                                     configuration
@@ -488,7 +507,12 @@ fun App(
                                 else foldersViewModel.updateFolder(configuration)
                                 editingFolder = null
                                 pendingFolderToAdd = null
+                                selectedFolderPath = null
                                 navigateBack()
+                            },
+                            onRedirectToPathChooserPage = { folderId ->
+                                folderPathChooserFolderId = folderId
+                                navigateTo(AppSubPage.SETTINGS_STORAGE_PERMISSION)
                             },
                             navigateBack = navigateBack,
                         )

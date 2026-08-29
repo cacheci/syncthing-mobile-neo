@@ -35,7 +35,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -51,8 +50,6 @@ import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.core.defaultFolderPath
-import moe.https.syncthing.platform.FolderPickerResult
-import moe.https.syncthing.platform.rememberFolderPicker
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.InputValueRow
@@ -334,7 +331,9 @@ internal fun AddFolderScreen(
     devices: List<SyncthingDevice>,
     existingFolder: SyncthingFolder? = null,
     pendingFolder: SyncthingPendingFolder? = null,
+    selectedFolderPath: String?,
     onConfirm: (NewFolderConfiguration) -> Unit,
+    onRedirectToPathChooserPage: (folderId: String) -> Unit,
     navigateBack: () -> Unit,
 ) {
     val isEditingFolder = (existingFolder != null)
@@ -346,10 +345,6 @@ internal fun AddFolderScreen(
     var folderId by remember(existingFolder, pendingFolder) {
         mutableStateOf(existingFolder?.id ?: pendingFolder?.id.orEmpty())
     }
-    var selectedFolderPath by remember(existingFolder) {
-        mutableStateOf(existingFolder?.path)
-    }
-    var folderPickerError by remember(existingFolder) { mutableStateOf<String?>(null) }
     var versioning by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioning ?: NewFolderConfiguration.Versioning.NONE)
     }
@@ -407,16 +402,6 @@ internal fun AddFolderScreen(
         defaultFolderPath(folderId.trim())
     }
     val displayedFolderPath = selectedFolderPath ?: defaultPath
-    val openFolderPicker = rememberFolderPicker { result ->
-        when (result) {
-            FolderPickerResult.Cancelled -> Unit
-            is FolderPickerResult.Error -> folderPickerError = result.message
-            is FolderPickerResult.Selected -> {
-                selectedFolderPath = result.path
-                folderPickerError = null
-            }
-        }
-    }
     val canSubmit = (
             (folderId.trim().isNotBlank()) &&
             (listOf(
@@ -517,11 +502,6 @@ internal fun AddFolderScreen(
                     scrollBehavior.nestedScrollConnection,
                 )
         ) {
-            LaunchedEffect(folderPickerError) {
-                folderPickerError?.let { snackbarHostState.showSnackbar(it) }
-                folderPickerError = null
-            }
-
             Column(
                 modifier = modifier
                     .fillMaxSize()
@@ -559,7 +539,9 @@ internal fun AddFolderScreen(
                         ArrowPreference(
                             title = "文件夹位置",
                             summary = displayedFolderPath,
-                            onClick = openFolderPicker,
+                            onClick = {
+                                onRedirectToPathChooserPage(folderId.trim())
+                            },
                             enabled = !isSubmitting,
                         )
                     }

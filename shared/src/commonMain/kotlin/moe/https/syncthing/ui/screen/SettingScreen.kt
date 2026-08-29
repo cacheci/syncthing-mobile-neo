@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,11 +35,14 @@ import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreAvailability
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
+import moe.https.syncthing.core.defaultFolderPath
+import moe.https.syncthing.platform.FolderPickerResult
+import moe.https.syncthing.platform.rememberFolderPicker
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CheckableInputValueRow
-import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.component.TextWithOptionField
@@ -64,9 +68,9 @@ import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlin.collections.plus
 
 @Composable
 internal fun SettingScreen(
@@ -750,11 +754,42 @@ internal fun SettingEditDiscoveryScreen(
 
 @Composable
 internal fun SettingStoragePermissionPage(
+    granted: Boolean,
     onRequestPermission: () -> Unit,
+    folderId: String? = null,
+    selectedFolderPath: String? = null,
+    onFolderPathSelected: ((String?) -> Unit)? = null,
     navigateBack: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
+    val defaultPath = folderId?.let(::defaultFolderPath)
+    var chosenFolderPath by remember(folderId, selectedFolderPath) {
+        mutableStateOf(selectedFolderPath?.takeUnless { it == defaultPath })
+    }
+    var selectedFolderType by remember(folderId, selectedFolderPath) {
+        mutableIntStateOf(
+            if (selectedFolderPath == null || selectedFolderPath == defaultPath) 0 else 1,
+        )
+    }
+    var folderPickerError by remember { mutableStateOf<String?>(null) }
+    val openFolderPicker = rememberFolderPicker { result ->
+        when (result) {
+            FolderPickerResult.Cancelled -> Unit
+            is FolderPickerResult.Error -> folderPickerError = result.message
+            is FolderPickerResult.Selected -> {
+                chosenFolderPath = result.path
+                selectedFolderType = 1
+                folderPickerError = null
+                onFolderPathSelected?.invoke(result.path)
+            }
+        }
+    }
+
+    LaunchedEffect(folderPickerError) {
+        folderPickerError?.let { snackbarHostState.showSnackbar(it) }
+        folderPickerError = null
+    }
 
     Scaffold(
         topBar = { AdaptiveTopAppBar(
@@ -786,17 +821,46 @@ internal fun SettingStoragePermissionPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(horizontal = 20.dp),
             ) {
-                MessageCard(
-                    title = "公共目录访问权限",
-                    message = "若希望同步公有存储中的文件夹，请启用公共目录访问权限。"
-                ) {
-                    ArrowPreference(
-                        title = "授权公共目录访问权限",
-                        onClick = onRequestPermission,
-                    )
+                if (!granted || (folderId == null)) {
+                    MessageCard(
+                        title = "公共目录访问权限",
+                        message = "若希望同步公有存储中的文件夹，请启用公共目录访问权限。",
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    ) {
+                        InfoSwitch(
+                            title = "公共目录访问权限",
+                            checked = granted,
+                            onCheckedChange = { onRequestPermission() },
+                            enabled = true,
+                        )
+                    }
+                }
+
+                if (folderId != null && onFolderPathSelected != null) {
+                    InfoSwitchCard(
+                        title = "选择路径"
+                    ) {
+                        RadioButtonPreference(
+                            title = "默认路径",
+                            summary = defaultPath,
+                            selected = selectedFolderType == 0,
+                            onClick = {
+                                selectedFolderType = 0
+                                chosenFolderPath = null
+                                onFolderPathSelected.invoke(null)
+                            },
+                        )
+
+                        RadioButtonPreference(
+                            title = "外部路径",
+                            enabled = granted,
+                            summary = chosenFolderPath,
+                            selected = selectedFolderType == 1,
+                            onClick = openFolderPicker,
+                        )
+                    }
                 }
             }
         }

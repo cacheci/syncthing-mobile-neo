@@ -131,8 +131,11 @@ class MainActivity : ComponentActivity() {
                 scannedDeviceId = scannedDeviceId,
                 webUiUrlProvider = applicationState.coreRuntime::guiUrl,
                 webView = { url, reloadToken, onScroll, modifier ->
+                    val credentials = applicationState.coreRuntime.guiCredentials()
                     AndroidSystemWebView(
                         url = url,
+                        username = credentials?.first.orEmpty(),
+                        password = credentials?.second.orEmpty(),
                         reloadToken = reloadToken,
                         onScroll = onScroll,
                         modifier = modifier,

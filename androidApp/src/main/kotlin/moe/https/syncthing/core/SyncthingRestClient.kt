@@ -1,5 +1,6 @@
 package moe.https.syncthing.core
 
+import at.favre.lib.crypto.bcrypt.BCrypt
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -446,6 +447,7 @@ internal class SyncthingRestClient(
     fun updateSetting(
         configuration: SettingConfiguration,
         localDeviceId: String,
+        managedGuiPassword: String,
     ): SettingSaveResult {
         val options = request("/rest/config/options")
             .put(
@@ -485,26 +487,27 @@ internal class SyncthingRestClient(
         val currentGuiAddress = gui.optString("address")
         val currentGuiUser = gui.optString("user")
         val currentGuiTheme = gui.optString("theme")
-        val currentGuiPasswordConfigured = gui.optString("password").isNotBlank()
+        val currentGuiPassword = gui.optString("password")
+        val currentGuiPasswordMatches = configuration.guiAuthenticationEnabled &&
+            verifyPassword(managedGuiPassword, currentGuiPassword)
         val desiredGuiAddress = formatGuiAddress(configuration.guiListenAddress, configuration.guiPort)
         val desiredGuiUser = if (configuration.guiAuthenticationEnabled) configuration.guiUser else ""
+        val desiredBasicAuthPrompt = configuration.guiAuthenticationEnabled
         val guiChanged = currentGuiAddress != desiredGuiAddress ||
             currentGuiUser != desiredGuiUser ||
             currentGuiTheme != configuration.guiTheme.apiValue ||
-            currentGuiPasswordConfigured != configuration.guiAuthenticationEnabled ||
-            configuration.newGuiPassword.isNotBlank()
+            (configuration.guiAuthenticationEnabled && !currentGuiPasswordMatches) ||
+            (!configuration.guiAuthenticationEnabled && currentGuiPassword.isNotBlank()) ||
+            gui.optBoolean("sendBasicAuthPrompt", false) != desiredBasicAuthPrompt
         gui
             .put("address", desiredGuiAddress)
-            .put(
-                "user",
-                desiredGuiUser,
-            )
+            .put("user", desiredGuiUser)
             .put("theme", configuration.guiTheme.apiValue)
-        when {
-            !configuration.guiAuthenticationEnabled -> gui.put("password", "")
-            configuration.newGuiPassword.isNotBlank() -> {
-                gui.put("password", configuration.newGuiPassword)
-            }
+            .put("sendBasicAuthPrompt", desiredBasicAuthPrompt)
+        if (!configuration.guiAuthenticationEnabled) {
+            gui.put("password", "")
+        } else if (!currentGuiPasswordMatches) {
+            gui.put("password", managedGuiPassword)
         }
 
         requestBody(
@@ -515,19 +518,52 @@ internal class SyncthingRestClient(
         val optionsRestartRequired = request("/rest/config/restart-required")
             .optBoolean("requiresRestart", false)
         requestBody(
-            path = "/rest/config/gui",
-            method = "PUT",
-            body = gui.toString(),
-        )
-        requestBody(
             path = "/rest/config/devices/$localDeviceId",
             method = "PUT",
             body = localDevice.toString(),
+        )
+        requestBody(
+            path = "/rest/config/gui",
+            method = "PUT",
+            body = gui.toString(),
         )
         return SettingSaveResult(
             restartRequired = optionsRestartRequired || guiChanged,
             accessMode = SettingAccessMode.REST,
         )
+    }
+
+    fun ensureGuiAuthentication(
+        enabled: Boolean,
+        username: String,
+        password: String,
+    ): Boolean {
+        val gui = request("/rest/config/gui")
+        val currentUsername = gui.optString("user")
+        val currentPassword = gui.optString("password")
+        val passwordMatches = enabled && verifyPassword(password, currentPassword)
+        val currentPromptEnabled = gui.optBoolean("sendBasicAuthPrompt", false)
+        val changed = if (enabled) {
+            currentUsername != username || !passwordMatches || !currentPromptEnabled
+        } else {
+            currentUsername.isNotBlank() || currentPassword.isNotBlank() || currentPromptEnabled
+        }
+        if (!changed) return false
+
+        gui
+            .put("user", if (enabled) username else "")
+            .put("sendBasicAuthPrompt", enabled)
+        if (!enabled) {
+            gui.put("password", "")
+        } else if (!passwordMatches) {
+            gui.put("password", password)
+        }
+        requestBody(
+            path = "/rest/config/gui",
+            method = "PUT",
+            body = gui.toString(),
+        )
+        return true
     }
 
     fun shutdown() {
@@ -537,6 +573,18 @@ internal class SyncthingRestClient(
     private fun request(path: String, method: String = "GET"): JSONObject {
         val body = requestBody(path, method)
         return if (body.isBlank()) JSONObject() else JSONObject(body)
+    }
+
+    private fun verifyPassword(password: String, passwordHash: String): Boolean {
+        if (passwordHash.isBlank()) return false
+        val passwordChars = password.toCharArray()
+        return try {
+            runCatching {
+                BCrypt.verifyer().verify(passwordChars, passwordHash.toCharArray()).verified
+            }.getOrDefault(false)
+        } finally {
+            passwordChars.fill('\u0000')
+        }
     }
 
     private fun requestArray(path: String): JSONArray = JSONArray(requestBody(path))

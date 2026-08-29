@@ -51,6 +51,10 @@ class CoreRuntime(
     private val homeDirectory = File(applicationContext.filesDir, SYNCTHING_HOME_DIRECTORY)
     private val configFile = SyncthingConfigFile(File(homeDirectory, CONFIG_FILE_NAME))
     @Volatile
+    private var managedGuiCredentials = loadOrCreateGuiCredentials()
+    @Volatile
+    private var managedGuiAuthenticationEnabled = loadGuiAuthenticationEnabled()
+    @Volatile
     private var activeGuiHost = loadProtocolStack().guiListenAddress
     @Volatile
     private var activeGuiPort = initialGuiPort()
@@ -148,6 +152,13 @@ class CoreRuntime(
     }
 
     fun guiUrl(): String = formatGuiBaseUrl(activeGuiHost, activeGuiPort)
+
+    fun guiCredentials(): Pair<String, String>? =
+        if (managedGuiAuthenticationEnabled) {
+            managedGuiCredentials.username to managedGuiCredentials.password
+        } else {
+            null
+        }
 
     override suspend fun loadDevices(): DevicesSnapshot = withContext(Dispatchers.IO) {
         val status = restClient.status()
@@ -319,6 +330,10 @@ class CoreRuntime(
         snapshot.copy(
             configuration = snapshot.configuration.copy(
                 guiListenAddress = loadProtocolStack().guiListenAddress,
+                guiAuthenticationEnabled = managedGuiAuthenticationEnabled,
+                guiUser = managedGuiCredentials.username,
+                guiPasswordConfigured = true,
+                newGuiPassword = "",
             ),
         )
     }
@@ -344,21 +359,40 @@ class CoreRuntime(
         configuration: SettingConfiguration,
     ): SettingSaveResult = withContext(Dispatchers.IO) {
         processMutex.withLock {
+            val desiredGuiAuthenticationEnabled = configuration.guiAuthenticationEnabled
+            val desiredGuiCredentials = ManagedGuiCredentials(
+                username = configuration.guiUser.trim().ifBlank { managedGuiCredentials.username },
+                password = configuration.newGuiPassword.takeIf(String::isNotBlank)
+                    ?: managedGuiCredentials.password,
+            )
             val effectiveConfiguration = configuration.copy(
                 guiListenAddress = loadProtocolStack().guiListenAddress,
+                guiAuthenticationEnabled = desiredGuiAuthenticationEnabled,
+                guiUser = desiredGuiCredentials.username,
+                guiPasswordConfigured = desiredGuiAuthenticationEnabled,
+                newGuiPassword = "",
             )
             val previousGuiPort = activeGuiPort
             val previousPortConflictBehavior = loadGuiPortConflictBehavior()
             val savedResult = when {
                 restClient.ping() -> {
                     val localDeviceId = requireLocalDeviceId()
-                    restClient.updateSetting(effectiveConfiguration, localDeviceId)
+                    restClient.updateSetting(
+                        configuration = effectiveConfiguration,
+                        localDeviceId = localDeviceId,
+                        managedGuiPassword = desiredGuiCredentials.password,
+                    )
                 }
                 process?.isAlive == true || currentPid() != null -> {
                     throw IOException("Syncthing 核心进程仍在运行，不能同时写入配置文件")
                 }
                 configFile.exists -> {
                     configFile.write(effectiveConfiguration, rememberedLocalDeviceId())
+                    configFile.ensureGuiAuthentication(
+                        enabled = desiredGuiAuthenticationEnabled,
+                        username = desiredGuiCredentials.username,
+                        password = desiredGuiCredentials.password,
+                    )
                     SettingSaveResult(
                         restartRequired = true,
                         accessMode = SettingAccessMode.CONFIG_FILE,
@@ -369,6 +403,10 @@ class CoreRuntime(
                     accessMode = SettingAccessMode.STARTUP_ONLY,
                 )
             }
+            saveGuiAuthentication(
+                enabled = desiredGuiAuthenticationEnabled,
+                credentials = desiredGuiCredentials,
+            )
             val result = savedResult.copy(
                 restartRequired = savedResult.restartRequired ||
                     effectiveConfiguration.guiPortConflictBehavior != previousPortConflictBehavior,
@@ -476,6 +514,11 @@ class CoreRuntime(
         }
 
         if (restClient.ping()) {
+            restClient.ensureGuiAuthentication(
+                enabled = managedGuiAuthenticationEnabled,
+                username = managedGuiCredentials.username,
+                password = managedGuiCredentials.password,
+            )
             mutableSnapshot.update {
                 it.copy(
                     state = CoreState.RUNNING,
@@ -640,6 +683,7 @@ class CoreRuntime(
             loadProtocolStack().guiListenAddress,
             configuredGuiPort(portConflictBehavior),
         )
+        ensureManagedGuiAuthentication(executable, configuredGuiAddress, logs)
         val guiAddress = resolveLaunchGuiAddress(configuredGuiAddress, portConflictBehavior)
         activeGuiHost = parseGuiHost(guiAddress)
         activeGuiPort = parseGuiPort(guiAddress)
@@ -668,6 +712,46 @@ class CoreRuntime(
             redirectErrorStream(true)
             redirectOutput(ProcessBuilder.Redirect.to(File(logs, "launcher.log")))
         }.start()
+    }
+
+    private fun ensureManagedGuiAuthentication(
+        executable: CoreExecutable,
+        configuredGuiAddress: String,
+        logs: File,
+    ) {
+        if (!configFile.exists) {
+            val arguments = listOf(
+                executable.file.absolutePath,
+                "generate",
+                "--home=${homeDirectory.absolutePath}",
+                "--gui-user=${managedGuiCredentials.username}",
+                "--gui-password=-",
+                "--no-port-probing",
+            )
+            val generateProcess = ProcessBuilder(arguments).apply {
+                environment()["HOME"] = applicationContext.filesDir.absolutePath
+                redirectErrorStream(true)
+                redirectOutput(ProcessBuilder.Redirect.to(File(logs, "generate.log")))
+            }.start()
+            generateProcess.outputStream.bufferedWriter().use { writer ->
+                writer.write(managedGuiCredentials.password)
+                writer.newLine()
+            }
+            if (!generateProcess.waitFor(GENERATE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                generateProcess.destroyForcibly()
+                throw IOException("生成 Syncthing 初始配置超时")
+            }
+            val exitCode = generateProcess.exitValue()
+            if (exitCode != 0 || !configFile.exists) {
+                throw IOException("生成 Syncthing 初始配置失败，退出码 $exitCode")
+            }
+        }
+        configFile.ensureGuiAuthentication(
+            enabled = managedGuiAuthenticationEnabled,
+            username = managedGuiCredentials.username,
+            password = managedGuiCredentials.password,
+            guiAddress = configuredGuiAddress,
+        )
     }
 
     private suspend fun waitForApi(currentProcess: Process): ApiWaitResult {
@@ -838,6 +922,59 @@ class CoreRuntime(
         val key = UUID.randomUUID().toString().replace("-", "")
         preferences.edit(commit = true) { putString(KEY_API_KEY, key) }
         return key
+    }
+
+    private fun loadOrCreateGuiCredentials(): ManagedGuiCredentials {
+        val storedUsername = preferences.getString(KEY_GUI_USERNAME, null)
+            ?.takeIf(String::isNotBlank)
+        val storedPassword = preferences.getString(KEY_GUI_PASSWORD, null)
+            ?.takeIf(String::isNotBlank)
+        if (storedUsername != null && storedPassword != null) {
+            return ManagedGuiCredentials(storedUsername, storedPassword)
+        }
+
+        val credentials = ManagedGuiCredentials(
+            username = "app-${UUID.randomUUID().toString().replace("-", "").take(16)}",
+            password = buildString {
+                repeat(2) { append(UUID.randomUUID().toString().replace("-", "")) }
+            },
+        )
+        preferences.edit(commit = true) {
+            putString(KEY_GUI_USERNAME, credentials.username)
+            putString(KEY_GUI_PASSWORD, credentials.password)
+        }
+        return credentials
+    }
+
+    private fun loadGuiAuthenticationEnabled(): Boolean {
+        if (preferences.contains(KEY_GUI_AUTHENTICATION_ENABLED)) {
+            return preferences.getBoolean(KEY_GUI_AUTHENTICATION_ENABLED, true)
+        }
+        val enabled = if (configFile.exists) {
+            runCatching {
+                configFile.read(loadGuiPortConflictBehavior(), rememberedLocalDeviceId())
+                    .guiAuthenticationEnabled
+            }.getOrDefault(true)
+        } else {
+            true
+        }
+        preferences.edit(commit = true) {
+            putBoolean(KEY_GUI_AUTHENTICATION_ENABLED, enabled)
+        }
+        return enabled
+    }
+
+    private fun saveGuiAuthentication(
+        enabled: Boolean,
+        credentials: ManagedGuiCredentials,
+    ) {
+        preferences.edit(commit = true) {
+            putBoolean(KEY_GUI_AUTHENTICATION_ENABLED, enabled)
+            putString(KEY_GUI_USERNAME, credentials.username)
+            putString(KEY_GUI_PASSWORD, credentials.password)
+        }
+        managedGuiAuthenticationEnabled = enabled
+        managedGuiCredentials = credentials
     }
 
     private fun supportsArm64(): Boolean =
@@ -1032,6 +1169,9 @@ class CoreRuntime(
         private const val CONFIG_FILE_NAME = "config.xml"
         private const val PREFERENCES = "core_runtime"
         private const val KEY_API_KEY = "api_key"
+        private const val KEY_GUI_USERNAME = "gui_username"
+        private const val KEY_GUI_PASSWORD = "gui_password"
+        private const val KEY_GUI_AUTHENTICATION_ENABLED = "gui_authentication_enabled"
         private const val KEY_PID = "pid"
         private const val KEY_EXECUTABLE_PATH = "executable_path"
         private const val KEY_RUNNING_CORE_ID = "running_core_id"
@@ -1048,6 +1188,7 @@ class CoreRuntime(
         private const val DISCOVERY_PING_TIMEOUT_MILLIS = 1_000
         private const val NANOSECONDS_PER_MILLISECOND = 1_000_000L
         private const val STOP_TIMEOUT_SECONDS = 5L
+        private const val GENERATE_TIMEOUT_SECONDS = 15L
         private const val FORCE_TIMEOUT_SECONDS = 2L
         private const val STOP_POLL_COUNT = 10
         private const val STOP_POLL_INTERVAL_MILLIS = 500L
@@ -1185,3 +1326,8 @@ private fun Process.exitCodeOrNull(): Int? =
 
 private fun Throwable.userMessage(): String =
     message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
+
+private data class ManagedGuiCredentials(
+    val username: String,
+    val password: String,
+)

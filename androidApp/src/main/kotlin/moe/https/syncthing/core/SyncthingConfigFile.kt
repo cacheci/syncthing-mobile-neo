@@ -161,6 +161,62 @@ internal class SyncthingConfigFile(
         writeDocumentAtomically(document)
     }
 
+    fun ensureGuiAuthentication(
+        enabled: Boolean,
+        username: String,
+        password: String,
+        guiAddress: String? = null,
+    ): Boolean {
+        val document = readDocument()
+        val root = document.documentElement
+            ?.takeIf { it.tagName == CONFIGURATION_TAG }
+            ?: error("Syncthing 配置文件缺少 configuration 根节点")
+        val gui = root.ensureChild(document, GUI_TAG)
+        val currentPasswordHash = gui.childText(PASSWORD_TAG)
+        val currentUsername = gui.childText(USER_TAG)
+        val passwordMatches = enabled && verifyPassword(password, currentPasswordHash)
+        val currentPromptEnabled = gui.getAttribute(SEND_BASIC_AUTH_PROMPT_ATTRIBUTE).toBoolean()
+        val changed = (enabled && (currentUsername != username || !passwordMatches || !currentPromptEnabled)) ||
+            (!enabled && (currentUsername.isNotBlank() || currentPasswordHash.isNotBlank() || currentPromptEnabled)) ||
+            (guiAddress != null && gui.childText(ADDRESS_TAG) != guiAddress)
+        if (!changed) return false
+
+        guiAddress?.let { gui.setChildText(document, ADDRESS_TAG, it) }
+        if (enabled) {
+            gui.setChildText(document, USER_TAG, username)
+        } else {
+            gui.setChildText(document, USER_TAG, "")
+            gui.setChildText(document, PASSWORD_TAG, "")
+        }
+        if (enabled && !passwordMatches) {
+            val passwordChars = password.toCharArray()
+            try {
+                gui.setChildText(
+                    document,
+                    PASSWORD_TAG,
+                    BCrypt.withDefaults().hashToString(BCRYPT_COST, passwordChars),
+                )
+            } finally {
+                passwordChars.fill('\u0000')
+            }
+        }
+        gui.setAttribute(SEND_BASIC_AUTH_PROMPT_ATTRIBUTE, enabled.toString())
+        writeDocumentAtomically(document)
+        return true
+    }
+
+    private fun verifyPassword(password: String, passwordHash: String): Boolean {
+        if (passwordHash.isBlank()) return false
+        val passwordChars = password.toCharArray()
+        return try {
+            runCatching {
+                BCrypt.verifyer().verify(passwordChars, passwordHash.toCharArray()).verified
+            }.getOrDefault(false)
+        } finally {
+            passwordChars.fill('\u0000')
+        }
+    }
+
     private fun readDocument(): Document {
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
@@ -240,6 +296,7 @@ internal class SyncthingConfigFile(
         private const val USER_TAG = "user"
         private const val PASSWORD_TAG = "password"
         private const val THEME_TAG = "theme"
+        private const val SEND_BASIC_AUTH_PROMPT_ATTRIBUTE = "sendBasicAuthPrompt"
         private const val DEVICE_TAG = "device"
         private const val ID_ATTRIBUTE = "id"
         private const val NAME_ATTRIBUTE = "name"

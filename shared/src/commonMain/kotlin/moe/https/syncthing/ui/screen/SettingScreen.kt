@@ -276,11 +276,7 @@ private fun SettingForm(
             checked = formState.guiAuthenticationEnabled,
             enabled = fullSettingEnabled,
             onCheckedChange = {
-                settingViewModel.onFormChange(
-                    guiAuthenticationEnabled = it,
-                    guiUser = "",
-                    newGuiPassword = "",
-                )
+                settingViewModel.onFormChange(guiAuthenticationEnabled = it)
             },
         )
 

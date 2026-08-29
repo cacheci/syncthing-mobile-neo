@@ -317,7 +317,8 @@ class SettingViewModel(
                         guiPasswordConfigured = if (result.accessMode == SettingAccessMode.STARTUP_ONLY) {
                             normalizedConfiguration.guiPasswordConfigured
                         } else {
-                            normalizedConfiguration.guiAuthenticationEnabled
+                            normalizedConfiguration.guiPasswordConfigured ||
+                                normalizedConfiguration.guiAuthenticationEnabled
                         },
                         newGuiPassword = "",
                     )

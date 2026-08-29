@@ -1,11 +1,10 @@
 package moe.https.syncthing
 
-import android.app.AlertDialog
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
-import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -38,9 +37,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.net.toUri
 
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun AndroidSystemWebView(
     url: String,
+    username: String,
+    password: String,
     reloadToken: Int,
     onScroll: (deltaY: Float, isAtTop: Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -181,8 +183,12 @@ internal fun AndroidSystemWebView(
                             host: String,
                             realm: String,
                         ) {
-                            if (host.equals(url.toUri().host, ignoreCase = true)) {
-                                showAuthenticationDialog(view, handler, host, realm)
+                            if (
+                                host.equals(url.toUri().host, ignoreCase = true) &&
+                                username.isNotBlank() &&
+                                password.isNotBlank()
+                            ) {
+                                handler.proceed(username, password)
                             } else {
                                 handler.cancel()
                             }
@@ -260,44 +266,6 @@ private fun openExternalUrl(view: WebView, uri: Uri): Boolean {
         view.context.startActivity(Intent(Intent.ACTION_VIEW, uri))
         true
     }.getOrDefault(true)
-}
-
-private fun showAuthenticationDialog(
-    view: WebView,
-    handler: HttpAuthHandler,
-    host: String,
-    realm: String,
-) {
-    val context = view.context
-    val savedCredentials = view.getHttpAuthUsernamePassword(host, realm)
-    val username = android.widget.EditText(context).apply {
-        hint = "用户名"
-        setSingleLine()
-        setText(savedCredentials?.getOrNull(0).orEmpty())
-    }
-    val password = android.widget.EditText(context).apply {
-        hint = "密码"
-        setSingleLine()
-        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        setText(savedCredentials?.getOrNull(1).orEmpty())
-    }
-    val fields = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        val horizontalPadding = 24.dp(context)
-        setPadding(horizontalPadding, 8.dp(context), horizontalPadding, 0)
-        addView(username)
-        addView(password)
-    }
-
-    AlertDialog.Builder(context)
-        .setTitle("登录 Syncthing WebUI")
-        .setView(fields)
-        .setPositiveButton("登录") { _, _ ->
-            handler.proceed(username.text.toString(), password.text.toString())
-        }
-        .setNegativeButton("取消") { _, _ -> handler.cancel() }
-        .setOnCancelListener { handler.cancel() }
-        .show()
 }
 
 private fun Uri.hasSameOrigin(other: Uri): Boolean =

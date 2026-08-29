@@ -443,7 +443,7 @@ internal fun AddFolderScreen(
 
     Scaffold(
         topBar = { AdaptiveTopAppBar(
-            title = "DEBUG*",
+            title = if (isEditingFolder) "编辑文件夹" else "添加文件夹",
             showTopAppBar = true,
             isWideScreen = false,
             scrollBehavior = scrollBehavior,

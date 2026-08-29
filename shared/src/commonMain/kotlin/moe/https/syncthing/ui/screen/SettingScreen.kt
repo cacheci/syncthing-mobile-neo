@@ -758,7 +758,7 @@ internal fun SettingStoragePermissionPage(
 
     Scaffold(
         topBar = { AdaptiveTopAppBar(
-            title = "DEBUG*",
+            title = "存储权限",
             showTopAppBar = true,
             isWideScreen = false,
             scrollBehavior = scrollBehavior,

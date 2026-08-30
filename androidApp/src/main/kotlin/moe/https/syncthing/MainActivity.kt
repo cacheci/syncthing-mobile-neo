@@ -4,6 +4,8 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -14,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +43,9 @@ class MainActivity : ComponentActivity() {
     private var scannedDeviceId by mutableStateOf("")
     private var publicStorageAccessGranted by mutableStateOf(false)
     private var batteryOptimizationExempt by mutableStateOf(false)
+    private var wifiNameAccessGranted by mutableStateOf(false)
+    private var locationServiceEnabled by mutableStateOf(false)
+    private var currentWifiName by mutableStateOf<String?>(null)
     private var waitingBatteryOptimizationResult = false
 
     private val scanQrCodeLauncher = registerForActivityResult(ScanQRCode()) { result ->
@@ -71,6 +77,7 @@ class MainActivity : ComponentActivity() {
         SettingViewModel.factory(
             applicationState.coreRuntime,
             appSettingsStorage = applicationState.appSettingsStorage,
+            onAutoStartSettingsChanged = applicationState::onAutoStartSettingsChanged,
         )
     }
 
@@ -90,6 +97,14 @@ class MainActivity : ComponentActivity() {
         publicStorageAccessGranted = hasPublicStorageAccess()
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
+    private val wifiNamePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        updateWifiNameState()
+        applicationState.onAutoStartSettingsChanged()
+    }
+
     private val allFilesAccessLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
@@ -100,10 +115,12 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult(),
     ) { }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         publicStorageAccessGranted = hasPublicStorageAccess()
         batteryOptimizationExempt = isBatteryOptimizationExempt()
+        updateWifiNameState()
         enableEdgeToEdge()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -140,6 +157,13 @@ class MainActivity : ComponentActivity() {
                 },
                 publicStorageAccessGranted = publicStorageAccessGranted,
                 onRequestPublicStorageAccess = ::requestPublicStorageAccess,
+                currentWifiName = currentWifiName,
+                wifiNameAccessGranted = wifiNameAccessGranted,
+                locationServiceEnabled = locationServiceEnabled,
+                onRequestWifiNameAccess = {
+                    wifiNamePermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                },
+                onOpenLocationSettings = ::openLocationSettings,
                 batteryOptimizationExempt = batteryOptimizationExempt,
                 onBatteryOptimizationRequest = ::batteryOptimizationExemption,
                 onOpenAppDetailsSettings = ::openAppDetailsSettings,
@@ -160,10 +184,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onResume() {
         super.onResume()
         publicStorageAccessGranted = hasPublicStorageAccess()
         batteryOptimizationExempt = isBatteryOptimizationExempt()
+        updateWifiNameState()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -203,6 +229,12 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun openLocationSettings() {
+        backgroundSettingsLauncher.launch(
+            Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+        )
+    }
+
     private fun hasPublicStorageAccess(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Environment.isExternalStorageManager()
@@ -212,6 +244,21 @@ class MainActivity : ComponentActivity() {
                 checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
                 PackageManager.PERMISSION_GRANTED
         }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    @Suppress("DEPRECATION")
+    private fun updateWifiNameState() {
+        wifiNameAccessGranted = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        locationServiceEnabled = getSystemService(LocationManager::class.java).isLocationEnabled
+        currentWifiName = if (wifiNameAccessGranted) {
+            getSystemService(WifiManager::class.java).connectionInfo.ssid
+                ?.removeSurrounding("\"")
+                ?.takeUnless { it.isBlank() || it == WifiManager.UNKNOWN_SSID }
+        } else {
+            null
+        }
+    }
 
     private fun requestPublicStorageAccess() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,10 +56,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_qr
+import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberClipboard
 import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -67,6 +70,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.NumberPicker
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
@@ -279,7 +283,7 @@ internal fun InfoSwitch(
     title: String,
     summary: String ?= null,
     checked: Boolean,
-    enabled: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     BasicComponent(
@@ -489,7 +493,8 @@ internal fun CheckableInputValueRow(
 
 @Composable
 internal fun DeleteBox(
-    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onDelete: () -> Unit,
 ) {
     val sinkFeedback = remember {
@@ -501,7 +506,7 @@ internal fun DeleteBox(
     val hapticFeedback = LocalHapticFeedback.current
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .wrapContentSize(Alignment.Center)
             .requiredSize(26.dp)
             .pressable(
@@ -594,6 +599,126 @@ internal fun PendingCard(
                 content()
             }
         }
+    }
+}
+
+@Composable
+internal fun TimePicker(
+    initialHour: Int = 13,
+    initialMinute: Int = 30,
+    use24h: Boolean? = null,
+    onTimeChange: (hour: Int, minute: Int) -> Unit = { _, _ -> },
+) {
+    val systemUse24h = isSystem24HourFormat()
+    val resolvedUse24h = use24h ?: systemUse24h
+    var hourValue by rememberSaveable(initialHour) {
+        mutableIntStateOf(initialHour.coerceIn(0, 23))
+    }
+    var minuteValue by rememberSaveable(initialMinute) {
+        mutableIntStateOf(initialMinute.coerceIn(0, 59))
+    }
+    val isPm = hourValue >= 12
+    val displayedHour = when (val hourInHalfDay = hourValue % 12) {
+        0 -> 12
+        else -> hourInHalfDay
+    }
+
+    fun updateHour(newHour: Int) {
+        hourValue = newHour
+        onTimeChange(hourValue, minuteValue)
+    }
+
+    fun updateMinute(newMinute: Int) {
+        minuteValue = newMinute
+        onTimeChange(hourValue, minuteValue)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (!resolvedUse24h) {
+            NumberPicker(
+                value = if (isPm) 1 else 0,
+                onValueChange = { selectedPeriod ->
+                    updateHour(hourValue % 12 + if (selectedPeriod == 1) 12 else 0)
+                },
+                range = 0..1,
+                label = { if (it == 0) "AM" else "PM" },
+                wrapAround = false,
+                textStyle = MiuixTheme.textStyles.title3,
+                modifier = Modifier.weight(0.6f),
+            )
+        }
+        NumberPicker(
+            value = if (resolvedUse24h) hourValue else displayedHour,
+            onValueChange = { selectedHour ->
+                updateHour(
+                    if (resolvedUse24h) {
+                        selectedHour
+                    } else {
+                        selectedHour % 12 + if (isPm) 12 else 0
+                    },
+                )
+            },
+            range = if (resolvedUse24h) 0..23 else 1..12,
+            label = { it.toString().padStart(2, '0') },
+            wrapAround = true,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = ":",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        NumberPicker(
+            value = minuteValue,
+            onValueChange = ::updateMinute,
+            range = 0..59,
+            label = { it.toString().padStart(2, '0') },
+            wrapAround = true,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+internal fun CheckableRow(
+    modifier: Modifier = Modifier,
+    title: String,
+    summary: String? = null,
+    state: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Row (
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable( enabled = enabled, onClick = onClick )
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column ( modifier = Modifier.weight(1f) ) {
+            Text(
+                text = title,
+                color = if (enabled) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.disabledOnSurface
+            )
+            summary?.let {
+                Text(
+                    text = it,
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                )
+            }
+        }
+        Checkbox(
+            state = ToggleableState(state),
+            enabled = enabled,
+            onClick = onClick,
+        )
     }
 }
 

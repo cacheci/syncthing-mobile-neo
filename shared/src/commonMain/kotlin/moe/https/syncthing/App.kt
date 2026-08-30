@@ -38,10 +38,16 @@ import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
+import moe.https.syncthing.ui.screen.SettingBackgroundRunningAdvancedPage
+import moe.https.syncthing.ui.screen.SettingBackgroundRunningBatteryPage
+import moe.https.syncthing.ui.screen.SettingBackgroundRunningDurationPage
+import moe.https.syncthing.ui.screen.SettingBackgroundRunningNetworkPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningPage
 import moe.https.syncthing.ui.screen.SettingCoreSelectScreen
 import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
 import moe.https.syncthing.ui.screen.SettingEditListenScreen
+import moe.https.syncthing.ui.screen.SettingPermissionPage
+import moe.https.syncthing.ui.screen.SettingPositionPermissionPage
 import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.ui.screen.SettingStoragePermissionPage
 import moe.https.syncthing.ui.screen.WebviewScreen
@@ -90,6 +96,11 @@ fun App(
     onScanQrCode: () -> Unit,
     publicStorageAccessGranted: Boolean,
     onRequestPublicStorageAccess: () -> Unit,
+    currentWifiName: String?,
+    wifiNameAccessGranted: Boolean,
+    locationServiceEnabled: Boolean,
+    onRequestWifiNameAccess: () -> Unit,
+    onOpenLocationSettings: () -> Unit,
     batteryOptimizationExempt: Boolean,
     onBatteryOptimizationRequest: () -> Unit,
     onOpenAppDetailsSettings: () -> Unit,
@@ -388,10 +399,6 @@ fun App(
                                     onChangeToAbout = {
                                         navigateTo(AppSubPage.ABOUT)
                                     },
-                                    onEditingStoragePermission = {
-                                        folderPathChooserFolderId = null
-                                        navigateTo(AppSubPage.SETTINGS_STORAGE_PERMISSION)
-                                    },
                                     onEditingListenAddresses = {
                                         navigateTo(AppSubPage.SETTINGS_LISTEN_EDIT)
                                     },
@@ -404,12 +411,24 @@ fun App(
                                     onChangeToLicence = {
                                         navigateTo(AppSubPage.LICENCE)
                                     },
-                                    onEditingBackgroundPermission = {
-                                        navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING)
-                                    },
                                     onRedirectingToDeveloperPage = {
                                         navigateTo(AppSubPage.DEV)
-                                    }
+                                    },
+                                    onEditingRunningConditionNetwork = {
+                                        navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING_NETWORK)
+                                    },
+                                    onEditingRunningConditionBattery = {
+                                        navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING_BATTERY)
+                                    },
+                                    onEditingRunningConditionDuration = {
+                                        navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING_DURATION)
+                                    },
+                                    onEditingRunningConditionAdvanced = {
+                                        navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING_ADVANCED)
+                                    },
+                                    onEditingPermission = {
+                                        navigateTo(AppSubPage.SETTINGS_PERMISSIONS)
+                                    },
                                 )
 
                                 AppPage.CORE -> CoreScreen(
@@ -610,6 +629,58 @@ fun App(
                                             onCoreDelete = coreViewModel::onCoreDelete,
                                         )
                                     }
+
+                                    AppSubPage.SETTINGS_BACKGROUND_RUNNING_NETWORK -> {
+                                        SettingBackgroundRunningNetworkPage(
+                                            settingViewModel = settingViewModel,
+                                            currentWifiName = currentWifiName,
+                                            wifiNameAccessGranted = wifiNameAccessGranted,
+                                            locationServiceEnabled = locationServiceEnabled,
+                                            onRequestWifiNameAccess = onRequestWifiNameAccess,
+                                            onOpenLocationSettings = onOpenLocationSettings,
+                                        )
+                                    }
+
+                                    AppSubPage.SETTINGS_BACKGROUND_RUNNING_BATTERY -> {
+                                        SettingBackgroundRunningBatteryPage(
+                                            settingViewModel = settingViewModel
+                                        )
+                                    }
+
+                                    AppSubPage.SETTINGS_BACKGROUND_RUNNING_DURATION -> {
+                                        SettingBackgroundRunningDurationPage(
+                                            settingViewModel = settingViewModel
+                                        )
+                                    }
+
+                                    AppSubPage.SETTINGS_BACKGROUND_RUNNING_ADVANCED -> {
+                                        SettingBackgroundRunningAdvancedPage(
+                                            settingViewModel = settingViewModel,
+                                        )
+                                    }
+
+                                    AppSubPage.SETTINGS_PERMISSIONS -> {
+                                        SettingPermissionPage(
+                                            onEditingBackgroundPermission = {
+                                                navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING)
+                                            },
+                                            onEditingStoragePermission = {
+                                                folderPathChooserFolderId = null
+                                                navigateTo(AppSubPage.SETTINGS_STORAGE_PERMISSION)
+                                            },
+                                            onEditingPositionPermission = {
+                                                navigateTo(AppSubPage.SETTINGS_POSITION_PERMISSION)
+                                            }
+                                        )
+                                    }
+
+                                    AppSubPage.SETTINGS_POSITION_PERMISSION -> {
+                                        SettingPositionPermissionPage(
+                                            wifiNameAccessGranted = wifiNameAccessGranted,
+                                            onRequestWifiNameAccess = onRequestWifiNameAccess,
+                                            onOpenLocationSettings = onOpenLocationSettings,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -649,5 +720,11 @@ internal enum class AppSubPage(val title: String) {
     SETTINGS_STORAGE_PERMISSION("存储权限"),
     SETTINGS_CORE_MANAGE("核心管理"),
     SETTINGS_BACKGROUND_RUNNING("后台运行"),
+    SETTINGS_BACKGROUND_RUNNING_NETWORK("当连接到网络..."),
+    SETTINGS_BACKGROUND_RUNNING_BATTERY("当电池状态..."),
+    SETTINGS_BACKGROUND_RUNNING_DURATION("特定时间段..."),
+    SETTINGS_BACKGROUND_RUNNING_ADVANCED("高级"),
+    SETTINGS_POSITION_PERMISSION("定位权限"),
+    SETTINGS_PERMISSIONS("权限设置"),
     DEV("开发者设置"),
 }

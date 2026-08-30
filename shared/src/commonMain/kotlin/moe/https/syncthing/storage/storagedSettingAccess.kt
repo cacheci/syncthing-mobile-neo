@@ -24,6 +24,8 @@ interface AppSettingPrivateStorage {
 
     companion object {
         const val KEY_DEVELOPER_MODE = "developer_mode"
+        const val KEY_AUTO_START_MODE = "auto_start_mode"
+        const val KEY_AUTO_START_CONDITION = "auto_start_condition"
         const val KEY_PROTOCOL_STACK = "protocol_stack"
         const val KEY_LISTEN_PREFERENCE = "listen_prefer"
         const val KEY_DISCOVERY_PREFERENCE = "discovery_prefer"

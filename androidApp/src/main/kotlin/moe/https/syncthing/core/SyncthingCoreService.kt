@@ -12,21 +12,26 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import moe.https.syncthing.MainActivity
 import moe.https.syncthing.R
 import moe.https.syncthing.SyncthingApplication
+import moe.https.syncthing.storage.AppSettingPrivateStorage
+import moe.https.syncthing.ui.util.AutoStartModeType
 import kotlin.math.min
 import androidx.core.content.edit
+import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 
 class SyncthingCoreService : Service() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val preferences by lazy {
         getSharedPreferences(PREFERENCES, MODE_PRIVATE)
     }
@@ -34,11 +39,35 @@ class SyncthingCoreService : Service() {
         get() = (application as SyncthingApplication).coreRuntime
 
     private var supervisorJob: Job? = null
+    private var stoppingJob: Job? = null
     private var foregroundStarted = false
     private var wakeLock: PowerManager.WakeLock? = null
+    private var automaticControlActive = false
+    private var destroyed = false
+    private lateinit var conditionMonitor: AutoStartConditionMonitor
 
     override fun onCreate() {
         super.onCreate()
+        automaticControlActive = preferences.getBoolean(KEY_AUTOMATIC_CONTROL_ACTIVE, false)
+        conditionMonitor = AutoStartConditionMonitor(
+            context = this,
+            storage = (application as SyncthingApplication).appSettingsStorage,
+            onConditionChanged = { conditionsSatisfied ->
+                if (automaticControlActive) {
+                    requestCoreRunning(conditionsSatisfied)
+                }
+            },
+            onStartTriggered = {
+                if (automaticControlActive) {
+                    requestCoreRunning(true)
+                }
+            },
+            onStopTriggered = {
+                if (automaticControlActive) {
+                    requestCoreRunning(false)
+                }
+            },
+        )
         createNotificationChannel()
         serviceScope.launch {
             runtime.snapshot.collectLatest { snapshot ->
@@ -52,37 +81,106 @@ class SyncthingCoreService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> requestStop()
-            ACTION_START -> requestStart()
-            else -> {
-                if (preferences.getBoolean(KEY_DESIRED_RUNNING, false)) {
-                    requestStart()
-                } else {
-                    stopSelf()
-                }
-            }
+            ACTION_STOP -> requestManualStop()
+            ACTION_START -> requestManualStart()
+            ACTION_REEVALUATE_AUTO_START -> configureAutomaticControl()
+            else -> restoreDesiredMode()
         }
-        return START_STICKY
+        return if (!shouldRemainStarted()) {
+            START_NOT_STICKY
+        } else {
+            START_STICKY
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        destroyed = true
+        conditionMonitor.stop()
         releaseWakeLock()
         serviceScope.cancel()
         super.onDestroy()
     }
 
-    private fun requestStart() {
-        preferences.edit { putBoolean(KEY_DESIRED_RUNNING, true) }
+    private fun requestManualStart() {
+        requestCoreRunning(true)
+    }
+
+    private fun requestManualStop() {
+        requestCoreRunning(
+            shouldRun = false,
+            stopServiceWhenStopped = !automaticControlActive,
+        )
+    }
+
+    private fun restoreDesiredMode() {
+        when {
+            preferences.getBoolean(KEY_AUTOMATIC_CONTROL_ACTIVE, false) ->
+                configureAutomaticControl()
+            preferences.getBoolean(KEY_DESIRED_RUNNING, false) -> requestManualStart()
+            else -> stopSelf()
+        }
+    }
+
+    private fun configureAutomaticControl() {
+        val mode = loadAutoStartMode()
+        if (mode == AutoStartModeType.DISABLED) {
+            conditionMonitor.stop()
+            if (automaticControlActive) {
+                setAutomaticControlActive(false)
+                requestCoreRunning(shouldRun = false, stopServiceWhenStopped = true)
+            } else if (!preferences.getBoolean(KEY_DESIRED_RUNNING, false)) {
+                stopSelf()
+            }
+            return
+        }
+
+        setAutomaticControlActive(true)
+        ensureForeground()
+        when (mode) {
+            AutoStartModeType.DISABLED -> Unit
+            AutoStartModeType.ENABLED -> {
+                conditionMonitor.stop()
+                requestCoreRunning(true)
+            }
+            AutoStartModeType.WITH_CONDITION -> conditionMonitor.start()
+        }
+    }
+
+    private fun setAutomaticControlActive(active: Boolean) {
+        automaticControlActive = active
+        preferences.edit { putBoolean(KEY_AUTOMATIC_CONTROL_ACTIVE, active) }
+    }
+
+    private fun requestCoreRunning(
+        shouldRun: Boolean,
+        stopServiceWhenStopped: Boolean = false,
+    ) {
+        preferences.edit { putBoolean(KEY_DESIRED_RUNNING, shouldRun) }
+        if (!shouldRun) {
+            stopCore(stopServiceWhenStopped)
+            return
+        }
+
+        ensureForeground()
+        if (stoppingJob?.isActive == true || supervisorJob?.isActive == true) return
+        launchCoreSupervisor()
+    }
+
+    private fun ensureForeground() {
         if (!foregroundStarted) {
             foregroundStarted = true
             startForeground(NOTIFICATION_ID, buildNotification(runtime.snapshot.value))
+        } else {
+            getSystemService(NotificationManager::class.java)
+                .notify(NOTIFICATION_ID, buildNotification(runtime.snapshot.value))
         }
-        acquireWakeLock()
+    }
 
-        if (supervisorJob?.isActive == true) return
-        supervisorJob = serviceScope.launch {
+    private fun launchCoreSupervisor() {
+        acquireWakeLock()
+        supervisorJob = serviceScope.launch(Dispatchers.IO) {
             var failures = 0
             while (preferences.getBoolean(KEY_DESIRED_RUNNING, false)) {
                 val result = try {
@@ -121,30 +219,61 @@ class SyncthingCoreService : Service() {
                 delay(backoff.milliseconds)
             }
 
-            releaseWakeLock()
-            if (foregroundStarted) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                foregroundStarted = false
+            val finishedJob = coroutineContext[Job]
+            withContext(NonCancellable + Dispatchers.Main.immediate) {
+                if (finishedJob != null && supervisorJob === finishedJob && stoppingJob == null) {
+                    supervisorJob = null
+                    if (!destroyed) onCoreStopped()
+                }
             }
-            stopSelf()
         }
     }
 
-    private fun requestStop() {
-        preferences.edit { putBoolean(KEY_DESIRED_RUNNING, false) }
-        serviceScope.launch {
-            val runningSupervisor = supervisorJob
-            supervisorJob = null
-            runningSupervisor?.cancelAndJoin()
-            runtime.stop()
-            releaseWakeLock()
-            if (foregroundStarted) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                foregroundStarted = false
+    private fun stopCore(stopServiceWhenStopped: Boolean) {
+        val runningSupervisor = supervisorJob
+        if (runningSupervisor == null) {
+            onCoreStopped(stopServiceWhenStopped)
+            return
+        }
+        if (stoppingJob?.isActive == true) return
+        stoppingJob = serviceScope.launch {
+            runningSupervisor.cancelAndJoin()
+            withContext(Dispatchers.IO) {
+                runtime.stop()
             }
-            stopSelf()
+            if (supervisorJob === runningSupervisor) supervisorJob = null
+            stoppingJob = null
+            if (preferences.getBoolean(KEY_DESIRED_RUNNING, false)) {
+                launchCoreSupervisor()
+            } else {
+                onCoreStopped(stopServiceWhenStopped)
+            }
         }
     }
+
+    private fun onCoreStopped(stopServiceWhenStopped: Boolean = false) {
+        releaseWakeLock()
+        if (destroyed) return
+        if (automaticControlActive && !stopServiceWhenStopped) {
+            ensureForeground()
+            return
+        }
+        if (foregroundStarted) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            foregroundStarted = false
+        }
+        stopSelf()
+    }
+
+    private fun loadAutoStartMode(): AutoStartModeType {
+        val storage = (application as SyncthingApplication).appSettingsStorage
+        return storage.getString(AppSettingPrivateStorage.KEY_AUTO_START_MODE)
+            ?.let { stored -> AutoStartModeType.entries.firstOrNull { it.name == stored } }
+            ?: AutoStartModeType.DISABLED
+    }
+
+    private fun shouldRemainStarted(): Boolean =
+        automaticControlActive || preferences.getBoolean(KEY_DESIRED_RUNNING, false)
 
     @Suppress("WakelockTimeout")
     private fun acquireWakeLock() {
@@ -192,7 +321,15 @@ class SyncthingCoreService : Service() {
         return Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentTitle("Syncthing 核心")
-            .setContentText(snapshot.notificationText())
+            .setContentText(
+                if (automaticControlActive &&
+                    !preferences.getBoolean(KEY_DESIRED_RUNNING, false)
+                ) {
+                    "等待运行条件"
+                } else {
+                    snapshot.notificationText()
+                },
+            )
             .setContentIntent(contentIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(true)
@@ -209,9 +346,12 @@ class SyncthingCoreService : Service() {
     companion object {
         const val ACTION_START = "moe.https.syncthing.action.START_CORE"
         const val ACTION_STOP = "moe.https.syncthing.action.STOP_CORE"
+        const val ACTION_REEVALUATE_AUTO_START =
+            "moe.https.syncthing.action.REEVALUATE_AUTO_START"
 
         private const val PREFERENCES = "core_service"
         private const val KEY_DESIRED_RUNNING = "desired_running"
+        private const val KEY_AUTOMATIC_CONTROL_ACTIVE = "automatic_control_active"
         private const val NOTIFICATION_CHANNEL_ID = "syncthing_core"
         private const val NOTIFICATION_ID = 1001
         private const val MAX_RESTART_ATTEMPTS = 3

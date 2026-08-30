@@ -1,5 +1,7 @@
 package moe.https.syncthing.core
 
+import kotlinx.serialization.Serializable
+
 data class SettingConfiguration(
     val deviceName: String,
     val minHomeDiskFree: Double,
@@ -49,6 +51,13 @@ data class SettingConfiguration(
     enum class GuiPortConflictBehavior(val displayName: String) {
         FAIL("关闭"),
         TRY_NEXT("自增"),
+    }
+
+    @Serializable
+    enum class RunningOnPoweredBy(val displayName: String) {
+        CHARGED("交流电源"),
+        BATTERY("电池"),
+        BOTH("电池和交流电源"),
     }
 
     companion object {

@@ -27,10 +27,17 @@ import moe.https.syncthing.core.SettingController
 import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
+import moe.https.syncthing.ui.util.AutoStartCondition
+import moe.https.syncthing.ui.util.AutoStartModeType
+import moe.https.syncthing.ui.util.CronTrigger
+import moe.https.syncthing.ui.util.ExecuteSchedule
 import moe.https.syncthing.ui.util.ListenAddressListItem
 import moe.https.syncthing.ui.util.ListenAddressSetting
 import moe.https.syncthing.ui.util.SettingProtocolStack
 import moe.https.syncthing.ui.util.UriProtocolStack
+import moe.https.syncthing.ui.util.loadAutoStartCondition
+import moe.https.syncthing.ui.util.normalized
+import moe.https.syncthing.ui.util.saveAutoStartCondition
 import kotlin.time.Duration.Companion.milliseconds
 
 sealed interface DiscoveryServerPingState {
@@ -42,11 +49,22 @@ sealed interface DiscoveryServerPingState {
 class SettingViewModel(
     private val controller: SettingController,
     private val appSettingsStorage: AppSettingPrivateStorage,
+    private val onAutoStartSettingsChanged: () -> Unit = {},
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(SettingUiState())
     val uiState: StateFlow<SettingUiState> = mutableUiState.asStateFlow()
     private val operationMutex = Mutex()
     private val discoveryServerPingStates = mutableStateMapOf<String, DiscoveryServerPingState>()
+    var autoStartMode by mutableStateOf(
+        appSettingsStorage.getString(AppSettingPrivateStorage.KEY_AUTO_START_MODE)
+            ?.let { storedValue ->
+                AutoStartModeType.entries.firstOrNull { it.name == storedValue }
+            }
+            ?: AutoStartModeType.DISABLED,
+    )
+        private set
+    var autoStartCondition by mutableStateOf(loadAutoStartCondition(appSettingsStorage))
+        private set
     var listenAddressSettingUnsaved by mutableStateOf( loadSavedListenSetting() )
     var discoveryAddressSettingUnsaved by mutableStateOf( loadSavedDiscoverySetting() )
     var addressProtocolStack by mutableStateOf(
@@ -68,6 +86,108 @@ class SettingViewModel(
 
     fun discoveryServerPingState(address: String): DiscoveryServerPingState? =
         discoveryServerPingStates[address.trim()]
+
+    fun updateAutoStartMode(mode: AutoStartModeType) {
+        if (mode == autoStartMode) return
+        autoStartMode = mode
+        appSettingsStorage.putString(
+            AppSettingPrivateStorage.KEY_AUTO_START_MODE,
+            mode.name,
+        )
+        onAutoStartSettingsChanged()
+    }
+
+    fun updateAutoStartCondition(condition: AutoStartCondition) {
+        val normalizedCondition = condition.normalized()
+        if (normalizedCondition == autoStartCondition) return
+        autoStartCondition = normalizedCondition
+        saveAutoStartCondition(appSettingsStorage, normalizedCondition)
+        onAutoStartSettingsChanged()
+    }
+
+    fun addExecuteSchedule() {
+        val nextId = (autoStartCondition.schedules.maxOfOrNull(ExecuteSchedule::id) ?: 0L) + 1L
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                schedules = autoStartCondition.schedules + ExecuteSchedule(id = nextId),
+            ),
+        )
+    }
+
+    fun updateExecuteSchedule(schedule: ExecuteSchedule) {
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                schedules = autoStartCondition.schedules.map { current ->
+                    if (current.id == schedule.id) schedule else current
+                },
+            ),
+        )
+    }
+
+    fun removeExecuteSchedule(id: Long) {
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                schedules = autoStartCondition.schedules.filterNot { it.id == id },
+            ),
+        )
+    }
+
+    fun addStartCronTrigger() {
+        val nextId = (autoStartCondition.startCronTriggers.maxOfOrNull(CronTrigger::id) ?: 0L) + 1L
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                startCronTriggers = autoStartCondition.startCronTriggers + CronTrigger(id = nextId),
+            ),
+        )
+    }
+
+    fun updateStartCronTrigger(trigger: CronTrigger) {
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                startCronTriggers = autoStartCondition.startCronTriggers.map { current ->
+                    if (current.id == trigger.id) trigger else current
+                },
+            ),
+        )
+    }
+
+    fun removeStartCronTrigger(id: Long) {
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                startCronTriggers = autoStartCondition.startCronTriggers.filterNot { it.id == id },
+            ),
+        )
+    }
+
+    fun addStopCronTrigger() {
+        val nextId = (autoStartCondition.stopCronTriggers.maxOfOrNull(CronTrigger::id) ?: 0L) + 1L
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                stopCronTriggers = autoStartCondition.stopCronTriggers + CronTrigger(
+                    id = nextId,
+                    expression = "0 16 * * *",
+                ),
+            ),
+        )
+    }
+
+    fun updateStopCronTrigger(trigger: CronTrigger) {
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                stopCronTriggers = autoStartCondition.stopCronTriggers.map { current ->
+                    if (current.id == trigger.id) trigger else current
+                },
+            ),
+        )
+    }
+
+    fun removeStopCronTrigger(id: Long) {
+        updateAutoStartCondition(
+            autoStartCondition.copy(
+                stopCronTriggers = autoStartCondition.stopCronTriggers.filterNot { it.id == id },
+            ),
+        )
+    }
 
     fun pingDiscoveryServer(address: String) {
         val normalizedAddress = address.trim()
@@ -450,11 +570,13 @@ class SettingViewModel(
         fun factory(
             controller: SettingController,
             appSettingsStorage: AppSettingPrivateStorage,
+            onAutoStartSettingsChanged: () -> Unit = {},
         ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 SettingViewModel(
                     controller = controller,
                     appSettingsStorage = appSettingsStorage,
+                    onAutoStartSettingsChanged = onAutoStartSettingsChanged,
                 )
             }
         }

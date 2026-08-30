@@ -348,6 +348,9 @@ internal fun AddFolderScreen(
     var versioning by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioning ?: NewFolderConfiguration.Versioning.NONE)
     }
+    var versioningFsPath by remember(existingFolder) {
+        mutableStateOf(existingFolder?.versioningFsPath.orEmpty())
+    }
     var cleanoutDays by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioningCleanoutDays?.toString().orEmpty())
     }
@@ -451,6 +454,7 @@ internal fun AddFolderScreen(
                                 path = selectedFolderPath ?: defaultFolderPath(folderId.trim()),
                                 versioning = versioning,
                                 updateVersioning = existingFolder?.versioningSupported != false,
+                                versioningFsPath = versioningFsPath.trim(),
                                 versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,
                                 versioningKeep = keepVersions.toIntOrNull() ?: 5,
                                 versioningCleanupIntervalSeconds = cleanupIntervalSeconds.toIntOrNull() ?: 3600,
@@ -623,12 +627,11 @@ internal fun AddFolderScreen(
 
                                 InputValueRow(
                                     label = "历史版本路径",
-                                    value = "",
+                                    value = versioningFsPath,
                                     valueLabel = ".stversions",
-                                    allowEdit = false,
-                                    onValueChange = {  },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                ) // TODO: 历史版本路径
+                                    allowEdit = !isSubmitting,
+                                    onValueChange = { versioningFsPath = it },
+                                )
 
                                 // 简易版本控制
                                 AnimatedVisibility(

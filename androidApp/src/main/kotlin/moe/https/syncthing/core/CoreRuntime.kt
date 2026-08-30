@@ -252,6 +252,7 @@ class CoreRuntime(
                     rescanIntervalSeconds = folder.rescanIntervalSeconds,
                     versioning = folder.versioning.type,
                     versioningSupported = folder.versioning.supported,
+                    versioningFsPath = folder.versioning.fsPath,
                     versioningCleanoutDays = folder.versioning.cleanoutDays,
                     versioningKeep = folder.versioning.keep,
                     versioningCleanupIntervalSeconds = folder.versioning.cleanupIntervalSeconds,

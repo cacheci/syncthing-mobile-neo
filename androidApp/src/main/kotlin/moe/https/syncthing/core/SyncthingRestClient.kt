@@ -701,6 +701,7 @@ internal class SyncthingRestClient(
     data class RestFolderVersioning(
         val type: NewFolderConfiguration.Versioning,
         val supported: Boolean,
+        val fsPath: String,
         val cleanoutDays: Int,
         val keep: Int,
         val cleanupIntervalSeconds: Int,
@@ -785,6 +786,7 @@ internal class SyncthingRestClient(
         return RestFolderVersioning(
             type = type,
             supported = rawType.isBlank() || rawType == "trashcan" || rawType == "simple",
+            fsPath = json?.optString("fsPath").orEmpty(),
             cleanoutDays = params?.optString("cleanoutDays")?.toIntOrNull() ?: 0,
             keep = params?.optString("keep")?.toIntOrNull() ?: 5,
             cleanupIntervalSeconds = json?.optInt("cleanupIntervalS", 3600) ?: 3600,
@@ -853,6 +855,7 @@ internal class SyncthingRestClient(
         if (configuration.updateVersioning) {
             val versioning = folder.optJSONObject("versioning") ?: JSONObject()
             val params = versioning.optJSONObject("params") ?: JSONObject()
+            versioning.put("fsPath", configuration.versioningFsPath)
             when (configuration.versioning) {
                 NewFolderConfiguration.Versioning.NONE -> {
                     versioning.put("type", "")

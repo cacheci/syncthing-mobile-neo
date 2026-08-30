@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -17,6 +19,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.https.syncthing.storage.AppSettingPrivateStorage
+import moe.https.syncthing.ui.util.SettingProtocolStack
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
@@ -28,18 +31,17 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
 import java.net.SocketTimeoutException
+import java.net.URL
 import java.net.UnknownHostException
 import java.net.UnknownServiceException
-import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import androidx.core.content.edit
-import moe.https.syncthing.ui.util.SettingProtocolStack
 import kotlin.time.Duration.Companion.milliseconds
 
+@RequiresApi(Build.VERSION_CODES.R)
 class CoreRuntime(
     context: Context,
     private val coreRegistry: CoreRegistry,

@@ -2,6 +2,8 @@ package moe.https.syncthing
 
 import android.app.Application
 import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +18,7 @@ import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.storage.SharedPreferencesAppSettingsStorage
 import moe.https.syncthing.ui.util.AutoStartModeType
 
+@RequiresApi(Build.VERSION_CODES.R)
 class SyncthingApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

@@ -6,10 +6,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import kotlinx.coroutines.CoroutineScope
+import androidx.annotation.RequiresApi
+import androidx.core.content.edit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -26,10 +29,9 @@ import moe.https.syncthing.SyncthingApplication
 import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.util.AutoStartModeType
 import kotlin.math.min
-import androidx.core.content.edit
-import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 
+@RequiresApi(Build.VERSION_CODES.R)
 class SyncthingCoreService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val preferences by lazy {
@@ -139,7 +141,6 @@ class SyncthingCoreService : Service() {
         setAutomaticControlActive(true)
         ensureForeground()
         when (mode) {
-            AutoStartModeType.DISABLED -> Unit
             AutoStartModeType.ENABLED -> {
                 conditionMonitor.stop()
                 requestCoreRunning(true)
@@ -360,7 +361,7 @@ class SyncthingCoreService : Service() {
         private const val STABLE_SESSION_MILLIS = 60_000L
 
         internal fun isDesiredRunning(context: android.content.Context): Boolean =
-            context.getSharedPreferences(PREFERENCES, android.content.Context.MODE_PRIVATE)
+            context.getSharedPreferences(PREFERENCES, MODE_PRIVATE)
                 .getBoolean(KEY_DESIRED_RUNNING, false)
     }
 }

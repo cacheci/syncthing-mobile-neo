@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import androidx.annotation.RequiresApi
 import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.util.AutoStartCondition
 import moe.https.syncthing.ui.util.CronExpression
@@ -23,6 +24,7 @@ import moe.https.syncthing.ui.util.ExecuteScheduleType
 import moe.https.syncthing.ui.util.loadAutoStartCondition
 import java.util.Calendar
 
+@RequiresApi(Build.VERSION_CODES.R)
 internal class AutoStartConditionMonitor(
     context: Context,
     private val storage: AppSettingPrivateStorage,
@@ -199,13 +201,12 @@ internal class AutoStartConditionMonitor(
             ?: activeCapabilities
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     @Suppress("DEPRECATION")
     private fun currentWifiName(capabilities: NetworkCapabilities): String? {
-        val wifiInfo = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            capabilities.transportInfo as? WifiInfo
-        } else {
-            null
-        })
+        val wifiInfo = (
+                capabilities.transportInfo as? WifiInfo
+                )
             ?: runCatching { wifiManager.connectionInfo }.getOrNull()
         return wifiInfo?.ssid
             ?.removeSurrounding("\"")

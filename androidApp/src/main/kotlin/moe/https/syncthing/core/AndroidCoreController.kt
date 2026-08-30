@@ -2,8 +2,11 @@ package moe.https.syncthing.core
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.StateFlow
 
+@RequiresApi(Build.VERSION_CODES.R)
 class AndroidCoreController(
     context: Context,
     private val runtime: CoreRuntime,

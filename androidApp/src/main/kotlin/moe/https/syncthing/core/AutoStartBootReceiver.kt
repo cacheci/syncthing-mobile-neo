@@ -3,10 +3,13 @@ package moe.https.syncthing.core
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
 import moe.https.syncthing.SyncthingApplication
 import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.util.AutoStartModeType
 
+@RequiresApi(Build.VERSION_CODES.R)
 class AutoStartBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED &&

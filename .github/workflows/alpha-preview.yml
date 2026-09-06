@@ -100,6 +100,7 @@ jobs:
           echo "path=${apks[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Publish Alpha Preview release
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           APK_PATH: ${{ steps.apk.outputs.path }}
@@ -109,12 +110,62 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists; nothing to publish."
+            echo "published=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          release_notes="Automated Alpha Preview build for commit $GITHUB_SHA.
+
+          > [!WARNING]
+          > Please note that the preview release is unstable and is signed with the AOSP test key. Since the test key is publicly available, anyone can generate and sign an APK with the same key, and such APKs may be installed without triggering a signature-related warning."
 
           gh release create "$tag" "$APK_PATH" \
             --target "$GITHUB_SHA" \
             --title "Alpha Preview $short_sha" \
-            --notes "Automated Alpha Preview build for commit $GITHUB_SHA." \
+            --notes "$release_notes" \
             --prerelease \
             --latest=false
+
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Alpha Preview to Telegram
+        if: steps.release.outputs.published == 'true'
+        env:
+          APK_PATH: ${{ steps.apk.outputs.path }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_REPLY_TO_MESSAGE_ID: ${{ secrets.TELEGRAM_REPLY_TO_MESSAGE_ID }}
+        run: |
+          missing=()
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_REPLY_TO_MESSAGE_ID; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+          if [[ ! "$TELEGRAM_REPLY_TO_MESSAGE_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "TELEGRAM_REPLY_TO_MESSAGE_ID must be a positive integer." >&2
+            exit 1
+          fi
+
+          short_sha="${GITHUB_SHA:0:12}"
+          reply_parameters="$(printf '{\"message_id\":%s}' "$TELEGRAM_REPLY_TO_MESSAGE_ID")"
+          telegram_caption="Alpha Preview $short_sha
+
+          ⚠️ Please note that the preview release is unstable and is signed with the AOSP test key. Since the test key is publicly available, anyone can generate and sign an APK with the same key, and such APKs may be installed without triggering a signature-related warning."
+
+          curl \
+            --silent \
+            --show-error \
+            --fail-with-body \
+            --retry 3 \
+            --form-string "chat_id=$TELEGRAM_CHAT_ID" \
+            --form "document=@$APK_PATH" \
+            --form-string "caption=$telegram_caption" \
+            --form-string "reply_parameters=$reply_parameters" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"

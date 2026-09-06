@@ -250,7 +250,7 @@ internal fun MessageCard(
     content: @Composable () -> Unit = {},
 ) {
     Card(
-        modifier = modifier.padding(bottom = 12.dp).fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = if (isError) {
             CardDefaults.defaultColors(
                 color = MiuixTheme.colorScheme.errorContainer,

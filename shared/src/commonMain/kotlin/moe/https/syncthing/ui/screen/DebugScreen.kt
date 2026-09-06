@@ -11,7 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
-import moe.https.syncthing.AppPage
+import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.AppSubPage
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.InfoSwitchCard

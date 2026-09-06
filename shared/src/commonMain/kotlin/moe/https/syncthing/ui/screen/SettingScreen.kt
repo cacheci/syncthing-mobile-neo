@@ -38,6 +38,7 @@ import moe.https.syncthing.core.CoreAvailability
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.core.defaultFolderPath
+import moe.https.syncthing.icon
 import moe.https.syncthing.platform.FolderPickerResult
 import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberFolderPicker
@@ -52,7 +53,9 @@ import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.component.TimePicker
+import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.ui.model.CoreUiState
+import moe.https.syncthing.ui.model.MainUiState
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
 import moe.https.syncthing.ui.util.AutoStartModeType
@@ -72,6 +75,8 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -102,6 +107,7 @@ internal fun SettingScreen(
     onEditingListenAddresses: () -> Unit,
     onEditingCores: () -> Unit,
     onEditingPermission: () -> Unit,
+    onEditingBottomBar: () -> Unit,
     onEditingRunningConditionNetwork: () -> Unit,
     onEditingRunningConditionBattery: () -> Unit,
     onEditingRunningConditionDuration: () -> Unit,
@@ -175,18 +181,64 @@ internal fun SettingScreen(
             settingAvailable = settingAvailable,
             onEditingDiscoverServers = onEditingDiscoverServers,
             onEditingListenAddresses = onEditingListenAddresses,
-            onEditingCores = onEditingCores,
             onRedirectingToDeveloperPage = onRedirectingToDeveloperPage,
-            onEditingRunningConditionNetwork = onEditingRunningConditionNetwork,
-            onEditingRunningConditionBattery = onEditingRunningConditionBattery,
-            onEditingRunningConditionDuration = onEditingRunningConditionDuration,
-            onEditingRunningConditionAdvanced = onEditingRunningConditionAdvanced,
         )
 
-        InfoSwitchCard("其他设置") {
+        InfoSwitchCard(title = "后台运行") {
+            OverlayDropdownPreference(
+                title = "自启动",
+                items = AutoStartModeType.entries.map { it.displayName },
+                selectedIndex = settingViewModel.autoStartMode.ordinal,
+                enabled = true,
+                onSelectedIndexChange = { index ->
+                    settingViewModel.updateAutoStartMode(AutoStartModeType.entries[index])
+                },
+            )
+
+            AnimatedVisibility(
+                visible = settingViewModel.autoStartMode == AutoStartModeType.WITH_CONDITION,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+            ) {
+                Column {
+                    ArrowPreference(
+                        title = "当连接到网络...",
+                        onClick = onEditingRunningConditionNetwork,
+                    )
+                    ArrowPreference(
+                        title = "当电池状态...",
+                        onClick = onEditingRunningConditionBattery,
+                    )
+                    ArrowPreference(
+                        title = "特定时间段...",
+                        onClick = onEditingRunningConditionDuration,
+                    )
+                    ArrowPreference(
+                        "高级触发器",
+                        onClick = onEditingRunningConditionAdvanced,
+                    )
+                }
+            }
+        }
+
+        InfoSwitchCard("应用设置") {
+            ArrowPreference(
+                title = "底栏设置",
+                onClick = onEditingBottomBar,
+            )
+
             ArrowPreference(
                 title = "系统权限",
                 onClick = onEditingPermission,
+            )
+
+            ArrowPreference(
+                title = "核心选择",
+                onClick = onEditingCores,
             )
         }
 
@@ -219,12 +271,7 @@ private fun SettingForm(
     onModifyDeveloperMode: () -> Unit,
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
-    onEditingRunningConditionNetwork: () -> Unit,
-    onEditingRunningConditionBattery: () -> Unit,
-    onEditingRunningConditionDuration: () -> Unit,
-    onEditingRunningConditionAdvanced: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
-    onEditingCores: () -> Unit,
     settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
@@ -522,54 +569,6 @@ private fun SettingForm(
             valueLabel = "无限制",
             allowEdit = fullSettingEnabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-    }
-
-    InfoSwitchCard(title = "后台运行") {
-        OverlayDropdownPreference(
-            title = "自启动",
-            items = AutoStartModeType.entries.map { it.displayName },
-            selectedIndex = settingViewModel.autoStartMode.ordinal,
-            enabled = true,
-            onSelectedIndexChange = { index ->
-                settingViewModel.updateAutoStartMode(AutoStartModeType.entries[index])
-            },
-        )
-
-        AnimatedVisibility(
-            visible = settingViewModel.autoStartMode == AutoStartModeType.WITH_CONDITION,
-            enter = expandVertically(
-                animationSpec = tween(durationMillis = 300)
-            ),
-            exit = shrinkVertically(
-                animationSpec = tween(durationMillis = 300)
-            ),
-        ) {
-            Column {
-                ArrowPreference(
-                    title = "当连接到网络...",
-                    onClick = onEditingRunningConditionNetwork,
-                )
-                ArrowPreference(
-                    title = "当电池状态...",
-                    onClick = onEditingRunningConditionBattery,
-                )
-                ArrowPreference(
-                    title = "特定时间段...",
-                    onClick = onEditingRunningConditionDuration,
-                )
-                ArrowPreference(
-                    "高级触发器",
-                    onClick = onEditingRunningConditionAdvanced,
-                )
-            }
-        }
-    }
-
-    InfoSwitchCard(title = "核心设置") {
-        ArrowPreference(
-            title = "核心选择",
-            onClick = onEditingCores,
         )
     }
 }
@@ -1662,7 +1661,10 @@ internal fun SettingPositionPermissionPage(
     onRequestWifiNameAccess: () -> Unit,
     onOpenLocationSettings: () -> Unit,
 ) {
-    Column ( modifier = Modifier.padding( horizontal = 20.dp, vertical = 10.dp ) ) {
+    Column (
+        modifier = Modifier.padding( horizontal = 20.dp, vertical = 10.dp ),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         MessageCard(
             title = "授予获取位置信息权限",
             message = "若要根据 WLAN 自动运行/停止，则需要位置权限"
@@ -1682,6 +1684,97 @@ internal fun SettingPositionPermissionPage(
                 title = "开启位置服务",
                 onClick = onOpenLocationSettings,
             )
+        }
+    }
+}
+
+@Composable
+internal fun SettingBottomBarCustomPage(
+    uiState: MainUiState,
+    onPageToggle: (AppPage) -> Unit,
+    onDefaultPageChange: (AppPage) -> Unit,
+    navigateBack: () -> Unit,
+) {
+    val scrollBehavior = MiuixScrollBehavior()
+    val selectedPagesInOrder = AppPage.entries.filter(uiState.bottomBarPages::contains)
+
+    Scaffold(
+        topBar = {
+            AdaptiveTopAppBar(
+                title = "底栏设置",
+                showTopAppBar = true,
+                isWideScreen = false,
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = navigateBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Back,
+                            contentDescription = "返回",
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                MessageCard(
+                    title = "选择底栏项目",
+                    message = "最多选择 5 个项目。设置固定显示，以便随时调整底栏。",
+                )
+            }
+            item {
+                InfoSwitchCard (
+                    title = "底栏项目"
+                ) {
+                    AppPage.entries.forEach { page ->
+                        val selected = page in uiState.bottomBarPages
+                        CheckableRow(
+                            title = page.title,
+                            state = selected,
+                            enabled = page != AppPage.SETTINGS &&
+                                    (selected || uiState.canSelectMoreBottomBarPages),
+                            onClick = { onPageToggle(page) },
+                        )
+                    }
+                }
+            }
+            item {
+                Card {
+                    Column {
+                        OverlayDropdownPreference(
+                            title = "默认页面",
+                            summary = "启动 App 时打开的底栏页面",
+                            items = selectedPagesInOrder.map(AppPage::title),
+                            selectedIndex = selectedPagesInOrder.indexOf(
+                                uiState.defaultBottomBarPage,
+                            ),
+                            onSelectedIndexChange = { index ->
+                                selectedPagesInOrder.getOrNull(index)?.let(onDefaultPageChange)
+                            },
+                        )
+                        NavigationBar(
+                            color = MiuixTheme.colorScheme.background,
+                            defaultWindowInsetsPadding = false,
+                        ) {
+                            selectedPagesInOrder.forEach { page ->
+                                NavigationBarItem(
+                                    selected = page == uiState.defaultBottomBarPage,
+                                    onClick = {},
+                                    icon = page.icon,
+                                    label = page.title,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

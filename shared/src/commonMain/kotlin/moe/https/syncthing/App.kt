@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -29,6 +30,7 @@ import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
+import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
 import moe.https.syncthing.ui.screen.AddFolderScreen
@@ -43,6 +45,7 @@ import moe.https.syncthing.ui.screen.SettingBackgroundRunningBatteryPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningDurationPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningNetworkPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningPage
+import moe.https.syncthing.ui.screen.SettingBottomBarCustomPage
 import moe.https.syncthing.ui.screen.SettingCoreSelectScreen
 import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
 import moe.https.syncthing.ui.screen.SettingEditListenScreen
@@ -55,6 +58,7 @@ import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.LogViewModel
+import moe.https.syncthing.viewmodel.MainViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -90,6 +94,7 @@ fun App(
     devicesViewModel: DevicesViewModel,
     foldersViewModel: FoldersViewModel,
     settingViewModel: SettingViewModel,
+    mainViewModel: MainViewModel,
     versionName: String,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
@@ -118,8 +123,10 @@ fun App(
     val devicesUiState by devicesViewModel.uiState.collectAsState()
     val foldersUiState by foldersViewModel.uiState.collectAsState()
     val settingUiState by settingViewModel.uiState.collectAsState()
-    var currentPageMain by remember { mutableStateOf(AppPage.CORE) }
-    var requestedPageMain by remember { mutableStateOf(AppPage.CORE) }
+    val mainUiState by mainViewModel.uiState.collectAsState()
+    val initialMainPage = remember { mainUiState.defaultBottomBarPage }
+    var currentPageMain by remember { mutableStateOf(initialMainPage) }
+    var requestedPageMain by remember { mutableStateOf(initialMainPage) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     var pendingDeviceToAdd by remember { mutableStateOf<SyncthingPendingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
@@ -291,36 +298,16 @@ fun App(
                     },
                     bottomBar = {
                         NavigationBar {
-                            NavigationBarItem(
-                                selected = currentPageMain == AppPage.DEVICES,
-                                onClick = { requestSwitchToPageMain(AppPage.DEVICES) },
-                                icon = MiuixIcons.Link,
-                                label = AppPage.DEVICES.title,
-                            )
-                            NavigationBarItem(
-                                selected = currentPageMain == AppPage.FOLDERS,
-                                onClick = { requestSwitchToPageMain(AppPage.FOLDERS) },
-                                icon = MiuixIcons.Folder,
-                                label = AppPage.FOLDERS.title,
-                            )
-                            NavigationBarItem(
-                                selected = currentPageMain == AppPage.CORE,
-                                onClick = { requestSwitchToPageMain( AppPage.CORE) },
-                                icon = MiuixIcons.Home,
-                                label = AppPage.CORE.title,
-                            )
-                            NavigationBarItem(
-                                selected = currentPageMain == AppPage.WEBUI,
-                                onClick = { requestSwitchToPageMain( AppPage.WEBUI) },
-                                icon = MiuixIcons.HorizontalSplit,
-                                label = AppPage.WEBUI.title,
-                            )
-                            NavigationBarItem(
-                                selected = currentPageMain == AppPage.SETTINGS,
-                                onClick = { requestSwitchToPageMain(AppPage.SETTINGS) },
-                                icon = MiuixIcons.Settings,
-                                label = AppPage.SETTINGS.title,
-                            )
+                            AppPage.entries
+                                .filter(mainUiState.bottomBarPages::contains)
+                                .forEach { page ->
+                                    NavigationBarItem(
+                                        selected = currentPageMain == page,
+                                        onClick = { requestSwitchToPageMain(page) },
+                                        icon = page.icon,
+                                        label = page.title,
+                                    )
+                                }
                         }
                     },
                     snackbarHost = {
@@ -428,6 +415,9 @@ fun App(
                                     },
                                     onEditingPermission = {
                                         navigateTo(AppSubPage.SETTINGS_PERMISSIONS)
+                                    },
+                                    onEditingBottomBar = {
+                                        navigateTo(AppSubPage.SETTINGS_BOTTOM_BAR)
                                     },
                                 )
 
@@ -568,6 +558,15 @@ fun App(
                         )
                     }
 
+                    AppSubPage.SETTINGS_BOTTOM_BAR -> {
+                        SettingBottomBarCustomPage(
+                            uiState = mainUiState,
+                            onPageToggle = mainViewModel::onBottomBarPageToggled,
+                            onDefaultPageChange = mainViewModel::onDefaultBottomBarPageSelected,
+                            navigateBack = navigateBack,
+                        )
+                    }
+
                     else -> {
                         Scaffold(
                             topBar = {
@@ -700,13 +699,14 @@ private sealed interface AppRoute : NavKey {
     data class Plain(val page: AppSubPage) : AppRoute
 }
 
-internal enum class AppPage(val title: String) {
-    DEVICES("连接"),
-    FOLDERS("文件夹"),
-    CORE("Syncthing"),
-    WEBUI("WebUI"),
-    SETTINGS("设置"),
-}
+internal val AppPage.icon: ImageVector
+    get() = when (this) {
+        AppPage.DEVICES -> MiuixIcons.Link
+        AppPage.FOLDERS -> MiuixIcons.Folder
+        AppPage.CORE -> MiuixIcons.Home
+        AppPage.WEBUI -> MiuixIcons.HorizontalSplit
+        AppPage.SETTINGS -> MiuixIcons.Settings
+    }
 
 @Serializable
 internal enum class AppSubPage(val title: String) {
@@ -726,5 +726,6 @@ internal enum class AppSubPage(val title: String) {
     SETTINGS_BACKGROUND_RUNNING_ADVANCED("高级"),
     SETTINGS_POSITION_PERMISSION("定位权限"),
     SETTINGS_PERMISSIONS("权限设置"),
+    SETTINGS_BOTTOM_BAR("底栏设置"),
     DEV("开发者设置"),
 }

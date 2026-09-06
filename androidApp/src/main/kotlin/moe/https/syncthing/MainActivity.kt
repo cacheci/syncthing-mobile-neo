@@ -36,6 +36,7 @@ import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.LogViewModel
+import moe.https.syncthing.viewmodel.MainViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -79,6 +80,10 @@ class MainActivity : ComponentActivity() {
             appSettingsStorage = applicationState.appSettingsStorage,
             onAutoStartSettingsChanged = applicationState::onAutoStartSettingsChanged,
         )
+    }
+
+    private val mainViewModel: MainViewModel by viewModels {
+        MainViewModel.factory(applicationState.appSettingsStorage)
     }
 
     private val corePicker = registerForActivityResult(
@@ -145,6 +150,7 @@ class MainActivity : ComponentActivity() {
                 devicesViewModel = devicesViewModel,
                 foldersViewModel = foldersViewModel,
                 settingViewModel = settingViewModel,
+                mainViewModel = mainViewModel,
                 versionName = BuildConfig.VERSION_NAME,
                 developerModeEnabled = developerModeEnabled,
                 onModifyDeveloperMode = {

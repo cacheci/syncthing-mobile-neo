@@ -4,3 +4,4 @@
 [submodule "third_party/scripta"]
 	path = third_party/scripta
 	url = https://github.com/cacheci/scripta.git
+	branch = main

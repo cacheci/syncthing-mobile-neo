@@ -1,0 +1,40 @@
+version: 2
+
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+    open-pull-requests-limit: 1
+
+    labels:
+      - "dependencies"
+      - "gradle"
+
+    commit-message:
+      prefix: "build(deps)"
+
+    groups:
+      kotlin-compose:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.compose*"
+
+      androidx:
+        patterns:
+          - "androidx.*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+    open-pull-requests-limit: 1
+
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+    commit-message:
+      prefix: "build(deps)"

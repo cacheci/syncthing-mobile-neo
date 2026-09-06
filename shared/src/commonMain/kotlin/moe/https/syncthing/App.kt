@@ -40,6 +40,7 @@ import moe.https.syncthing.ui.screen.DevicesScreen
 import moe.https.syncthing.ui.screen.FoldersScreen
 import moe.https.syncthing.ui.screen.LicenceScreen
 import moe.https.syncthing.ui.screen.LogScreen
+import moe.https.syncthing.ui.screen.RecentChangesScreen
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningAdvancedPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningBatteryPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningDurationPage
@@ -59,6 +60,7 @@ import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.MainViewModel
+import moe.https.syncthing.viewmodel.RecentChangesViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -78,6 +80,7 @@ import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.UploadCloud
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
@@ -93,6 +96,7 @@ fun App(
     logViewModel: LogViewModel,
     devicesViewModel: DevicesViewModel,
     foldersViewModel: FoldersViewModel,
+    recentChangesViewModel: RecentChangesViewModel,
     settingViewModel: SettingViewModel,
     mainViewModel: MainViewModel,
     versionName: String,
@@ -122,11 +126,13 @@ fun App(
     val logUiState by logViewModel.uiState.collectAsState()
     val devicesUiState by devicesViewModel.uiState.collectAsState()
     val foldersUiState by foldersViewModel.uiState.collectAsState()
+    val recentChangesUiState by recentChangesViewModel.uiState.collectAsState()
     val settingUiState by settingViewModel.uiState.collectAsState()
     val mainUiState by mainViewModel.uiState.collectAsState()
     val initialMainPage = remember { mainUiState.defaultBottomBarPage }
     var currentPageMain by remember { mutableStateOf(initialMainPage) }
     var requestedPageMain by remember { mutableStateOf(initialMainPage) }
+    var initialMainPageRefreshRequested by remember { mutableStateOf(false) }
     var editingDevice by remember { mutableStateOf<SyncthingDevice?>(null) }
     var pendingDeviceToAdd by remember { mutableStateOf<SyncthingPendingDevice?>(null) }
     var editingFolder by remember { mutableStateOf<SyncthingFolder?>(null) }
@@ -154,17 +160,44 @@ fun App(
         onDispose { }
     }
 
+    LaunchedEffect(initialMainPage, currentPageMain, coreUiState.state) {
+        if (initialMainPageRefreshRequested) return@LaunchedEffect
+        if (currentPageMain != initialMainPage) {
+            initialMainPageRefreshRequested = true
+            return@LaunchedEffect
+        }
+
+        val canRefresh = when (initialMainPage) {
+            AppPage.DEVICES,
+            AppPage.FOLDERS,
+            AppPage.RECENT_CHANGES -> coreUiState.state == CoreState.RUNNING
+            else -> true
+        }
+        if (!canRefresh) return@LaunchedEffect
+
+        initialMainPageRefreshRequested = true
+        when (initialMainPage) {
+            AppPage.DEVICES -> devicesViewModel.refresh()
+            AppPage.FOLDERS -> foldersViewModel.refresh()
+            AppPage.RECENT_CHANGES -> recentChangesViewModel.refresh()
+            AppPage.SETTINGS -> settingViewModel.refresh()
+            else -> Unit
+        }
+    }
+
     LaunchedEffect(
         requestedPageMain,
         coreUiState.state,
         devicesUiState.isLoading,
         foldersUiState.isLoading,
+        recentChangesUiState.isLoading,
         settingUiState.isLoading,
         logUiState.isLoading,
     ) {
         val ready = when (requestedPageMain) {
             AppPage.DEVICES -> !devicesUiState.isLoading
             AppPage.FOLDERS -> !foldersUiState.isLoading
+            AppPage.RECENT_CHANGES -> !recentChangesUiState.isLoading
             AppPage.SETTINGS -> !settingUiState.isLoading
             else -> true
         }
@@ -204,6 +237,7 @@ fun App(
         when (targetPage) {
             AppPage.DEVICES -> devicesViewModel.refresh()
             AppPage.FOLDERS -> foldersViewModel.refresh()
+            AppPage.RECENT_CHANGES -> recentChangesViewModel.refresh()
             AppPage.SETTINGS -> settingViewModel.refresh()
             else -> currentPageMain = targetPage
         }
@@ -403,6 +437,9 @@ fun App(
                                     onRedirectingToDeveloperPage = {
                                         navigateTo(AppSubPage.DEV)
                                     },
+                                    onRedirectingToWebuiPage = {
+                                        requestSwitchToPageMain(AppPage.WEBUI)
+                                    },
                                     onEditingRunningConditionNetwork = {
                                         navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING_NETWORK)
                                     },
@@ -447,6 +484,12 @@ fun App(
                                     webView = webView,
                                 )
 
+                                AppPage.RECENT_CHANGES -> RecentChangesScreen(
+                                    uiState = recentChangesUiState,
+                                    coreState = coreUiState.state,
+                                    topAppBarScrollBehavior = mainScrollBehavior,
+                                    onRefresh = recentChangesViewModel::refresh,
+                                )
                             }
                         }
                     }
@@ -707,6 +750,7 @@ internal val AppPage.icon: ImageVector
         AppPage.FOLDERS -> MiuixIcons.Folder
         AppPage.CORE -> MiuixIcons.Home
         AppPage.WEBUI -> MiuixIcons.HorizontalSplit
+        AppPage.RECENT_CHANGES -> MiuixIcons.UploadCloud
         AppPage.SETTINGS -> MiuixIcons.Settings
     }
 

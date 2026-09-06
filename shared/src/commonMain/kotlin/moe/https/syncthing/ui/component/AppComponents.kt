@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
@@ -86,6 +87,7 @@ fun ValueRow(
     modifier: Modifier = Modifier,
     label: String,
     value: String,
+    valueSingleLine: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -102,6 +104,8 @@ fun ValueRow(
             text = value,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.End,
+            maxLines = if (valueSingleLine) 1 else Int.MAX_VALUE,
+            overflow = TextOverflow.Ellipsis ,
             modifier = Modifier
                 .weight(0.5f)
                 .clickable(
@@ -308,6 +312,7 @@ internal fun CoreNotReadyTakePlace(
     title: String,
     message: String,
     isError: Boolean = false,
+    content: @Composable () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -327,6 +332,7 @@ internal fun CoreNotReadyTakePlace(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
+        content()
     }
 }
 

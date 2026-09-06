@@ -203,6 +203,35 @@ internal class SyncthingRestClient(
         )
     }
 
+    fun recentChanges(limit: Int = RECENT_CHANGES_LIMIT): List<RestRecentChange> {
+        val safeLimit = limit.coerceIn(1, RECENT_CHANGES_LIMIT)
+        val events = requestArray("/rest/events/disk?limit=$safeLimit&timeout=0")
+        return buildList {
+            for (index in events.length() - 1 downTo 0) {
+                val event = events.optJSONObject(index) ?: continue
+                val data = event.optJSONObject("data") ?: continue
+                val source = when (event.optString("type")) {
+                    "LocalChangeDetected" -> SyncthingRecentChange.Source.LOCAL
+                    "RemoteChangeDetected" -> SyncthingRecentChange.Source.REMOTE
+                    else -> continue
+                }
+                add(
+                    RestRecentChange(
+                        id = event.optLong("id", 0L),
+                        time = event.optString("time"),
+                        source = source,
+                        action = data.optString("action"),
+                        itemType = data.optString("type"),
+                        folderId = data.optString("folder"),
+                        folderLabel = data.optString("label").takeIf(String::isNotBlank),
+                        path = data.optString("path"),
+                        modifiedBy = data.optString("modifiedBy").takeIf(String::isNotBlank),
+                    ),
+                )
+            }
+        }
+    }
+
     fun folderIgnores(folderId: String): RestFolderIgnores {
         val encodedFolderId = URLEncoder.encode(folderId, Charsets.UTF_8.name())
         val response = request("/rest/db/ignores?folder=$encodedFolderId")
@@ -716,6 +745,18 @@ internal class SyncthingRestClient(
         val pullErrors: Long,
     )
 
+    data class RestRecentChange(
+        val id: Long,
+        val time: String,
+        val source: SyncthingRecentChange.Source,
+        val action: String,
+        val itemType: String,
+        val folderId: String,
+        val folderLabel: String?,
+        val path: String,
+        val modifiedBy: String?,
+    )
+
     data class RestFolderIgnores(
         val patterns: List<String>,
         val error: String?,
@@ -724,6 +765,7 @@ internal class SyncthingRestClient(
     companion object {
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8384"
         private const val TIMEOUT_MILLIS = 1_500
+        private const val RECENT_CHANGES_LIMIT = 25
         private const val MAX_ERROR_BODY_LENGTH = 8 * 1024
         private const val REDACTED_VALUE = "<redacted>"
     }

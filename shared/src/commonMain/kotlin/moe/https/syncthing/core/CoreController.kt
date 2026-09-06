@@ -35,6 +35,10 @@ interface FoldersController {
     suspend fun ignorePendingFolder(folder: SyncthingPendingFolder)
 }
 
+interface RecentChangesController {
+    suspend fun loadRecentChanges(): List<SyncthingRecentChange>
+}
+
 interface SettingController {
     suspend fun loadSetting(): SettingSnapshot
     suspend fun pingDiscoveryServer(address: String): Long

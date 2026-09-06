@@ -67,7 +67,7 @@ class MainViewModel(
         )
         val bottomBarPages = normalizeBottomBarPages(
             if (storedPageNames == null) {
-                AppPage.entries.toSet()
+                MainUiState.DEFAULT_BOTTOM_BAR_PAGES
             } else {
                 AppPage.entries.filterTo(mutableSetOf()) { it.name in storedPageNames }
             },

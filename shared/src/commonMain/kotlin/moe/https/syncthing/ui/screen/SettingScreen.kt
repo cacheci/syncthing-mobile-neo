@@ -115,6 +115,7 @@ internal fun SettingScreen(
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
+    onRedirectingToWebuiPage: () -> Unit,
 ) {
     var developerModeVisible by remember { mutableStateOf(developerModeEnabled) }
     val settingAvailable = uiState.settingRaw != null && uiState.accessMode != null
@@ -182,6 +183,7 @@ internal fun SettingScreen(
             onEditingDiscoverServers = onEditingDiscoverServers,
             onEditingListenAddresses = onEditingListenAddresses,
             onRedirectingToDeveloperPage = onRedirectingToDeveloperPage,
+            onRedirectingToWebuiPage = onRedirectingToWebuiPage,
         )
 
         InfoSwitchCard(title = "后台运行") {
@@ -272,6 +274,7 @@ private fun SettingForm(
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
+    onRedirectingToWebuiPage: () -> Unit,
     settingAvailable: Boolean,
 ) {
     val startupOnly = accessMode == SettingAccessMode.STARTUP_ONLY
@@ -332,6 +335,11 @@ private fun SettingForm(
     }
 
     InfoSwitchCard(title = "WebUI") {
+        ArrowPreference(
+            title = "打开 WebUI",
+            onClick = onRedirectingToWebuiPage
+        )
+
         InputValueRow(
             value = formState.guiPort,
             onValueChange = { settingViewModel.onFormChange(guiPort = it) },

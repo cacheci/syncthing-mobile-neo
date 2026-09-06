@@ -46,7 +46,7 @@ class CoreRuntime(
     context: Context,
     private val coreRegistry: CoreRegistry,
     private val appSettingsStorage: AppSettingPrivateStorage,
-) : DevicesController, FoldersController, SettingController {
+) : DevicesController, FoldersController, RecentChangesController, SettingController {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val processMutex = Mutex()
@@ -276,6 +276,23 @@ class CoreRuntime(
     override suspend fun loadPendingFolders(): List<SyncthingPendingFolder> =
         withContext(Dispatchers.IO) {
             restClient.pendingFolders()
+        }
+
+    override suspend fun loadRecentChanges(): List<SyncthingRecentChange> =
+        withContext(Dispatchers.IO) {
+            restClient.recentChanges().map { change ->
+                SyncthingRecentChange(
+                    id = change.id,
+                    time = change.time,
+                    source = change.source,
+                    action = change.action,
+                    itemType = change.itemType,
+                    folderId = change.folderId,
+                    folderLabel = change.folderLabel,
+                    path = change.path,
+                    modifiedBy = change.modifiedBy,
+                )
+            }
         }
 
     override suspend fun addFolder(

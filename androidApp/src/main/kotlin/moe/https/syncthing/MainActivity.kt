@@ -37,6 +37,7 @@ import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.LogViewModel
 import moe.https.syncthing.viewmodel.MainViewModel
+import moe.https.syncthing.viewmodel.RecentChangesViewModel
 import moe.https.syncthing.viewmodel.SettingViewModel
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -72,6 +73,10 @@ class MainActivity : ComponentActivity() {
 
     private val foldersViewModel: FoldersViewModel by viewModels {
         FoldersViewModel.factory(applicationState.coreRuntime)
+    }
+
+    private val recentChangesViewModel: RecentChangesViewModel by viewModels {
+        RecentChangesViewModel.factory(applicationState.coreRuntime)
     }
 
     private val settingViewModel: SettingViewModel by viewModels {
@@ -149,6 +154,7 @@ class MainActivity : ComponentActivity() {
                 logViewModel = logViewModel,
                 devicesViewModel = devicesViewModel,
                 foldersViewModel = foldersViewModel,
+                recentChangesViewModel = recentChangesViewModel,
                 settingViewModel = settingViewModel,
                 mainViewModel = mainViewModel,
                 versionName = BuildConfig.VERSION_NAME,

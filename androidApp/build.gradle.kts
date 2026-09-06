@@ -39,7 +39,11 @@ val keyPasswordValue: String? = localProperties.getProperty("KEY_PASSWORD") ?: S
 
 android {
     namespace = "moe.https.syncthing"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
     ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {

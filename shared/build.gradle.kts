@@ -11,7 +11,11 @@ plugins {
 kotlin {
     android {
         namespace = "moe.https.syncthing.shared"
-        compileSdk = 37
+        compileSdk {
+            version = release(37) {
+                minorApiLevel = 2
+            }
+        }
         minSdk = 26
 
         androidResources.enable = true

@@ -297,7 +297,9 @@ fun App(
                         }
                     },
                     bottomBar = {
-                        NavigationBar {
+                        NavigationBar (
+                            color = MiuixTheme.colorScheme.background
+                        ) {
                             AppPage.entries
                                 .filter(mainUiState.bottomBarPages::contains)
                                 .forEach { page ->

@@ -13,6 +13,9 @@ jobs:
     name: Build and publish Alpha Preview
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    concurrency:
+      group: alpha-preview-release
+      cancel-in-progress: false
 
     steps:
       - name: Checkout repository
@@ -106,32 +109,92 @@ jobs:
           APK_PATH: ${{ steps.apk.outputs.path }}
         run: |
           short_sha="${GITHUB_SHA:0:12}"
-          tag="alpha-preview-$short_sha"
+          tag="alpha-preview"
+          previous_sha="$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/git/ref/tags/$tag" \
+              --jq '.object.sha' \
+              2>/dev/null || true
+          )"
+          existing_release_body="$(
+            gh release view "$tag" --json body --jq '.body' 2>/dev/null || true
+          )"
+          release_sha="$(
+            printf '%s\n' "$existing_release_body" \
+              | sed -n 's/^Automated Alpha Preview build for commit \([0-9a-f]\{40\}\)\.$/\1/p' \
+              | head -n 1
+          )"
+          baseline_sha="${release_sha:-$previous_sha}"
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; nothing to publish."
-            echo "published=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [[ -n "$baseline_sha" ]] && git cat-file -e "${baseline_sha}^{commit}" 2>/dev/null; then
+            raw_commit_messages="$(
+              git log "${baseline_sha}..${GITHUB_SHA}" --reverse --format='%s'
+            )"
+          else
+            raw_commit_messages="$(git log -1 "$GITHUB_SHA" --format='%s')"
           fi
 
-          release_notes="Automated Alpha Preview build for commit $GITHUB_SHA.
+          commit_messages="$(
+            printf '%s\n' "$raw_commit_messages" \
+              | grep -Eiv '^(chore|workflow)' \
+              | sed 's/^/- /' \
+              || true
+          )"
+
+          if [[ "$release_sha" == "$GITHUB_SHA" ]] && [[ -n "$existing_release_body" ]]; then
+            release_notes="$existing_release_body"
+          else
+            release_notes="Automated Alpha Preview build for commit $GITHUB_SHA.
+
+          $commit_messages
 
           > [!WARNING]
           > Please note that the preview release is unstable and is signed with the AOSP test key. Since the test key is publicly available, anyone can generate and sign an APK with the same key, and such APKs may be installed without triggering a signature-related warning."
+          fi
 
-          gh release create "$tag" "$APK_PATH" \
-            --target "$GITHUB_SHA" \
-            --title "Alpha Preview $short_sha" \
-            --notes "$release_notes" \
-            --prerelease \
-            --latest=false
+          if [[ -n "$previous_sha" ]]; then
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/git/refs/tags/$tag" \
+              -f sha="$GITHUB_SHA" \
+              -F force=true \
+              >/dev/null
+          else
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/$tag" \
+              -f sha="$GITHUB_SHA" \
+              >/dev/null
+          fi
 
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$APK_PATH" --clobber
+            gh release edit "$tag" \
+              --target "$GITHUB_SHA" \
+              --title "Alpha Preview $short_sha" \
+              --notes "$release_notes" \
+              --prerelease \
+              --draft=false \
+              --latest=false
+          else
+            gh release create "$tag" "$APK_PATH" \
+              --verify-tag \
+              --title "Alpha Preview $short_sha" \
+              --notes "$release_notes" \
+              --prerelease \
+              --latest=false
+          fi
+
+          commit_messages_b64="$(printf '%s' "$commit_messages" | base64 -w 0)"
+          echo "commit_messages_b64=$commit_messages_b64" >> "$GITHUB_OUTPUT"
           echo "published=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload Alpha Preview to Telegram
         if: steps.release.outputs.published == 'true'
         env:
           APK_PATH: ${{ steps.apk.outputs.path }}
+          COMMIT_MESSAGES_B64: ${{ steps.release.outputs.commit_messages_b64 }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_REPLY_TO_MESSAGE_ID: ${{ secrets.TELEGRAM_REPLY_TO_MESSAGE_ID }}
@@ -155,9 +218,42 @@ jobs:
 
           short_sha="${GITHUB_SHA:0:12}"
           reply_parameters="$(printf '{\"message_id\":%s}' "$TELEGRAM_REPLY_TO_MESSAGE_ID")"
-          telegram_caption="Alpha Preview $short_sha
+          commit_messages="$(printf '%s' "$COMMIT_MESSAGES_B64" | base64 --decode)"
+          caption_prefix="Alpha Preview $short_sha
 
-          ⚠️ Please note that the preview release is unstable and is signed with the AOSP test key. Since the test key is publicly available, anyone can generate and sign an APK with the same key, and such APKs may be installed without triggering a signature-related warning."
+          Changes
+          "
+          warning="⚠️ Please note that the preview release is unstable and is signed with the AOSP test key. Since the test key is publicly available, anyone can generate and sign an APK with the same key, and such APKs may be installed without triggering a signature-related warning."
+          caption_suffix=$'\n\n'"$warning"
+
+          max_caption_length=1000
+          max_commit_length=$((
+            max_caption_length - ${#caption_prefix} - ${#caption_suffix}
+          ))
+          truncation_marker=$'\n… (additional commits omitted)'
+          if (( ${#commit_messages} > max_commit_length )); then
+            truncated_length=$((max_commit_length - ${#truncation_marker}))
+            commit_messages="${commit_messages:0:truncated_length}${truncation_marker}"
+          fi
+
+          escape_markdown_v2() {
+            sed \
+              -e 's/\\/\\\\/g' \
+              -e 's/[][()~`>#+=|{}.!_*-]/\\&/g'
+          }
+
+          escaped_commit_messages="$(
+            printf '%s' "$commit_messages" | escape_markdown_v2
+          )"
+          escaped_warning="$(
+            printf '%s' "$warning" | escape_markdown_v2
+          )"
+          telegram_caption="*Alpha Preview* \`$short_sha\`
+
+          *Changes*
+          $escaped_commit_messages
+
+          $escaped_warning"
 
           curl \
             --silent \
@@ -167,5 +263,6 @@ jobs:
             --form-string "chat_id=$TELEGRAM_CHAT_ID" \
             --form "document=@$APK_PATH" \
             --form-string "caption=$telegram_caption" \
+            --form-string "parse_mode=MarkdownV2" \
             --form-string "reply_parameters=$reply_parameters" \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"

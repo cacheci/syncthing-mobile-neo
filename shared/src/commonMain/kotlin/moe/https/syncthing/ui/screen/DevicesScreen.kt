@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -39,15 +41,15 @@ import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.NewDeviceConfiguration
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingDiscoveryStatus
-import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingListenAddress
+import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
-import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
 import moe.https.syncthing.ui.component.StatusColor
@@ -72,8 +74,8 @@ import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 @Composable
@@ -226,7 +228,6 @@ private fun RemoteDeviceCard(
     var showShareOverlay by rememberSaveable { mutableStateOf(false) }
     var showDeleteOverlay by rememberSaveable { mutableStateOf(false) }
     var foldContentStatus by rememberSaveable { mutableStateOf(false) }
-    var foldSettingContentStatus by rememberSaveable { mutableStateOf(false) }
 
     val statusColor = if (device.connected) {
         StatusColor.OK.color
@@ -246,18 +247,7 @@ private fun RemoteDeviceCard(
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .combinedClickable(
-                        onLongClick = {
-                            if (foldSettingContentStatus && foldContentStatus) {
-                                foldContentStatus = false
-                            }
-                            foldSettingContentStatus = !foldSettingContentStatus
-                        },
-                        onClick = {
-                            if (foldSettingContentStatus && foldContentStatus) {
-                                foldSettingContentStatus = false
-                            }
-                            foldContentStatus = !foldContentStatus
-                        },
+                        onClick = { foldContentStatus = !foldContentStatus },
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ),
@@ -290,18 +280,6 @@ private fun RemoteDeviceCard(
             }
 
             AnimatedVisibility(
-                visible = foldContentStatus || foldSettingContentStatus,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300)
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 300)
-                )
-            ) {
-                HorizontalDivider()
-            }
-
-            AnimatedVisibility(
                 visible = foldContentStatus,
                 enter = expandVertically(
                     animationSpec = tween(durationMillis = 300)
@@ -311,6 +289,7 @@ private fun RemoteDeviceCard(
                 )
             ) {
                 Column ( verticalArrangement = Arrangement.spacedBy(10.dp) ) {
+                    HorizontalDivider()
                     MultipleValueRow(
                         label = "设备 ID",
                         values = listOf(device.id.take(7)),
@@ -350,38 +329,28 @@ private fun RemoteDeviceCard(
                             values = device.discoveredAddresses,
                         )
                     }
-                }
-            }
-
-            AnimatedVisibility(
-                visible = foldSettingContentStatus,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300)
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 300)
-                )
-            ) {
-                Row (
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    TextButton(
-                        modifier = Modifier.weight(0.45f).padding(end = 5.dp),
-                        text = "删除",
-                        onClick = { showDeleteOverlay = true },
-                        colors = TextButtonColors(
-                            color = MiuixTheme.colorScheme.secondaryContainer,
-                            disabledColor = MiuixTheme.colorScheme.surface,
-                            textColor = MiuixTheme.colorScheme.error,
-                            disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                    Row (
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "删除",
+                            onClick = { showDeleteOverlay = true },
+                            colors = TextButtonColors(
+                                color = MiuixTheme.colorScheme.secondaryContainer,
+                                disabledColor = MiuixTheme.colorScheme.surface,
+                                textColor = MiuixTheme.colorScheme.error,
+                                disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                            )
                         )
-                    )
-                    TextButton(
-                        modifier = Modifier.weight(0.45f).padding(start = 5.dp),
-                        text = "编辑",
-                        onClick = { onEditDevice(device) },
-                    )
+                        Spacer(Modifier.width(10.dp))
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "编辑",
+                            onClick = { onEditDevice(device) },
+                        )
+                    }
                 }
             }
         }
@@ -421,7 +390,7 @@ private fun RemoteDeviceCard(
                     text = "删除",
                     onClick = {
                         showDeleteOverlay = false
-                        foldSettingContentStatus = false
+                        foldContentStatus = false
                         onDeleteDevice(device.id)
                     },
                     colors = TextButtonColors(
@@ -462,7 +431,6 @@ private fun LocalDeviceCard(
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .combinedClickable(
-                        onLongClick = { },
                         onClick = { foldContentStatus = !foldContentStatus },
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

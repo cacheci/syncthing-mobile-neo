@@ -3,10 +3,12 @@ package moe.https.syncthing.core
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.edit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -34,6 +36,12 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 import java.net.UnknownServiceException
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -311,6 +319,45 @@ class CoreRuntime(
         if (configuration.updateIgnorePatterns) {
             restClient.updateFolderIgnores(configuration.folderId, configuration.ignorePatterns)
         }
+    }
+
+    override suspend fun deleteFolder(
+        folderId: String,
+        deleteLocalFiles: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        if (!deleteLocalFiles) {
+            restClient.deleteFolder(folderId)
+            return@withContext
+        }
+
+        val configuredFolders = restClient.configuredFolders()
+        val folder = configuredFolders.firstOrNull { it.id == folderId }
+            ?: throw IOException("找不到要删除的文件夹配置：$folderId")
+        val directory = resolveFolderDirectory(folder.path)
+        validateFolderDeletionTarget(
+            directory = directory,
+            otherFolderPaths = configuredFolders
+                .filterNot { it.id == folderId }
+                .map { it.path },
+        )
+
+        restClient.deleteFolder(folderId)
+        try {
+            deleteDirectoryWithoutFollowingLinks(directory)
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            throw IOException(
+                "已移除 Syncthing 文件夹配置，但删除本地文件失败：${error.message ?: directory.path}",
+                error,
+            )
+        }
+    }
+
+    override suspend fun setFolderPaused(
+        folderId: String,
+        paused: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        restClient.setFolderPaused(folderId, paused)
     }
 
     override suspend fun dismissPendingFolder(
@@ -1337,6 +1384,87 @@ class CoreRuntime(
     private fun requireLocalDeviceId(): String = restClient.status().myId
         ?.also(::rememberLocalDeviceId)
         ?: throw IOException("Syncthing REST 状态中缺少本机设备 ID")
+
+    private fun resolveFolderDirectory(configuredPath: String): File {
+        val path = configuredPath.trim()
+        if (path.isBlank()) throw IOException("文件夹路径为空，拒绝删除本地文件")
+
+        val unresolvedDirectory = when {
+            path == "~" -> applicationContext.filesDir
+            path.startsWith("~/") -> File(applicationContext.filesDir, path.removePrefix("~/"))
+            path.startsWith("~") -> throw IOException("无法解析文件夹路径：$configuredPath")
+            File(path).isAbsolute -> File(path)
+            else -> throw IOException("文件夹路径不是绝对路径：$configuredPath")
+        }
+        val normalizedPath = unresolvedDirectory.toPath().toAbsolutePath().normalize()
+        if (Files.isSymbolicLink(normalizedPath)) {
+            throw IOException("文件夹路径是符号链接，拒绝删除本地文件：$configuredPath")
+        }
+        return normalizedPath.toFile().canonicalFile
+    }
+
+    private fun validateFolderDeletionTarget(
+        directory: File,
+        otherFolderPaths: List<String>,
+    ) {
+        val targetPath = directory.toPath()
+        val filesRoot = applicationContext.filesDir.canonicalFile.toPath()
+        val coreHome = homeDirectory.canonicalFile.toPath()
+        val storageRoot = File("/storage").canonicalFile.toPath()
+
+        val isSafeInternalPath = targetPath.startsWith(filesRoot) &&
+            targetPath != filesRoot &&
+            !targetPath.startsWith(coreHome)
+        val isSafeStoragePath = if (targetPath.startsWith(storageRoot)) {
+            val relativePath = storageRoot.relativize(targetPath)
+            val minimumDepth = if (relativePath.firstOrNull()?.toString() == "emulated") 3 else 2
+            relativePath.nameCount >= minimumDepth
+        } else {
+            false
+        }
+        if (!isSafeInternalPath && !isSafeStoragePath) {
+            throw IOException("文件夹路径不在允许删除的目录范围内：${directory.path}")
+        }
+
+        val externalStorageRoot = Environment.getExternalStorageDirectory().canonicalFile.toPath()
+        if (targetPath == externalStorageRoot) {
+            throw IOException("拒绝删除设备公共存储根目录：${directory.path}")
+        }
+
+        otherFolderPaths.forEach { otherConfiguredPath ->
+            val otherPath = resolveFolderDirectory(otherConfiguredPath).toPath()
+            if (targetPath.startsWith(otherPath) || otherPath.startsWith(targetPath)) {
+                throw IOException("该路径与其他同步文件夹重叠，拒绝删除本地文件：${directory.path}")
+            }
+        }
+    }
+
+    private fun deleteDirectoryWithoutFollowingLinks(directory: File) {
+        val targetPath = directory.toPath()
+        if (!Files.exists(targetPath, LinkOption.NOFOLLOW_LINKS)) return
+        if (!Files.isDirectory(targetPath, LinkOption.NOFOLLOW_LINKS)) {
+            throw IOException("文件夹路径不是目录：${directory.path}")
+        }
+
+        Files.walkFileTree(targetPath, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(
+                file: Path,
+                attributes: BasicFileAttributes,
+            ): FileVisitResult {
+                Files.delete(file)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(
+                directory: Path,
+                error: IOException?,
+            ): FileVisitResult {
+                if (error != null) throw error
+                Files.delete(directory)
+                return FileVisitResult.CONTINUE
+            }
+        })
+    }
 
     private fun restApiAddress(): String = "http://localhost:$activeGuiPort"
 }

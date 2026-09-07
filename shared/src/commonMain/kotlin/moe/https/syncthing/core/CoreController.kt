@@ -31,6 +31,8 @@ interface FoldersController {
 
     suspend fun addFolder(configuration: NewFolderConfiguration)
     suspend fun updateFolder(configuration: NewFolderConfiguration)
+    suspend fun deleteFolder(folderId: String, deleteLocalFiles: Boolean)
+    suspend fun setFolderPaused(folderId: String, paused: Boolean)
     suspend fun dismissPendingFolder(folder: SyncthingPendingFolder)
     suspend fun ignorePendingFolder(folder: SyncthingPendingFolder)
 }

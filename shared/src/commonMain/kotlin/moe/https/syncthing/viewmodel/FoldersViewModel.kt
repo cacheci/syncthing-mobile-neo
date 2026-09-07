@@ -31,7 +31,7 @@ class FoldersViewModel(
             refreshMutex.withLock {
                 if (mutableUiState.value.isLoading) return@withLock
 
-                mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+                mutableUiState.update { it.copy(isLoading = true, loadError = null) }
                 try {
                     mutableUiState.value = mutableUiState.value.updateFrom(controller.loadFolders())
                 } catch (error: CancellationException) {
@@ -41,7 +41,7 @@ class FoldersViewModel(
                         it.copy(
                             isLoading = false,
                             hasLoaded = true,
-                            errorMessage = error.message
+                            loadError = error.message
                                 ?.takeIf(String::isNotBlank)
                                 ?: error.javaClass.simpleName,
                         )
@@ -57,6 +57,22 @@ class FoldersViewModel(
 
     fun updateFolder(configuration: NewFolderConfiguration) {
         saveFolder(configuration, updating = true)
+    }
+
+    fun deleteFolder(
+        folderId: String,
+        deleteLocalFiles: Boolean,
+        onSuccess: () -> Unit = {},
+    ) {
+        updateConfiguredFolder(folderId, onSuccess) { normalizedFolderId ->
+            controller.deleteFolder(normalizedFolderId, deleteLocalFiles)
+        }
+    }
+
+    fun setFolderPaused(folderId: String, paused: Boolean) {
+        updateConfiguredFolder(folderId) { normalizedFolderId ->
+            controller.setFolderPaused(normalizedFolderId, paused)
+        }
     }
 
     fun dismissPendingFolder(folder: SyncthingPendingFolder) {
@@ -79,7 +95,7 @@ class FoldersViewModel(
                 if (mutableUiState.value.isPendingFolderActionInProgress) return@withLock
 
                 mutableUiState.update {
-                    it.copy(isPendingFolderActionInProgress = true, errorMessage = null)
+                    it.copy(isPendingFolderActionInProgress = true, actionError = null)
                 }
                 try {
                     operation()
@@ -96,7 +112,43 @@ class FoldersViewModel(
                     mutableUiState.update {
                         it.copy(
                             isPendingFolderActionInProgress = false,
-                            errorMessage = error.message
+                            actionError = error.message
+                                ?.takeIf(String::isNotBlank)
+                                ?: error.javaClass.simpleName,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updateConfiguredFolder(
+        folderId: String,
+        onSuccess: () -> Unit = {},
+        operation: suspend (String) -> Unit,
+    ) {
+        val normalizedFolderId = folderId.trim()
+        if (normalizedFolderId.isBlank()) {
+            mutableUiState.update { it.copy(actionError = "文件夹 ID 不能为空") }
+            return
+        }
+
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                if (mutableUiState.value.isLoading) return@withLock
+
+                mutableUiState.update { it.copy(isLoading = true, actionError = null) }
+                try {
+                    operation(normalizedFolderId)
+                    mutableUiState.value = mutableUiState.value.updateFrom(controller.loadFolders())
+                    onSuccess()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    mutableUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            actionError = error.message
                                 ?.takeIf(String::isNotBlank)
                                 ?: error.javaClass.simpleName,
                         )
@@ -131,7 +183,7 @@ class FoldersViewModel(
             else -> null
         }
         if (validationMessage != null) {
-            mutableUiState.update { it.copy(errorMessage = validationMessage) }
+            mutableUiState.update { it.copy(actionError = validationMessage) }
             return
         }
 
@@ -139,7 +191,7 @@ class FoldersViewModel(
             refreshMutex.withLock {
                 if (mutableUiState.value.isLoading) return@withLock
 
-                mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+                mutableUiState.update { it.copy(isLoading = true, actionError = null) }
                 try {
                     if (updating) controller.updateFolder(normalizedConfiguration)
                     else controller.addFolder(normalizedConfiguration)
@@ -150,7 +202,7 @@ class FoldersViewModel(
                     mutableUiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = error.message
+                            actionError = error.message
                                 ?.takeIf(String::isNotBlank)
                                 ?: error.javaClass.simpleName,
                         )

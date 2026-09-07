@@ -404,6 +404,8 @@ fun App(
                                     },
                                     onDismissPendingFolder = foldersViewModel::dismissPendingFolder,
                                     onIgnorePendingFolder = foldersViewModel::ignorePendingFolder,
+                                    onSetFolderPaused = foldersViewModel::setFolderPaused,
+                                    snackbarHostState = snackbarHostState,
                                     onEditFolder = { folder ->
                                         editingFolder = folder
                                         pendingFolderToAdd = null
@@ -557,6 +559,7 @@ fun App(
                     AppSubPage.FOLDER_ADD -> {
                         AddFolderScreen(
                             isSubmitting = foldersUiState.isLoading,
+                            actionError = foldersUiState.actionError,
                             devices = devicesUiState.devices,
                             existingFolder = editingFolder,
                             pendingFolder = pendingFolderToAdd,
@@ -574,6 +577,13 @@ fun App(
                             onRedirectToPathChooserPage = { folderId ->
                                 folderPathChooserFolderId = folderId
                                 navigateTo(AppSubPage.SETTINGS_STORAGE_PERMISSION)
+                            },
+                            onDeleteFolder = { folderId, deleteLocalFiles ->
+                                foldersViewModel.deleteFolder(
+                                    folderId = folderId,
+                                    deleteLocalFiles = deleteLocalFiles,
+                                    onSuccess = navigateBack,
+                                )
                             },
                             navigateBack = navigateBack,
                         )

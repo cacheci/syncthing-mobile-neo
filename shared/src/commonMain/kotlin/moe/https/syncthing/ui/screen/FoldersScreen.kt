@@ -7,42 +7,46 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.FolderDeviceConfiguration
 import moe.https.syncthing.core.NewFolderConfiguration
@@ -52,15 +56,17 @@ import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.core.defaultFolderPath
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
-import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
 import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.util.formatBytes
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -72,13 +78,13 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Help
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -99,9 +105,17 @@ internal fun FoldersScreen(
     onDismissPendingFolder: (SyncthingPendingFolder) -> Unit,
     onIgnorePendingFolder: (SyncthingPendingFolder) -> Unit,
     onEditFolder: (SyncthingFolder) -> Unit,
+    onSetFolderPaused: (folderId: String, paused: Boolean) -> Unit,
+    snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
+
+    LaunchedEffect(uiState.actionError) {
+        uiState.actionError?.takeIf(String::isNotBlank)?.let { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     PullToRefresh(
         isRefreshing = uiState.isLoading,
@@ -118,9 +132,9 @@ internal fun FoldersScreen(
 
             uiState.isLoading && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> {}
 
-            uiState.errorMessage != null -> CoreNotReadyTakePlace(
+            uiState.loadError != null -> CoreNotReadyTakePlace(
                 title = "读取失败",
-                message = uiState.errorMessage,
+                message = uiState.loadError,
                 isError = true,
             )
 
@@ -150,7 +164,14 @@ internal fun FoldersScreen(
                     }
                     uiState.folders.forEach { folder ->
                         key(folder.id) {
-                            FolderCard(folder, onEditFolder)
+                            FolderCard(
+                                folder = folder,
+                                isLoading = !uiState.isLoading,
+                                onEditFolder = onEditFolder,
+                                onSetPaused = { paused ->
+                                    onSetFolderPaused(folder.id, paused)
+                                },
+                            )
                         }
                     }
                 }
@@ -162,7 +183,9 @@ internal fun FoldersScreen(
 @Composable
 private fun FolderCard(
     folder: SyncthingFolder,
+    isLoading: Boolean,
     onEditFolder: (SyncthingFolder) -> Unit,
+    onSetPaused: (Boolean) -> Unit,
 ) {
     var holdDown by rememberSaveable { mutableStateOf(false) }
     var foldContentStatus by rememberSaveable { mutableStateOf(false) }
@@ -179,7 +202,6 @@ private fun FolderCard(
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .combinedClickable(
-                        onLongClick = { onEditFolder( folder ) },
                         onClick = { foldContentStatus = !foldContentStatus },
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -211,12 +233,8 @@ private fun FolderCard(
 
             AnimatedVisibility(
                 visible = foldContentStatus,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300)  // 展开动画时长
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 300)  // 折叠动画时长
-                )
+                enter = expandVertically(animationSpec = tween(durationMillis = 300)),
+                exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
             ) {
                 Column (verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     HorizontalDivider()
@@ -233,6 +251,24 @@ private fun FolderCard(
                     )
                     if (folder.pullErrors > 0) {
                         FolderValueRow("同步错误", "${folder.pullErrors} 个文件", isError = true)
+                    }
+                    Row (
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = if (folder.paused) "恢复" else "暂停",
+                            enabled = isLoading,
+                            onClick = { onSetPaused(!folder.paused) },
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "编辑",
+                            enabled = isLoading,
+                            onClick = { onEditFolder( folder ) },
+                        )
                     }
                 }
             }
@@ -300,12 +336,7 @@ private fun NewFolderCard(
                     text = "黑名单",
                     enabled = enabled,
                     onClick = onIgnore,
-                    colors = TextButtonColors(
-                        color = MiuixTheme.colorScheme.secondaryContainer,
-                        disabledColor = MiuixTheme.colorScheme.surface,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
-                    )
+                    colors = ButtonDefaults.textButtonColors(textColor = MiuixTheme.colorScheme.error)
                 )
                 TextButton(
                     modifier = Modifier.weight(0.3f),
@@ -328,12 +359,14 @@ private fun NewFolderCard(
 internal fun AddFolderScreen(
     modifier: Modifier = Modifier,
     isSubmitting: Boolean,
+    actionError: String? = null,
     devices: List<SyncthingDevice>,
     existingFolder: SyncthingFolder? = null,
     pendingFolder: SyncthingPendingFolder? = null,
     selectedFolderPath: String?,
     onConfirm: (NewFolderConfiguration) -> Unit,
     onRedirectToPathChooserPage: (folderId: String) -> Unit,
+    onDeleteFolder: (folderId: String, deleteLocalFiles: Boolean) -> Unit = { _, _ -> },
     navigateBack: () -> Unit,
 ) {
     val isEditingFolder = (existingFolder != null)
@@ -422,11 +455,19 @@ internal fun AddFolderScreen(
 
     var showEditorBottomSheet by remember { mutableStateOf(false) }
     var showStIgnoreHelp by remember { mutableStateOf(false) }
+    var showDeleteOverlay by rememberSaveable { mutableStateOf(false) }
+    var deleteLocalFiles by rememberSaveable { mutableStateOf(false) }
 
     val uriHandler = LocalUriHandler.current
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
+
+    LaunchedEffect(actionError) {
+        actionError?.takeIf(String::isNotBlank)?.let { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Scaffold(
         topBar = { AdaptiveTopAppBar(
@@ -747,8 +788,20 @@ internal fun AddFolderScreen(
                             },
                         )
                     }
-
                 )
+
+                if (isEditingFolder) {
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                        text = "删除",
+                        enabled = !isSubmitting,
+                        onClick = {
+                            deleteLocalFiles = false
+                            showDeleteOverlay = true
+                        },
+                        colors = ButtonDefaults.textButtonColors(textColor = MiuixTheme.colorScheme.error)
+                    )
+                }
             }
 
             OverlayBottomSheet(
@@ -869,6 +922,75 @@ internal fun AddFolderScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(320.dp)
+                        )
+                    }
+                }
+            }
+
+            OverlayDialog(
+                show = showDeleteOverlay,
+                title = "删除文件夹",
+                onDismissRequest = { showDeleteOverlay = false },
+                onDismissFinished = {
+                    showDeleteOverlay = false
+                    deleteLocalFiles = false
+                },
+            ) {
+                Column (
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "确定要删除文件夹 “${folderId.toCharArray().joinToString("\u200B")}” 吗？",
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                enabled = !isSubmitting,
+                                role = Role.Checkbox,
+                                onClick = { deleteLocalFiles = !deleteLocalFiles },
+                            ),
+                    ) {
+                        Checkbox(
+                            state = ToggleableState(deleteLocalFiles),
+                            enabled = !isSubmitting,
+                            onClick = { deleteLocalFiles = !deleteLocalFiles },
+                        )
+                        Text(
+                            "同时删除本地文件",
+                            style = MiuixTheme.textStyles.body2,
+                            color = MiuixTheme.colorScheme.onBackgroundVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(end = 34.dp).fillMaxWidth(),
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "取消",
+                            enabled = !isSubmitting,
+                            onClick = { showDeleteOverlay = false },
+                        )
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "删除",
+                            enabled = !isSubmitting,
+                            onClick = {
+                                val shouldDeleteLocalFiles = deleteLocalFiles
+                                showDeleteOverlay = false
+                                deleteLocalFiles = false
+                                onDeleteFolder(folderId, shouldDeleteLocalFiles)
+                            },
+                            colors = ButtonDefaults.textButtonColors(textColor = MiuixTheme.colorScheme.error),
                         )
                     }
                 }

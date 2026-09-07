@@ -190,6 +190,19 @@ internal class SyncthingRestClient(
         )
     }
 
+    fun deleteFolder(folderId: String) {
+        val encodedFolderId = encodePathSegment(folderId)
+        request("/rest/config/folders/$encodedFolderId", method = "DELETE")
+    }
+
+    fun setFolderPaused(folderId: String, paused: Boolean) {
+        val encodedFolderId = encodePathSegment(folderId)
+        val path = "/rest/config/folders/$encodedFolderId"
+        val folder = request(path)
+        folder.put("paused", paused)
+        requestBody(path = path, method = "PUT", body = folder.toString())
+    }
+
     fun folderStatus(folderId: String): RestFolderStatus {
         val encodedFolderId = URLEncoder.encode(folderId, Charsets.UTF_8.name())
         val json = request("/rest/db/status?folder=$encodedFolderId")

@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -243,6 +243,19 @@ internal fun LicenceScreen(
                 summary = "Apache-2.0",
                 endText = "GitHub",
                 onClick = { uriHandler.openUri("https://github.com/ktorio/ktor") },
+                onShowLicence = {
+                    showLicenceType = LicenceText.APACHE2
+                    showLicenceOverlay = true
+                },
+            )
+        }
+
+        item {
+            AboutCard(
+                title = "zip4j",
+                summary = "Apache-2.0",
+                endText = "GitHub",
+                onClick = { uriHandler.openUri("https://github.com/srikanth-lingala/zip4j") },
                 onShowLicence = {
                     showLicenceType = LicenceText.APACHE2
                     showLicenceOverlay = true

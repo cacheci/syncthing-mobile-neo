@@ -1385,6 +1385,19 @@ class CoreRuntime(
         ?.also(::rememberLocalDeviceId)
         ?: throw IOException("Syncthing REST 状态中缺少本机设备 ID")
 
+    internal fun reconcileImportedConfiguration() {
+        activeGuiHost = loadProtocolStack().guiListenAddress
+        activeGuiPort = initialGuiPort()
+        configFile.ensureGuiAuthentication(
+            enabled = managedGuiAuthenticationEnabled,
+            username = managedGuiCredentials.username,
+            password = managedGuiCredentials.password,
+            guiAddress = formatGuiAddress(activeGuiHost, activeGuiPort),
+            apiKey = loadOrCreateApiKey(),
+        )
+        preferences.edit { remove(KEY_LOCAL_DEVICE_ID) }
+    }
+
     private fun resolveFolderDirectory(configuredPath: String): File {
         val path = configuredPath.trim()
         if (path.isBlank()) throw IOException("文件夹路径为空，拒绝删除本地文件")

@@ -166,6 +166,7 @@ internal class SyncthingConfigFile(
         username: String,
         password: String,
         guiAddress: String? = null,
+        apiKey: String? = null,
     ): Boolean {
         val document = readDocument()
         val root = document.documentElement
@@ -178,10 +179,12 @@ internal class SyncthingConfigFile(
         val currentPromptEnabled = gui.getAttribute(SEND_BASIC_AUTH_PROMPT_ATTRIBUTE).toBoolean()
         val changed = (enabled && (currentUsername != username || !passwordMatches || !currentPromptEnabled)) ||
             (!enabled && (currentUsername.isNotBlank() || currentPasswordHash.isNotBlank() || currentPromptEnabled)) ||
-            (guiAddress != null && gui.childText(ADDRESS_TAG) != guiAddress)
+            (guiAddress != null && gui.childText(ADDRESS_TAG) != guiAddress) ||
+            (apiKey != null && gui.childText(API_KEY_TAG) != apiKey)
         if (!changed) return false
 
         guiAddress?.let { gui.setChildText(document, ADDRESS_TAG, it) }
+        apiKey?.let { gui.setChildText(document, API_KEY_TAG, it) }
         if (enabled) {
             gui.setChildText(document, USER_TAG, username)
         } else {
@@ -203,6 +206,14 @@ internal class SyncthingConfigFile(
         gui.setAttribute(SEND_BASIC_AUTH_PROMPT_ATTRIBUTE, enabled.toString())
         writeDocumentAtomically(document)
         return true
+    }
+
+    fun validate() {
+        val root = readDocument().documentElement
+            ?.takeIf { it.tagName == CONFIGURATION_TAG }
+            ?: error("Syncthing 配置文件缺少 configuration 根节点")
+        if (root.childElement(GUI_TAG) == null) error("Syncthing 配置文件缺少 gui 节点")
+        if (root.childElement(OPTIONS_TAG) == null) error("Syncthing 配置文件缺少 options 节点")
     }
 
     private fun verifyPassword(password: String, passwordHash: String): Boolean {
@@ -295,6 +306,7 @@ internal class SyncthingConfigFile(
         private const val ADDRESS_TAG = "address"
         private const val USER_TAG = "user"
         private const val PASSWORD_TAG = "password"
+        private const val API_KEY_TAG = "apikey"
         private const val THEME_TAG = "theme"
         private const val SEND_BASIC_AUTH_PROMPT_ATTRIBUTE = "sendBasicAuthPrompt"
         private const val DEVICE_TAG = "device"

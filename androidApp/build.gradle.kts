@@ -124,9 +124,11 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ui)
     implementation(libs.bcrypt)
     implementation(libs.quickie.bundled)
+    implementation(libs.zip4j)
     debugImplementation(libs.ui.tooling)
 }
 

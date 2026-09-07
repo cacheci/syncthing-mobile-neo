@@ -46,6 +46,7 @@ import moe.https.syncthing.ui.screen.SettingBackgroundRunningBatteryPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningDurationPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningNetworkPage
 import moe.https.syncthing.ui.screen.SettingBackgroundRunningPage
+import moe.https.syncthing.ui.screen.SettingBackupPage
 import moe.https.syncthing.ui.screen.SettingBottomBarCustomPage
 import moe.https.syncthing.ui.screen.SettingCoreSelectScreen
 import moe.https.syncthing.ui.screen.SettingEditDiscoveryScreen
@@ -56,6 +57,7 @@ import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.ui.screen.SettingStoragePermissionPage
 import moe.https.syncthing.ui.screen.WebviewScreen
 import moe.https.syncthing.viewmodel.CoreViewModel
+import moe.https.syncthing.viewmodel.BackupViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.LogViewModel
@@ -99,6 +101,7 @@ fun App(
     recentChangesViewModel: RecentChangesViewModel,
     settingViewModel: SettingViewModel,
     mainViewModel: MainViewModel,
+    backupViewModel: BackupViewModel,
     versionName: String,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
@@ -129,6 +132,7 @@ fun App(
     val recentChangesUiState by recentChangesViewModel.uiState.collectAsState()
     val settingUiState by settingViewModel.uiState.collectAsState()
     val mainUiState by mainViewModel.uiState.collectAsState()
+    val backupUiState by backupViewModel.uiState.collectAsState()
     val initialMainPage = remember { mainUiState.defaultBottomBarPage }
     var currentPageMain by remember { mutableStateOf(initialMainPage) }
     var requestedPageMain by remember { mutableStateOf(initialMainPage) }
@@ -442,6 +446,9 @@ fun App(
                                     onRedirectingToWebuiPage = {
                                         requestSwitchToPageMain(AppPage.WEBUI)
                                     },
+                                    onRedirectingToBackupPage = {
+                                        navigateTo(AppSubPage.SETTINGS_BACKUP)
+                                    },
                                     onEditingRunningConditionNetwork = {
                                         navigateTo(AppSubPage.SETTINGS_BACKGROUND_RUNNING_NETWORK)
                                     },
@@ -735,6 +742,18 @@ fun App(
                                             onOpenLocationSettings = onOpenLocationSettings,
                                         )
                                     }
+
+                                    AppSubPage.SETTINGS_BACKUP -> {
+                                        SettingBackupPage(
+                                            uiState = backupUiState,
+                                            snackbarHostState = plainPageSnackbarHostState,
+                                            onExport = backupViewModel::requestExport,
+                                            onImport = backupViewModel::requestImport,
+                                            onConfirmImport = backupViewModel::confirmImport,
+                                            onCancelImport = backupViewModel::cancelImport,
+                                            onMessageShown = backupViewModel::clearMessage,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -783,5 +802,6 @@ internal enum class AppSubPage(val title: String) {
     SETTINGS_POSITION_PERMISSION("定位权限"),
     SETTINGS_PERMISSIONS("权限设置"),
     SETTINGS_BOTTOM_BAR("底栏设置"),
+    SETTINGS_BACKUP("备份"),
     DEV("开发者设置"),
 }

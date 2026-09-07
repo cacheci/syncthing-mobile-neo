@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -30,10 +32,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import moe.https.syncthing.core.BackupImportFormat
 import moe.https.syncthing.core.CoreAvailability
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
@@ -54,6 +62,7 @@ import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.component.TimePicker
 import moe.https.syncthing.ui.model.AppPage
+import moe.https.syncthing.ui.model.BackupUiState
 import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.model.MainUiState
 import moe.https.syncthing.ui.model.SettingFormState
@@ -85,6 +94,8 @@ import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TextFieldColors
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -95,6 +106,7 @@ import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.preference.RangeSliderPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 internal fun SettingScreen(
@@ -116,6 +128,7 @@ internal fun SettingScreen(
     onChangeToLicence: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
     onRedirectingToWebuiPage: () -> Unit,
+    onRedirectingToBackupPage: () -> Unit,
 ) {
     var developerModeVisible by remember { mutableStateOf(developerModeEnabled) }
     val settingAvailable = uiState.settingRaw != null && uiState.accessMode != null
@@ -241,6 +254,11 @@ internal fun SettingScreen(
             ArrowPreference(
                 title = "核心选择",
                 onClick = onEditingCores,
+            )
+
+            ArrowPreference(
+                title = "备份配置",
+                onClick = onRedirectingToBackupPage,
             )
         }
 
@@ -1782,6 +1800,211 @@ internal fun SettingBottomBarCustomPage(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingBackupPage(
+    uiState: BackupUiState,
+    snackbarHostState: SnackbarHostState,
+    onExport: (password: String?) -> Unit,
+    onImport: (BackupImportFormat) -> Unit,
+    onConfirmImport: (password: String?) -> Unit,
+    onCancelImport: () -> Unit,
+    onMessageShown: () -> Unit,
+) {
+    var showEncryptedExportDialog by rememberSaveable { mutableStateOf(false) }
+    var exportPassword by remember { mutableStateOf(TextFieldValue()) }
+    var exportPasswordConfirmation by remember { mutableStateOf(TextFieldValue()) }
+    var importPassword by remember(uiState.pendingImport?.sourceUri) { mutableStateOf("") }
+    val exportPasswordConfirmationFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(uiState.successMessage, uiState.errorMessage) {
+        val message = uiState.errorMessage ?: uiState.successMessage
+        if (!message.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(message)
+            onMessageShown()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        if (uiState.isWorking) {
+            MessageCard(
+                title = "正在处理备份",
+                message = "操作期间核心会暂时停止，请勿关闭 App 或移除备份文件。",
+            )
+        } // TODO: use snackbar
+        InfoSwitchCard(
+            title = "导出",
+        ) {
+            ArrowPreference(
+                title = "导出备份",
+                summary = "请妥善保管备份文件。",
+                enabled = !uiState.isWorking,
+                modifier = Modifier.combinedClickable(
+                    onClick = {
+                        exportPassword = TextFieldValue()
+                        exportPasswordConfirmation = TextFieldValue()
+                        showEncryptedExportDialog = true
+                    },
+                    onLongClick = {
+                        onExport(null)
+                    }
+                ),
+            )
+        }
+        InfoSwitchCard(
+            title = "导入",
+        ) {
+            ArrowPreference(
+                title = "导入备份",
+                summary = "导入之前导出的备份文件",
+                enabled = !uiState.isWorking,
+                onClick = { onImport(BackupImportFormat.CURRENT) },
+            )
+            ArrowPreference(
+                title = "导入备份（旧版）",
+                summary = "从 Syncthing-Fork 导入",
+                enabled = !uiState.isWorking,
+                onClick = { onImport(BackupImportFormat.LEGACY) },
+            )
+        }
+    }
+
+    WindowDialog(
+        show = showEncryptedExportDialog,
+        title = "设置备份密码",
+        onDismissRequest = { showEncryptedExportDialog = false },
+        onDismissFinished = {
+            if (!showEncryptedExportDialog) {
+                exportPassword = TextFieldValue()
+                exportPasswordConfirmation = TextFieldValue()
+            }
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("请妥善保管密码，若忘记密码则无法恢复。")
+            TextField(
+                value = exportPassword,
+                onValueChange = { exportPassword = it },
+                label = "密码",
+                enabled = !uiState.isWorking,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next,
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { exportPasswordConfirmationFocusRequester.requestFocus() },
+                ),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            TextField(
+                modifier = Modifier.focusRequester(exportPasswordConfirmationFocusRequester),
+                value = exportPasswordConfirmation,
+                onValueChange = { exportPasswordConfirmation = it },
+                label = "确认密码",
+                enabled = !uiState.isWorking,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() },
+                ),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                colors = TextFieldColors(
+                    backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                    labelColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                    borderColor = if (exportPasswordConfirmation.text == exportPassword.text) {
+                        MiuixTheme.colorScheme.primary
+                    } else {
+                        MiuixTheme.colorScheme.error
+                    },
+                ),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    text = "取消",
+                    onClick = { showEncryptedExportDialog = false },
+                )
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    text = "确定",
+                    enabled = exportPassword.text.length >= 8 &&
+                        exportPassword.text == exportPasswordConfirmation.text,
+                    onClick = {
+                        val password = exportPassword.text
+                        showEncryptedExportDialog = false
+                        onExport(password)
+                    },
+                )
+            }
+        }
+    }
+
+    val pendingImport = uiState.pendingImport
+    WindowDialog(
+        show = pendingImport != null,
+        title = if (pendingImport?.format == BackupImportFormat.LEGACY) {
+            "导入旧版备份"
+        } else {
+            "导入备份"
+        },
+        onDismissRequest = {
+            if (!uiState.isWorking) onCancelImport()
+        },
+        onDismissFinished = {
+            if (uiState.pendingImport == null) importPassword = ""
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                if (pendingImport?.format == BackupImportFormat.LEGACY) {
+                    "将迁移旧版 Syncthing 身份与核心配置。旧版 App 设置和索引数据库不会导入。"
+                } else {
+                    "当前 App 设置、Syncthing 设备身份和核心配置将被替换。较新 App 创建的备份会被拒绝。"
+                },
+            )
+            Text("如果备份已加密，请输入密码；未加密备份请留空。")
+            InputValueRow(
+                label = "备份密码",
+                value = importPassword,
+                valueLabel = "未加密时留空",
+                allowEdit = !uiState.isWorking,
+                onValueChange = { importPassword = it },
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    text = "取消",
+                    enabled = !uiState.isWorking,
+                    onClick = onCancelImport,
+                )
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    text = "确认导入",
+                    enabled = !uiState.isWorking,
+                    onClick = { onConfirmImport(importPassword) },
+                )
             }
         }
     }

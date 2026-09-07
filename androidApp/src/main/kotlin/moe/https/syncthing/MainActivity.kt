@@ -31,7 +31,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.AndroidCoreLogReader
 import moe.https.syncthing.storage.AppSettingPrivateStorage
+import moe.https.syncthing.core.BackupImportFormat
+import moe.https.syncthing.ui.model.BackupUiEffect
 import moe.https.syncthing.ui.model.CoreUiEffect
+import moe.https.syncthing.viewmodel.BackupViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
@@ -91,6 +94,10 @@ class MainActivity : ComponentActivity() {
         MainViewModel.factory(applicationState.appSettingsStorage)
     }
 
+    private val backupViewModel: BackupViewModel by viewModels {
+        BackupViewModel.factory(applicationState.backupManager)
+    }
+
     private val corePicker = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -99,6 +106,24 @@ class MainActivity : ComponentActivity() {
                 applicationState.coreRuntime.importCore(uri)
             }
         }
+    }
+
+    private val backupCreator = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        backupViewModel.onExportDestinationSelected(uri?.toString())
+    }
+
+    private val currentBackupPicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        backupViewModel.onImportSourceSelected(uri?.toString(), BackupImportFormat.CURRENT)
+    }
+
+    private val legacyBackupPicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        backupViewModel.onImportSourceSelected(uri?.toString(), BackupImportFormat.LEGACY)
     }
 
     private val legacyStoragePermissionLauncher = registerForActivityResult(
@@ -134,9 +159,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                coreViewModel.effects.collect { effect ->
-                    when (effect) {
-                        CoreUiEffect.OpenCorePicker -> openCorePicker()
+                launch {
+                    coreViewModel.effects.collect { effect ->
+                        when (effect) {
+                            CoreUiEffect.OpenCorePicker -> openCorePicker()
+                        }
+                    }
+                }
+                launch {
+                    backupViewModel.effects.collect { effect ->
+                        when (effect) {
+                            is BackupUiEffect.CreateDocument -> backupCreator.launch(effect.suggestedFileName)
+                            is BackupUiEffect.OpenDocument -> {
+                                val mimeTypes = arrayOf("application/zip", "application/octet-stream")
+                                when (effect.format) {
+                                    BackupImportFormat.CURRENT -> currentBackupPicker.launch(mimeTypes)
+                                    BackupImportFormat.LEGACY -> legacyBackupPicker.launch(mimeTypes)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -157,6 +198,7 @@ class MainActivity : ComponentActivity() {
                 recentChangesViewModel = recentChangesViewModel,
                 settingViewModel = settingViewModel,
                 mainViewModel = mainViewModel,
+                backupViewModel = backupViewModel,
                 versionName = BuildConfig.VERSION_NAME,
                 developerModeEnabled = developerModeEnabled,
                 onModifyDeveloperMode = {

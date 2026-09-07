@@ -4,10 +4,13 @@ import android.app.Application
 import android.content.Intent
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.ui.AndroidComposeUiFlags
+import androidx.compose.ui.ExperimentalComposeUiApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import moe.https.syncthing.core.AndroidBackupManager
 import moe.https.syncthing.core.AndroidCoreController
 import moe.https.syncthing.core.BuiltInCoreProvider
 import moe.https.syncthing.core.CoreRegistry
@@ -28,11 +31,17 @@ class SyncthingApplication : Application() {
     lateinit var coreController: AndroidCoreController
         private set
 
+    lateinit var backupManager: AndroidBackupManager
+        private set
+
     lateinit var appSettingsStorage: AppSettingPrivateStorage
         private set
 
+    // TODO: Remove flag after AndroidX Compose UI upgrade to 1.21.1
+    @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate() {
         super.onCreate()
+        AndroidComposeUiFlags.isOutOfFrameSchedulerForTextInputEventsEnabled = false
         appSettingsStorage = SharedPreferencesAppSettingsStorage(this)
         val coreRegistry = CoreRegistry(
             context = this,
@@ -41,6 +50,7 @@ class SyncthingApplication : Application() {
         )
         coreRuntime = CoreRuntime(this, coreRegistry, appSettingsStorage)
         coreController = AndroidCoreController(this, coreRuntime)
+        backupManager = AndroidBackupManager(this, coreRuntime, coreController)
         applicationScope.launch {
             coreRuntime.refreshInstallation()
         }

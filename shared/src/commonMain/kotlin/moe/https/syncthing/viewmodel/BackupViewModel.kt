@@ -76,9 +76,9 @@ class BackupViewModel(
     fun confirmImport(password: String?) {
         if (mutableUiState.value.isWorking) return
         val pendingImport = mutableUiState.value.pendingImport ?: return
+        mutableUiState.update { it.copy(pendingImport = null) }
         runOperation(
             successMessage = "备份导入成功，部分 App 设置将在重启后生效",
-            onSuccess = { it.copy(pendingImport = null) },
         ) {
             controller.importBackup(
                 sourceUri = pendingImport.sourceUri,

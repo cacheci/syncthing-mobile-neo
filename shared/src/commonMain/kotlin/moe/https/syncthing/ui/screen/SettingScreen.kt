@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import moe.https.syncthing.core.BackupImportFormat
 import moe.https.syncthing.core.CoreAvailability
 import moe.https.syncthing.core.SettingAccessMode
@@ -1821,12 +1823,39 @@ internal fun SettingBackupPage(
     var importPassword by remember(uiState.pendingImport?.sourceUri) { mutableStateOf("") }
     val exportPasswordConfirmationFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val snackbarScope = rememberCoroutineScope()
+    val activeSnackbarMessages = remember { mutableSetOf<String>() }
+    val workingMessage = "正在处理备份：操作期间核心会暂时停止，请勿关闭 App 或移除备份文件。"
 
-    LaunchedEffect(uiState.successMessage, uiState.errorMessage) {
-        val message = uiState.errorMessage ?: uiState.successMessage
-        if (!message.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(message)
-            onMessageShown()
+    fun showSnackbarOnce(message: String) {
+        if (!activeSnackbarMessages.add(message)) return
+        snackbarScope.launch {
+            try {
+                val visibleMessages = listOfNotNull(
+                    snackbarHostState.newestSnackbarData(),
+                    snackbarHostState.oldestSnackbarData(),
+                ).map { it.visuals.message }
+                if (message !in visibleMessages) {
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        withDismissAction = true,
+                    )
+                }
+            } finally {
+                activeSnackbarMessages.remove(message)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.isWorking, uiState.successMessage, uiState.errorMessage) {
+        if (uiState.isWorking) {
+            showSnackbarOnce(workingMessage)
+        } else {
+            val message = uiState.errorMessage ?: uiState.successMessage
+            if (!message.isNullOrBlank()) {
+                onMessageShown()
+                showSnackbarOnce(message)
+            }
         }
     }
 
@@ -1837,12 +1866,6 @@ internal fun SettingBackupPage(
             .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        if (uiState.isWorking) {
-            MessageCard(
-                title = "正在处理备份",
-                message = "操作期间核心会暂时停止，请勿关闭 App 或移除备份文件。",
-            )
-        } // TODO: use snackbar
         InfoSwitchCard(
             title = "导出",
         ) {
@@ -1945,7 +1968,7 @@ internal fun SettingBackupPage(
                 TextButton(
                     modifier = Modifier.weight(1f),
                     text = "确定",
-                    enabled = exportPassword.text.length >= 8 &&
+                    enabled = exportPassword.text.isNotEmpty() &&
                         exportPassword.text == exportPasswordConfirmation.text,
                     onClick = {
                         val password = exportPassword.text
@@ -1975,12 +1998,11 @@ internal fun SettingBackupPage(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 if (pendingImport?.format == BackupImportFormat.LEGACY) {
-                    "将迁移旧版 Syncthing 身份与核心配置。旧版 App 设置和索引数据库不会导入。"
+                    "将迁移 Syncthing-fork 的身份认证与核心配置。注意：Relay、监听和 App 配置将不会导入。"
                 } else {
-                    "当前 App 设置、Syncthing 设备身份和核心配置将被替换。较新 App 创建的备份会被拒绝。"
+                    "所有设置都会被覆盖，包括安全性设置和 API 等。请确认覆盖当前配置。"
                 },
             )
-            Text("如果备份已加密，请输入密码；未加密备份请留空。")
             InputValueRow(
                 label = "备份密码",
                 value = importPassword,

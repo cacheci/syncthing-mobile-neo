@@ -380,6 +380,7 @@ internal fun AddFolderScreen(
     var versioning by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioning ?: NewFolderConfiguration.Versioning.NONE)
     }
+    val versioningOptions = NewFolderConfiguration.Versioning.entries
     var versioningFsPath by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioningFsPath.orEmpty())
     }
@@ -391,6 +392,9 @@ internal fun AddFolderScreen(
     }
     var cleanupIntervalSeconds by remember(existingFolder) {
         mutableStateOf(existingFolder?.versioningCleanupIntervalSeconds?.toString() ?: "3600")
+    }
+    var externalCommand by remember(existingFolder) {
+        mutableStateOf(existingFolder?.versioningExternalCommand.orEmpty())
     }
     var ignorePatternsEnabled by remember(existingFolder) {
         mutableStateOf(false)
@@ -446,6 +450,7 @@ internal fun AddFolderScreen(
                 rescanIntervalSeconds,
             ).all { value -> (value.toIntWithDefaultForEmpty(0))?.let{ it >= 0 } == true }) &&
             (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600)?.let{ it <= 31_536_000 } == true) &&
+            (versioning != NewFolderConfiguration.Versioning.EXTERNAL || externalCommand.trim().isNotBlank()) &&
             (remoteDevices
                 .filter { it.untrusted && it.id in selectedDeviceIds }
                 .all { device -> devicePasswords[device.id].orEmpty().isNotBlank() }) &&
@@ -498,6 +503,7 @@ internal fun AddFolderScreen(
                                 versioningCleanoutDays = cleanoutDays.toIntOrNull() ?: 0,
                                 versioningKeep = keepVersions.toIntOrNull() ?: 5,
                                 versioningCleanupIntervalSeconds = cleanupIntervalSeconds.toIntOrNull() ?: 3600,
+                                versioningExternalCommand = externalCommand.trim(),
                                 ignorePatterns = if (isEditingFolder) {
                                     acceptedIgnoreText.toIgnorePatternLines()
                                 } else {
@@ -634,16 +640,16 @@ internal fun AddFolderScreen(
                             } else {
                                 null
                             },
-                            items = listOf("不启用", "回收站版本控制", "简易版本控制"), // TODO: 先只做这三个
-                            selectedIndex = versioning.ordinal,
+                            items = versioningOptions.map { it.displayName },
+                            selectedIndex = versioningOptions.indexOf(versioning),
                             enabled = !isSubmitting && existingFolder?.versioningSupported != false,
                             onSelectedIndexChange = { selectedIndex ->
-                                versioning = NewFolderConfiguration.Versioning.entries[selectedIndex]
+                                versioning = versioningOptions[selectedIndex]
                             },
                         )
 
                         AnimatedVisibility(
-                            visible = versioning != NewFolderConfiguration.Versioning.NONE,
+                            visible = (versioning != NewFolderConfiguration.Versioning.NONE) && (versioning != NewFolderConfiguration.Versioning.EXTERNAL),
                             enter = expandVertically(
                                 animationSpec = tween(durationMillis = 300)
                             ),
@@ -653,14 +659,13 @@ internal fun AddFolderScreen(
                         ) {
                             Column {
                                 InputValueRow(
-                                    label = "回收站保留时长（天）",
+                                    label = "保留时长（天）",
                                     value = cleanoutDays,
                                     valueLabel = "永久",
                                     allowEdit = !isSubmitting,
                                     onValueChange = { cleanoutDays = it },
                                     valueValidator = {
-                                        (cleanoutDays.toIntWithDefaultForEmpty(0))
-                                            ?.let{ it >= 0 } == true
+                                        cleanoutDays.toIntWithDefaultForEmpty(0)?.let { it >= 0 } == true
                                     },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 )
@@ -706,17 +711,31 @@ internal fun AddFolderScreen(
                                     allowEdit = !isSubmitting,
                                     onValueChange = { cleanupIntervalSeconds = it },
                                     valueValidator = {
-                                        (
-                                          (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600))
-                                              ?.let{ it >= 0 } == true
-                                        ) && (
-                                          (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600))
-                                              ?.let{ it <= 31_536_000 } == true
-                                        )
+                                        cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600)
+                                            ?.let { it in 0..31_536_000 } == true
                                     },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 )
                             }
+                        }
+
+                        AnimatedVisibility(
+                            visible = versioning == NewFolderConfiguration.Versioning.EXTERNAL,
+                            enter = expandVertically(
+                                animationSpec = tween(durationMillis = 300)
+                            ),
+                            exit = shrinkVertically(
+                                animationSpec = tween(durationMillis = 300)
+                            ),
+                        ) {
+                            InputValueRow(
+                                label = "命令",
+                                value = externalCommand,
+                                valueLabel = "必填",
+                                allowEdit = !isSubmitting,
+                                onValueChange = { externalCommand = it },
+                                valueValidator = { externalCommand.trim().isNotBlank() },
+                            )
                         }
                     }
                 )

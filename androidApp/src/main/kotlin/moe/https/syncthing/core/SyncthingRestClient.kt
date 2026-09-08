@@ -753,6 +753,7 @@ internal class SyncthingRestClient(
         val cleanoutDays: Int,
         val keep: Int,
         val cleanupIntervalSeconds: Int,
+        val externalCommand: String,
     )
 
     data class RestFolderStatus(
@@ -787,6 +788,7 @@ internal class SyncthingRestClient(
         private const val RECENT_CHANGES_LIMIT = 25
         private const val MAX_ERROR_BODY_LENGTH = 8 * 1024
         private const val REDACTED_VALUE = "<redacted>"
+        private const val SECONDS_PER_DAY = 86_400L
     }
 
     private fun parseDiscoveryStatus(json: JSONObject?): List<RestDiscoveryStatus> {
@@ -842,15 +844,26 @@ internal class SyncthingRestClient(
         val type = when (rawType) {
             "trashcan" -> NewFolderConfiguration.Versioning.TRASHCAN
             "simple" -> NewFolderConfiguration.Versioning.SIMPLE
+            "staggered" -> NewFolderConfiguration.Versioning.STAGGERED
+            "external" -> NewFolderConfiguration.Versioning.EXTERNAL
             else -> NewFolderConfiguration.Versioning.NONE
         }
         return RestFolderVersioning(
             type = type,
-            supported = rawType.isBlank() || rawType == "trashcan" || rawType == "simple",
+            supported = rawType.isBlank() || rawType in setOf("trashcan", "simple", "staggered", "external"),
             fsPath = json?.optString("fsPath").orEmpty(),
-            cleanoutDays = params?.optString("cleanoutDays")?.toIntOrNull() ?: 0,
+            cleanoutDays = if (rawType == "staggered") {
+                params?.optString("maxAge")?.toLongOrNull()
+                    ?.div(SECONDS_PER_DAY)
+                    ?.coerceAtMost(Int.MAX_VALUE.toLong())
+                    ?.toInt()
+                    ?: 365
+            } else {
+                params?.optString("cleanoutDays")?.toIntOrNull() ?: 0
+            },
             keep = params?.optString("keep")?.toIntOrNull() ?: 5,
             cleanupIntervalSeconds = json?.optInt("cleanupIntervalS", 3600) ?: 3600,
+            externalCommand = params?.optString("command").orEmpty(),
         )
     }
 
@@ -923,6 +936,8 @@ internal class SyncthingRestClient(
                     versioning.put("cleanupIntervalS", 0)
                     params.remove("cleanoutDays")
                     params.remove("keep")
+                    params.remove("maxAge")
+                    params.remove("command")
                 }
 
                 NewFolderConfiguration.Versioning.TRASHCAN -> {
@@ -930,6 +945,8 @@ internal class SyncthingRestClient(
                     versioning.put("cleanupIntervalS", configuration.versioningCleanupIntervalSeconds)
                     params.put("cleanoutDays", configuration.versioningCleanoutDays.toString())
                     params.remove("keep")
+                    params.remove("maxAge")
+                    params.remove("command")
                 }
 
                 NewFolderConfiguration.Versioning.SIMPLE -> {
@@ -937,6 +954,29 @@ internal class SyncthingRestClient(
                     versioning.put("cleanupIntervalS", configuration.versioningCleanupIntervalSeconds)
                     params.put("cleanoutDays", configuration.versioningCleanoutDays.toString())
                     params.put("keep", configuration.versioningKeep.toString())
+                    params.remove("maxAge")
+                    params.remove("command")
+                }
+
+                NewFolderConfiguration.Versioning.STAGGERED -> {
+                    versioning.put("type", "staggered")
+                    versioning.put("cleanupIntervalS", configuration.versioningCleanupIntervalSeconds)
+                    params.put(
+                        "maxAge",
+                        (configuration.versioningCleanoutDays.toLong() * SECONDS_PER_DAY).toString(),
+                    )
+                    params.remove("cleanoutDays")
+                    params.remove("keep")
+                    params.remove("command")
+                }
+
+                NewFolderConfiguration.Versioning.EXTERNAL -> {
+                    versioning.put("type", "external")
+                    versioning.put("cleanupIntervalS", 0)
+                    params.put("command", configuration.versioningExternalCommand)
+                    params.remove("cleanoutDays")
+                    params.remove("keep")
+                    params.remove("maxAge")
                 }
             }
             versioning.put("params", params)

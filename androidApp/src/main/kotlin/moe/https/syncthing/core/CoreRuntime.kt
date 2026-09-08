@@ -266,6 +266,7 @@ class CoreRuntime(
                     versioningCleanoutDays = folder.versioning.cleanoutDays,
                     versioningKeep = folder.versioning.keep,
                     versioningCleanupIntervalSeconds = folder.versioning.cleanupIntervalSeconds,
+                    versioningExternalCommand = folder.versioning.externalCommand,
                     ignorePatterns = ignores.patterns,
                     ignoreError = ignores.error,
                     devices = folder.devices,

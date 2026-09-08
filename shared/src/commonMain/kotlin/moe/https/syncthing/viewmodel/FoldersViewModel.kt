@@ -180,6 +180,8 @@ class FoldersViewModel(
                 normalizedConfiguration.rescanIntervalSeconds < 0 -> "时间和数量设置必须是非负整数"
             normalizedConfiguration.versioningCleanupIntervalSeconds > 31_536_000 ->
                 "定期清除间隔不能超过一年"
+            normalizedConfiguration.versioning == NewFolderConfiguration.Versioning.EXTERNAL &&
+                normalizedConfiguration.versioningExternalCommand.isBlank() -> "外部版本控制命令不能为空"
             else -> null
         }
         if (validationMessage != null) {

@@ -15,6 +15,7 @@ data class SyncthingFolder(
     val versioningCleanoutDays: Int,
     val versioningKeep: Int,
     val versioningCleanupIntervalSeconds: Int,
+    val versioningExternalCommand: String,
     val ignorePatterns: List<String>,
     val ignoreError: String?,
     val devices: List<FolderDeviceConfiguration>,
@@ -50,6 +51,7 @@ data class NewFolderConfiguration(
     val versioningCleanoutDays: Int,
     val versioningKeep: Int,
     val versioningCleanupIntervalSeconds: Int,
+    val versioningExternalCommand: String,
     val ignorePatterns: List<String>,
     val updateIgnorePatterns: Boolean,
     val fsWatcherEnabled: Boolean,
@@ -58,10 +60,12 @@ data class NewFolderConfiguration(
     val devices: List<FolderDeviceConfiguration>,
     val availableDeviceIds: Set<String>,
 ) {
-    enum class Versioning {
-        NONE,
-        TRASHCAN,
-        SIMPLE,
+    enum class Versioning(val displayName: String) {
+        NONE("不启用"),
+        TRASHCAN("回收站版本控制"),
+        SIMPLE("简易版本控制"),
+        STAGGERED("阶段版本控制"),
+        EXTERNAL("外部版本控制"),
     }
 
     enum class Type {

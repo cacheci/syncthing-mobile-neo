@@ -318,7 +318,6 @@ private fun NewFolderCard(
             MultipleValueRow(
                 label = "文件夹 ID",
                 values = listOf(folder.id),
-                textAlign = TextAlign.Start,
                 modifier = Modifier.padding(horizontal = 18.dp)
             )
             MultipleValueRow(

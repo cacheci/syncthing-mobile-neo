@@ -204,13 +204,12 @@ internal class AutoStartConditionMonitor(
     @RequiresApi(Build.VERSION_CODES.R)
     @Suppress("DEPRECATION")
     private fun currentWifiName(capabilities: NetworkCapabilities): String? {
-        val wifiInfo = (
-                capabilities.transportInfo as? WifiInfo
-                )
-            ?: runCatching { wifiManager.connectionInfo }.getOrNull()
-        return wifiInfo?.ssid
+        fun WifiInfo?.usableSsid(): String? = this?.ssid
             ?.removeSurrounding("\"")
             ?.takeUnless { it.isBlank() || it == WifiManager.UNKNOWN_SSID }
+
+        return (capabilities.transportInfo as? WifiInfo).usableSsid()
+            ?: runCatching { wifiManager.connectionInfo }.getOrNull().usableSsid()
     }
 
     private fun batteryMatches(condition: AutoStartCondition): Boolean {

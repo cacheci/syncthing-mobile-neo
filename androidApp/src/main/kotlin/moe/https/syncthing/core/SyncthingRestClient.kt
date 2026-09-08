@@ -170,7 +170,13 @@ internal class SyncthingRestClient(
     fun addFolder(configuration: NewFolderConfiguration) {
         val folder = request("/rest/config/defaults/folder")
         applyFolderConfiguration(folder, configuration)
-        folder.put("path", configuration.path)
+        folder
+            .put("path", configuration.path)
+            .put("ignorePerms", true)
+            .put("syncOwnership", false)
+            .put("sendOwnership", false)
+            .put("syncXattrs", false)
+            .put("sendXattrs", false)
         requestBody(
             path = "/rest/config/folders",
             method = "POST",

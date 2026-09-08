@@ -192,7 +192,7 @@ androidComponents {
             variant.outputs.forEach { output ->
                 (output as? VariantOutputImpl)?.outputFileName?.set(
                     output.versionName.zip(output.versionCode) { versionName, versionCode ->
-                        "android_${androidArch}_${versionName}(${versionCode}).apk"
+                        "syncthing-neo_android-${androidArch}_${versionName}_${versionCode}.apk"
                     },
                 )
             }

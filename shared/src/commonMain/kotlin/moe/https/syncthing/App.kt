@@ -87,6 +87,7 @@ import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavController
+import top.yukonga.miuix.kmp.nav.gesture.PredictiveBackHandler
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -254,6 +255,16 @@ fun App(
             LayoutDirection.Ltr -> NavSwipeDirection.LeftToRight
             LayoutDirection.Rtl -> NavSwipeDirection.RightToLeft
         }
+
+        PredictiveBackHandler(
+            enabled = navController.backStack.size == 1 &&
+                currentPageMain != mainUiState.defaultBottomBarPage,
+            onProgress = {},
+            onCommit = {
+                requestSwitchToPageMain(mainUiState.defaultBottomBarPage)
+            },
+            onCancel = {},
+        )
 
         NavDisplay(
             navController = navController,

@@ -222,6 +222,20 @@ internal class SyncthingRestClient(
         )
     }
 
+    fun remoteFolderState(folderId: String, deviceId: String): RemoteFolderState {
+        val encodedFolderId = encodePathSegment(folderId)
+        val encodedDeviceId = encodePathSegment(deviceId)
+        return when (
+            request("/rest/db/completion?folder=$encodedFolderId&device=$encodedDeviceId")
+                .optString("remoteState")
+        ) {
+            "valid" -> RemoteFolderState.VALID
+            "notSharing" -> RemoteFolderState.NOT_SHARING
+            "paused" -> RemoteFolderState.PAUSED
+            else -> RemoteFolderState.UNKNOWN
+        }
+    }
+
     fun recentChanges(limit: Int = RECENT_CHANGES_LIMIT): List<RestRecentChange> {
         val safeLimit = limit.coerceIn(1, RECENT_CHANGES_LIMIT)
         val events = requestArray("/rest/events/disk?limit=$safeLimit&timeout=0")

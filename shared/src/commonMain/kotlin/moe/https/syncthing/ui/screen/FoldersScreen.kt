@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.FolderDeviceConfiguration
 import moe.https.syncthing.core.NewFolderConfiguration
+import moe.https.syncthing.core.RemoteFolderState
 import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingFolder
@@ -613,6 +614,9 @@ internal fun AddFolderScreen(
                                     device = device,
                                     isSubmitting = isSubmitting,
                                     selected = device.id in selectedDeviceIds,
+                                    remoteFolderState = existingFolder?.devices
+                                        ?.firstOrNull { it.deviceId == device.id }
+                                        ?.remoteFolderState,
                                     encryptionPassword = devicePasswords[device.id].orEmpty(),
                                     onSelectedChange = { selected ->
                                         selectedDeviceIds = if (selected) {
@@ -1047,6 +1051,7 @@ private fun AddFolderDevices(
     device: SyncthingDevice,
     isSubmitting: Boolean,
     selected: Boolean,
+    remoteFolderState: RemoteFolderState?,
     encryptionPassword: String,
     onSelectedChange: (Boolean) -> Unit,
     onEncryptionPasswordChange: (String) -> Unit,
@@ -1057,6 +1062,13 @@ private fun AddFolderDevices(
             summary = if (device.id == device.name) null else device.id,
             checked = selected,
             enabled = !isSubmitting,
+            statusColor = when (remoteFolderState) {
+                RemoteFolderState.VALID -> StatusColor.OK.color
+                RemoteFolderState.NOT_SHARING -> StatusColor.PENDING.color
+                RemoteFolderState.PAUSED -> StatusColor.PAUSED.color
+                RemoteFolderState.UNKNOWN -> StatusColor.FAIL.color
+                null -> StatusColor.DOWN.color
+            },
             onCheckedChange = onSelectedChange,
         )
         AnimatedVisibility(

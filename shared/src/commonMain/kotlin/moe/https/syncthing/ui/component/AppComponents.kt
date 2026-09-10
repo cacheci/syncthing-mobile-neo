@@ -288,6 +288,7 @@ internal fun InfoSwitch(
     summary: String ?= null,
     checked: Boolean,
     enabled: Boolean = true,
+    statusColor: Color? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     BasicComponent(
@@ -296,6 +297,12 @@ internal fun InfoSwitch(
         enabled = enabled,
         role = Role.Switch,
         onClick = { onCheckedChange(!checked) },
+        startAction = if (statusColor != null) ({
+            Text(
+                text = "●",
+                color = statusColor,
+            )
+        }) else null,
         endActions = {
             Switch(
                 checked = checked,
@@ -742,5 +749,6 @@ internal enum class StatusColor ( val color: Color ){
     OK(Color(0xFF2E7D32)),
     FAIL(Color(0xFFFF3728)),
     PENDING(Color(0xFFB26A00)),
+    PAUSED(Color(0xFF7a48a3)),
     DOWN(Color(0xFF666666)),
 }

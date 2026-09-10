@@ -38,7 +38,15 @@ data class SyncthingPendingFolder(
 data class FolderDeviceConfiguration(
     val deviceId: String,
     val encryptionPassword: String,
+    val remoteFolderState: RemoteFolderState = RemoteFolderState.UNKNOWN,
 )
+
+enum class RemoteFolderState {
+    UNKNOWN,
+    NOT_SHARING,
+    PAUSED,
+    VALID,
+}
 
 data class NewFolderConfiguration(
     val folderId: String,

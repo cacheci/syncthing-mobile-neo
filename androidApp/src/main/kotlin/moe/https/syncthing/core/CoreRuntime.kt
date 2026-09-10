@@ -269,7 +269,13 @@ class CoreRuntime(
                     versioningExternalCommand = folder.versioning.externalCommand,
                     ignorePatterns = ignores.patterns,
                     ignoreError = ignores.error,
-                    devices = folder.devices,
+                    devices = folder.devices.map { device ->
+                        device.copy(
+                            remoteFolderState = runCatching {
+                                restClient.remoteFolderState(folder.id, device.deviceId)
+                            }.getOrDefault(RemoteFolderState.UNKNOWN),
+                        )
+                    },
                     state = status.state,
                     localFiles = status.localFiles,
                     localBytes = status.localBytes,

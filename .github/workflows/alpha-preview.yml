@@ -153,7 +153,7 @@ jobs:
 
           commit_messages="$(
             printf '%s\n' "$raw_commit_messages" \
-              | grep -Eiv '^(chore|workflow)' \
+              | grep -Eiv '^(chore|wkfl|deps)' \
               | sed 's/^/- /' \
               || true
           )"
@@ -191,6 +191,7 @@ jobs:
             done
 
             gh release edit "$tag" \
+              --target "$GITHUB_SHA" \
               --title "Alpha Preview $short_sha" \
               --notes "$release_notes" \
               --prerelease \
@@ -204,6 +205,13 @@ jobs:
               --prerelease \
               --latest=false
           fi
+
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/git/refs/tags/$tag" \
+            -f "sha=$GITHUB_SHA" \
+            -F force=true \
+            >/dev/null
 
           commit_messages_b64="$(printf '%s' "$commit_messages" | base64 -w 0)"
           echo "commit_messages_b64=$commit_messages_b64" >> "$GITHUB_OUTPUT"
@@ -237,8 +245,37 @@ jobs:
 
           mapfile -t apk_paths <<< "$APK_PATHS"
 
+          eligible_apks=()
+          for apk_path in "${apk_paths[@]}"; do
+            if [[ ! -f "$apk_path" ]]; then
+              echo "APK file does not exist: $apk_path" >&2
+              exit 1
+            fi
+
+            size="$(stat -c '%s' "$apk_path")"
+            if (( size > 50*1024*1024 )); then
+              echo "::warning file=$apk_path::Skipping APK larger than Telegram's 50 MB upload limit."
+              continue
+            fi
+            eligible_apks+=("$apk_path")
+          done
+
+          apk_count="${#eligible_apks[@]}"
+          if (( apk_count == 0 )); then
+            echo "No APK files are eligible for Telegram upload." >&2
+            exit 1
+          fi
+          if (( apk_count > 10 )); then
+            echo "Telegram media groups support at most 10 files; found $apk_count." >&2
+            exit 1
+          fi
+
           short_sha="${GITHUB_SHA:0:12}"
-          reply_parameters="$(printf '{\"message_id\":%s}' "$TELEGRAM_REPLY_TO_MESSAGE_ID")"
+          reply_parameters="$(
+            jq -cn \
+              --argjson message_id "$TELEGRAM_REPLY_TO_MESSAGE_ID" \
+              '{message_id: $message_id}'
+          )"
           commit_messages="$(printf '%s' "$COMMIT_MESSAGES_B64" | base64 --decode)"
           caption_prefix="Alpha Preview $short_sha
 
@@ -276,30 +313,56 @@ jobs:
 
           $escaped_warning"
 
-          first=true
-          for apk_path in "${apk_paths[@]}"; do
-            if [[ "$first" == true ]]; then
+          verify_telegram_response() {
+            local response="$1"
+            if ! jq -e '.ok == true' >/dev/null <<< "$response"; then
+              echo "Telegram API returned an unsuccessful response: $response" >&2
+              return 1
+            fi
+          }
+
+          if (( apk_count == 1 )); then
+            response="$(
               curl \
                 --silent \
                 --show-error \
                 --fail-with-body \
                 --retry 3 \
                 --form-string "chat_id=$TELEGRAM_CHAT_ID" \
-                --form "document=@$apk_path" \
+                --form "document=@${eligible_apks[0]}" \
                 --form-string "caption=$telegram_caption" \
                 --form-string "parse_mode=MarkdownV2" \
                 --form-string "reply_parameters=$reply_parameters" \
                 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
-              first=false
-            else
+            )"
+          else
+            args=(
+              --silent
+              --show-error
+              --fail-with-body
+              --retry 3
+              --form-string "chat_id=$TELEGRAM_CHAT_ID"
+              --form-string "reply_parameters=$reply_parameters"
+            )
+
+            media_json='['
+            for (( i=0; i<apk_count; i++ )); do
+              apk_path="${eligible_apks[$i]}"
+              args+=(--form "file$i=@$apk_path")
+              if (( i == 0 )); then
+                media_json+="{\"type\":\"document\",\"media\":\"attach://file$i\",\"caption\":$(printf '%s' "$telegram_caption" | jq -Rs .),\"parse_mode\":\"MarkdownV2\"},"
+              else
+                media_json+="{\"type\":\"document\",\"media\":\"attach://file$i\"},"
+              fi
+            done
+
+            media_json="${media_json%,}]"
+            args+=(--form-string "media=$media_json")
+            response="$(
               curl \
-                --silent \
-                --show-error \
-                --fail-with-body \
-                --retry 3 \
-                --form-string "chat_id=$TELEGRAM_CHAT_ID" \
-                --form "document=@$apk_path" \
-                --form-string "reply_parameters=$reply_parameters" \
-                "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
-            fi
-          done
+                "${args[@]}" \
+                "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMediaGroup"
+            )"
+          fi
+
+          verify_telegram_response "$response"

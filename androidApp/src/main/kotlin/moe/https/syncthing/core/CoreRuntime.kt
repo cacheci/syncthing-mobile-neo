@@ -22,10 +22,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.https.syncthing.storage.AppSettingPrivateStorage
 import moe.https.syncthing.ui.util.SettingProtocolStack
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
 import java.net.ConnectException
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NoRouteToHostException
@@ -36,17 +38,26 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 import java.net.UnknownServiceException
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
+import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
 import kotlin.time.Duration.Companion.milliseconds
 
 @RequiresApi(Build.VERSION_CODES.R)
@@ -68,9 +79,14 @@ class CoreRuntime(
     private var activeGuiHost = loadProtocolStack().guiListenAddress
     @Volatile
     private var activeGuiPort = initialGuiPort()
+    @Volatile
+    private var activeGuiUseTls = configuredGuiUseTls()
+    @Volatile
+    private var activeGuiCertificate: ByteArray? = null
     private val restClient = SyncthingRestClient(
         apiKey = loadOrCreateApiKey(),
-        baseUrl = { formatGuiBaseUrl(activeGuiHost, activeGuiPort) },
+        baseUrl = { formatGuiBaseUrl(activeGuiHost, activeGuiPort, activeGuiUseTls) },
+        openConnection = ::openGuiConnection,
         onHttpError = { error ->
             logError(
                 "REST request failed: ${error.message}",
@@ -161,7 +177,11 @@ class CoreRuntime(
         }
     }
 
-    fun guiUrl(): String = formatGuiBaseUrl(activeGuiHost, activeGuiPort)
+    fun guiUrl(): String = formatGuiBaseUrl(activeGuiHost, activeGuiPort, activeGuiUseTls)
+
+    fun isGuiCertificateTrusted(encodedCertificate: ByteArray): Boolean = runCatching {
+        MessageDigest.isEqual(activeGuiCertificateBytes(), encodedCertificate)
+    }.getOrDefault(false)
 
     fun guiCredentials(): Pair<String, String>? =
         if (managedGuiAuthenticationEnabled) {
@@ -431,8 +451,10 @@ class CoreRuntime(
 
     override suspend fun saveSetting(
         configuration: SettingConfiguration,
+        guiTlsFiles: Map<GuiTlsFile, ByteArray>,
     ): SettingSaveResult = withContext(Dispatchers.IO) {
         processMutex.withLock {
+            guiTlsFiles.forEach { (type, content) -> validateGuiTlsFile(type, content) }
             val desiredGuiAuthenticationEnabled = configuration.guiAuthenticationEnabled
             val desiredGuiCredentials = ManagedGuiCredentials(
                 username = configuration.guiUser.trim().ifBlank { managedGuiCredentials.username },
@@ -447,6 +469,7 @@ class CoreRuntime(
                 newGuiPassword = "",
             )
             val previousGuiPort = activeGuiPort
+            val previousGuiUseTls = activeGuiUseTls
             val previousPortConflictBehavior = loadGuiPortConflictBehavior()
             val savedResult = when {
                 restClient.ping() -> {
@@ -483,23 +506,79 @@ class CoreRuntime(
             )
             val result = savedResult.copy(
                 restartRequired = savedResult.restartRequired ||
-                    effectiveConfiguration.guiPortConflictBehavior != previousPortConflictBehavior,
+                    effectiveConfiguration.guiPortConflictBehavior != previousPortConflictBehavior ||
+                    guiTlsFiles.isNotEmpty(),
             )
             saveStartupSetting(effectiveConfiguration)
             if (
                 result.accessMode == SettingAccessMode.REST &&
-                effectiveConfiguration.guiPort != previousGuiPort
+                (
+                    effectiveConfiguration.guiPort != previousGuiPort ||
+                        effectiveConfiguration.guiUseTls != previousGuiUseTls
+                )
             ) {
                 activeGuiPort = effectiveConfiguration.guiPort
+                activeGuiUseTls = effectiveConfiguration.guiUseTls
                 if (restClient.ping()) {
                     preferences.edit { putInt(KEY_ACTIVE_GUI_PORT, activeGuiPort) }
                 } else {
                     activeGuiPort = previousGuiPort
+                    activeGuiUseTls = previousGuiUseTls
                 }
             } else {
                 activeGuiPort = previousGuiPort
+                activeGuiUseTls = previousGuiUseTls
             }
-            result
+            replaceGuiTlsFiles(guiTlsFiles)
+            val guiTlsRestartNeeded = result.accessMode == SettingAccessMode.REST &&
+                (guiTlsFiles.isNotEmpty() || savedResult.guiTlsChanged)
+            val restartInitiated = guiTlsRestartNeeded &&
+                SyncthingCoreService.requestRestart(applicationContext)
+            if (restartInitiated) {
+                result.copy(restartRequired = false, restartInitiated = true)
+            } else {
+                result
+            }
+        }
+    }
+
+    private fun replaceGuiTlsFiles(files: Map<GuiTlsFile, ByteArray>) {
+        if (files.isEmpty()) return
+        homeDirectory.mkdirs()
+        val preparedFiles = mutableListOf<Pair<File, File>>()
+        try {
+            files.forEach { (type, content) ->
+                val target = File(homeDirectory, type.fileName)
+                val temporary = File.createTempFile("${type.fileName}.", ".tmp", homeDirectory)
+                preparedFiles += temporary to target
+                temporary.outputStream().use { output ->
+                    output.write(content)
+                    output.flush()
+                    (output as? java.io.FileOutputStream)?.fd?.sync()
+                }
+                temporary.setReadable(false, false)
+                temporary.setReadable(true, true)
+                temporary.setWritable(false, false)
+                temporary.setWritable(true, true)
+            }
+            preparedFiles.forEach { (temporary, target) ->
+                try {
+                    Files.move(
+                        temporary.toPath(),
+                        target.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(
+                        temporary.toPath(),
+                        target.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                }
+            }
+        } finally {
+            preparedFiles.forEach { (temporary, _) -> temporary.delete() }
         }
     }
 
@@ -768,10 +847,18 @@ class CoreRuntime(
             loadProtocolStack().guiListenAddress,
             configuredGuiPort(portConflictBehavior),
         )
-        ensureManagedGuiAuthentication(executable, configuredGuiAddress, logs)
+        val configuredGuiUseTls = configuredGuiUseTls()
+        ensureManagedGuiAuthentication(
+            executable,
+            configuredGuiAddress,
+            configuredGuiUseTls,
+            logs,
+        )
         val guiAddress = resolveLaunchGuiAddress(configuredGuiAddress, portConflictBehavior)
         activeGuiHost = parseGuiHost(guiAddress)
         activeGuiPort = parseGuiPort(guiAddress)
+        activeGuiUseTls = configuredGuiUseTls
+        activeGuiCertificate = null
         preferences.edit { putInt(KEY_ACTIVE_GUI_PORT, activeGuiPort) }
 
         val arguments = mutableListOf(
@@ -802,6 +889,7 @@ class CoreRuntime(
     private fun ensureManagedGuiAuthentication(
         executable: CoreExecutable,
         configuredGuiAddress: String,
+        guiUseTls: Boolean,
         logs: File,
     ) {
         if (!configFile.exists) {
@@ -837,6 +925,7 @@ class CoreRuntime(
             password = managedGuiCredentials.password,
             guiAddress = configuredGuiAddress,
         )
+        configFile.ensureGuiUseTls(guiUseTls)
     }
 
     private suspend fun waitForApi(currentProcess: Process): ApiWaitResult {
@@ -1281,6 +1370,7 @@ class CoreRuntime(
         private const val KEY_RUNNING_CORE_ID = "running_core_id"
         private const val KEY_GUI_PORT = "gui_port"
         private const val KEY_ACTIVE_GUI_PORT = "active_gui_port"
+        private const val KEY_GUI_USE_TLS = "gui_use_tls"
         private const val KEY_GUI_PORT_CONFLICT_BEHAVIOR = "gui_port_conflict_behavior"
         private const val KEY_LOCAL_DEVICE_ID = "local_device_id"
         private const val GUI_PORT_PROBE_LIMIT = 100
@@ -1298,6 +1388,7 @@ class CoreRuntime(
         private const val STOP_POLL_INTERVAL_MILLIS = 500L
         private const val MAX_CORE_LOG_LINES = 40
         private const val MAX_CORE_LOG_CHARS = 8_000
+        private const val MAX_GUI_TLS_FILE_BYTES = 1024 * 1024
         private const val LOGCAT_CHUNK_CHARS = 3_000
         private const val REDACTED_VALUE = "[REDACTED]"
         private const val CONTROLLER_LOG_FILE = "controller.log"
@@ -1313,10 +1404,91 @@ class CoreRuntime(
         return if (':' in normalizedAddress) "[$normalizedAddress]:$port" else "$normalizedAddress:$port"
     }
 
-    private fun formatGuiBaseUrl(address: String, port: Int): String {
+    private fun formatGuiBaseUrl(address: String, port: Int, useTls: Boolean): String {
         val normalizedAddress = address.trim().removePrefix("[").removeSuffix("]")
         val urlHost = if (':' in normalizedAddress) "[$normalizedAddress]" else normalizedAddress
-        return "http://$urlHost:$port"
+        val scheme = if (useTls) "https" else "http"
+        return "$scheme://$urlHost:$port"
+    }
+
+    private fun openGuiConnection(url: URL): HttpURLConnection {
+        val connection = url.openConnection() as HttpURLConnection
+        if (connection !is HttpsURLConnection) return connection
+
+        val certificate = ByteArrayInputStream(activeGuiCertificateBytes()).use { input ->
+            CertificateFactory.getInstance("X.509").generateCertificate(input)
+        }
+        val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+            load(null)
+            setCertificateEntry("syncthing-gui", certificate)
+        }
+        val trustManagerFactory = TrustManagerFactory.getInstance(
+            TrustManagerFactory.getDefaultAlgorithm(),
+        ).apply {
+            init(keyStore)
+        }
+        val sslContext = SSLContext.getInstance("TLS").apply {
+            init(null, trustManagerFactory.trustManagers, null)
+        }
+        connection.sslSocketFactory = sslContext.socketFactory
+        // 连接只信任应用私有目录中的固定证书，因此无需依赖自签名证书的主机名。
+        connection.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+        return connection
+    }
+
+    private fun activeGuiCertificateBytes(): ByteArray {
+        activeGuiCertificate?.let { return it }
+        val certificateFile = File(homeDirectory, GuiTlsFile.CERTIFICATE.fileName)
+        if (!certificateFile.isFile) {
+            throw IOException("HTTPS 证书不存在：${certificateFile.name}")
+        }
+        val loadedCertificate = certificateFile.inputStream().use { input ->
+            CertificateFactory.getInstance("X.509").generateCertificate(input) as X509Certificate
+        }.apply { checkValidity() }.encoded
+        return synchronized(this) {
+            activeGuiCertificate ?: loadedCertificate.also { activeGuiCertificate = it }
+        }
+    }
+
+    private fun validateGuiTlsFile(type: GuiTlsFile, content: ByteArray) {
+        if (content.isEmpty()) throw IOException("${type.displayName}文件为空")
+        if (content.size > MAX_GUI_TLS_FILE_BYTES) {
+            throw IOException("${type.displayName}文件不能超过 1 MiB")
+        }
+        val pem = content.toString(Charsets.US_ASCII)
+        when (type) {
+            GuiTlsFile.CERTIFICATE -> {
+                if (!pem.contains("-----BEGIN CERTIFICATE-----")) {
+                    throw IOException("所选文件不是 PEM 格式的 X.509 证书")
+                }
+                try {
+                    val certificates = ByteArrayInputStream(content).use { input ->
+                        CertificateFactory.getInstance("X.509").generateCertificates(input)
+                    }
+                    if (certificates.isEmpty()) throw IOException("证书文件中没有有效证书")
+                    (certificates.first() as X509Certificate).checkValidity()
+                } catch (error: IOException) {
+                    throw error
+                } catch (error: Throwable) {
+                    throw IOException("无法解析 X.509 证书", error)
+                }
+            }
+
+            GuiTlsFile.PRIVATE_KEY -> {
+                val supportedHeaders = listOf(
+                    "PRIVATE KEY",
+                    "RSA PRIVATE KEY",
+                    "EC PRIVATE KEY",
+                )
+                val keyType = supportedHeaders.firstOrNull { keyType ->
+                    pem.contains("-----BEGIN $keyType-----") &&
+                        pem.contains("-----END $keyType-----")
+                }
+                if (keyType == null) {
+                    throw IOException("所选文件不是受支持的 PEM 私钥")
+                }
+            }
+        }
     }
 
     private fun parseGuiPort(address: String): Int = address
@@ -1374,6 +1546,7 @@ class CoreRuntime(
         guiListenAddress = loadProtocolStack().guiListenAddress,
         guiPort = preferences.getInt(KEY_GUI_PORT, DEFAULT_GUI_PORT),
         guiPortConflictBehavior = portConflictBehavior,
+        guiUseTls = preferences.getBoolean(KEY_GUI_USE_TLS, false),
     )
 
     private fun configuredGuiPort(
@@ -1388,6 +1561,16 @@ class CoreRuntime(
         preferences.getInt(KEY_GUI_PORT, DEFAULT_GUI_PORT)
     }
 
+    private fun configuredGuiUseTls(): Boolean = if (configFile.exists) {
+        runCatching {
+            configFile.read(loadGuiPortConflictBehavior(), rememberedLocalDeviceId()).guiUseTls
+        }.getOrElse {
+            preferences.getBoolean(KEY_GUI_USE_TLS, false)
+        }
+    } else {
+        preferences.getBoolean(KEY_GUI_USE_TLS, false)
+    }
+
     private fun initialGuiPort(): Int {
         val configuredPort = configuredGuiPort(loadGuiPortConflictBehavior())
         return preferences.getInt(KEY_ACTIVE_GUI_PORT, configuredPort)
@@ -1396,6 +1579,7 @@ class CoreRuntime(
     private fun saveStartupSetting(configuration: SettingConfiguration) {
         preferences.edit {
             putInt(KEY_GUI_PORT, configuration.guiPort)
+                .putBoolean(KEY_GUI_USE_TLS, configuration.guiUseTls)
                 .putString(
                     KEY_GUI_PORT_CONFLICT_BEHAVIOR,
                     configuration.guiPortConflictBehavior.name,
@@ -1426,6 +1610,8 @@ class CoreRuntime(
     internal fun reconcileImportedConfiguration() {
         activeGuiHost = loadProtocolStack().guiListenAddress
         activeGuiPort = initialGuiPort()
+        activeGuiUseTls = configuredGuiUseTls()
+        activeGuiCertificate = null
         configFile.ensureGuiAuthentication(
             enabled = managedGuiAuthenticationEnabled,
             username = managedGuiCredentials.username,
@@ -1517,7 +1703,10 @@ class CoreRuntime(
         })
     }
 
-    private fun restApiAddress(): String = "http://localhost:$activeGuiPort"
+    private fun restApiAddress(): String {
+        val scheme = if (activeGuiUseTls) "https" else "http"
+        return "$scheme://localhost:$activeGuiPort"
+    }
 }
 
 private fun Process.exitCodeOrNull(): Int? =

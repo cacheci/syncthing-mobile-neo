@@ -45,13 +45,16 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.BackupImportFormat
 import moe.https.syncthing.core.CoreAvailability
+import moe.https.syncthing.core.GuiTlsFile
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.core.defaultFolderPath
 import moe.https.syncthing.icon
+import moe.https.syncthing.platform.FilePickerResult
 import moe.https.syncthing.platform.FolderPickerResult
 import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberFolderPicker
+import moe.https.syncthing.platform.rememberPemFilePicker
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CheckableInputValueRow
 import moe.https.syncthing.ui.component.CheckableRow
@@ -126,6 +129,7 @@ internal fun SettingScreen(
     onEditingRunningConditionBattery: () -> Unit,
     onEditingRunningConditionDuration: () -> Unit,
     onEditingRunningConditionAdvanced: () -> Unit,
+    onEditingWebuiAdvanced: () -> Unit,
     onChangeToAbout: () -> Unit,
     onChangeToLicence: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
@@ -195,6 +199,7 @@ internal fun SettingScreen(
             onModifyDeveloperMode = onModifyDeveloperMode,
             developerModeVisible = developerModeVisible,
             settingAvailable = settingAvailable,
+            onEditingWebuiAdvanced = onEditingWebuiAdvanced,
             onEditingDiscoverServers = onEditingDiscoverServers,
             onEditingListenAddresses = onEditingListenAddresses,
             onRedirectingToDeveloperPage = onRedirectingToDeveloperPage,
@@ -291,6 +296,7 @@ private fun SettingForm(
     developerModeEnabled: Boolean,
     developerModeVisible: Boolean,
     onModifyDeveloperMode: () -> Unit,
+    onEditingWebuiAdvanced: () -> Unit,
     onEditingDiscoverServers: () -> Unit,
     onEditingListenAddresses: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
@@ -419,16 +425,9 @@ private fun SettingForm(
             }
         }
 
-        WindowDropdownPreference(
-            title = "WebUI 主题",
-            items = SettingConfiguration.GuiTheme.entries.map { it.displayName },
-            selectedIndex = formState.guiTheme.ordinal,
-            enabled = fullSettingEnabled,
-            onSelectedIndexChange = { index ->
-                settingViewModel.onFormChange(
-                    guiTheme = SettingConfiguration.GuiTheme.entries[index],
-                )
-            },
+        ArrowPreference(
+            title = "WebUI 高级设置",
+            onClick = onEditingWebuiAdvanced,
         )
     }
 
@@ -2027,6 +2026,69 @@ internal fun SettingBackupPage(
                     enabled = !uiState.isWorking,
                     onClick = { onConfirmImport(importPassword) },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingWebuiAdvancedPage(
+    uiState: SettingUiState,
+    settingViewModel: SettingViewModel,
+) {
+    val openCertificatePicker = rememberPemFilePicker { result ->
+        when (result) {
+            is FilePickerResult.Selected -> settingViewModel.stageGuiTlsFile(
+                GuiTlsFile.CERTIFICATE,
+                result.content,
+            )
+            is FilePickerResult.Error -> settingViewModel.reportError(result.message)
+            FilePickerResult.Cancelled -> Unit
+        }
+    }
+    val openPrivateKeyPicker = rememberPemFilePicker { result ->
+        when (result) {
+            is FilePickerResult.Selected -> settingViewModel.stageGuiTlsFile(
+                GuiTlsFile.PRIVATE_KEY,
+                result.content,
+            )
+            is FilePickerResult.Error -> settingViewModel.reportError(result.message)
+            FilePickerResult.Cancelled -> Unit
+        }
+    }
+
+    Card(modifier = Modifier.padding(horizontal = 20.dp)) {
+        Column {
+            WindowDropdownPreference(
+                title = "WebUI 主题",
+                items = SettingConfiguration.GuiTheme.entries.map { it.displayName },
+                selectedIndex = uiState.formState.guiTheme.ordinal,
+                enabled = uiState.settingRaw != null && uiState.accessMode != null && !uiState.isSaving && uiState.accessMode != SettingAccessMode.STARTUP_ONLY,
+                onSelectedIndexChange = { index ->
+                    settingViewModel.onFormChange(
+                        guiTheme = SettingConfiguration.GuiTheme.entries[index],
+                    )
+                },
+            )
+            InfoSwitch(
+                title = "使用 HTTPS WebUI",
+                checked = uiState.formState.guiUseTls,
+                enabled = uiState.settingRaw != null && uiState.accessMode != null && !uiState.isSaving,
+                onCheckedChange = { settingViewModel.onFormChange(guiUseTls = it) },
+            )
+            AnimatedVisibility(
+                visible = uiState.formState.guiUseTls,
+            ) {
+                Column {
+                    ArrowPreference(
+                        title = "导入 HTTPS 证书",
+                        onClick = openCertificatePicker,
+                    )
+                    ArrowPreference(
+                        title = "导入 HTTPS 证书密钥",
+                        onClick = openPrivateKeyPicker,
+                    )
+                }
             }
         }
     }

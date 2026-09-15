@@ -55,9 +55,10 @@ import moe.https.syncthing.ui.screen.SettingPermissionPage
 import moe.https.syncthing.ui.screen.SettingPositionPermissionPage
 import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.ui.screen.SettingStoragePermissionPage
+import moe.https.syncthing.ui.screen.SettingWebuiAdvancedPage
 import moe.https.syncthing.ui.screen.WebviewScreen
-import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.BackupViewModel
+import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
 import moe.https.syncthing.viewmodel.FoldersViewModel
 import moe.https.syncthing.viewmodel.LogViewModel
@@ -233,6 +234,14 @@ fun App(
                 )
                 settingViewModel.onSuccessMessageShown()
             }
+        }
+    }
+
+    LaunchedEffect(settingUiState.noticeMessage) {
+        val message = settingUiState.noticeMessage
+        if (!message.isNullOrBlank()) {
+            plainPageSnackbarHostState.showSnackbar(message)
+            settingViewModel.onNoticeMessageShown()
         }
     }
 
@@ -478,6 +487,9 @@ fun App(
                                     onEditingBottomBar = {
                                         navigateTo(AppSubPage.SETTINGS_BOTTOM_BAR)
                                     },
+                                    onEditingWebuiAdvanced = {
+                                        navigateTo(AppSubPage.SETTINGS_WEBUI_ADVANCED)
+                                    }
                                 )
 
                                 AppPage.CORE -> CoreScreen(
@@ -765,6 +777,13 @@ fun App(
                                             onMessageShown = backupViewModel::clearMessage,
                                         )
                                     }
+
+                                    AppSubPage.SETTINGS_WEBUI_ADVANCED -> {
+                                        SettingWebuiAdvancedPage(
+                                            uiState = settingUiState,
+                                            settingViewModel = settingViewModel,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -814,5 +833,6 @@ internal enum class AppSubPage(val title: String) {
     SETTINGS_PERMISSIONS("权限设置"),
     SETTINGS_BOTTOM_BAR("底栏设置"),
     SETTINGS_BACKUP("备份"),
+    SETTINGS_WEBUI_ADVANCED("WebUI 高级设置"),
     DEV("开发者设置"),
 }

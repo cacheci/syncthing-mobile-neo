@@ -13,6 +13,7 @@ data class SettingUiState(
     val hasLoaded: Boolean = false,
     val errorMessage: String? = null,
     val successMessage: String? = null,
+    val noticeMessage: String? = null,
     val restartRequired: Boolean = false,
 )
 
@@ -29,6 +30,7 @@ data class SettingFormState(
     val guiUser: String = "",
     val newGuiPassword: String = "",
     val guiTheme: SettingConfiguration.GuiTheme = SettingConfiguration.GuiTheme.DEFAULT,
+    val guiUseTls: Boolean = false,
     val listenAddresses: String = "",
     val maxSendKiBPerSecond: String = "",
     val maxReceiveKiBPerSecond: String = "",

@@ -16,6 +16,7 @@ data class SettingConfiguration(
     val guiPasswordConfigured: Boolean,
     val newGuiPassword: String = "",
     val guiTheme: GuiTheme,
+    val guiUseTls: Boolean,
     val listenAddresses: List<String>,
     val maxSendKiBPerSecond: Int,
     val maxReceiveKiBPerSecond: Int,
@@ -65,6 +66,7 @@ data class SettingConfiguration(
             guiListenAddress: String = "127.0.0.1",
             guiPort: Int = 8384,
             guiPortConflictBehavior: GuiPortConflictBehavior = GuiPortConflictBehavior.FAIL,
+            guiUseTls: Boolean = false,
         ): SettingConfiguration = SettingConfiguration(
             deviceName = "Syncthing",
             minHomeDiskFree = 1.0,
@@ -78,6 +80,7 @@ data class SettingConfiguration(
             guiUser = "",
             guiPasswordConfigured = false,
             guiTheme = GuiTheme.DEFAULT,
+            guiUseTls = guiUseTls,
             listenAddresses = listOf("default"),
             maxSendKiBPerSecond = 0,
             maxReceiveKiBPerSecond = 0,
@@ -98,6 +101,11 @@ data class SettingConfiguration(
     }
 }
 
+enum class GuiTlsFile(val fileName: String, val displayName: String) {
+    CERTIFICATE("https-cert.pem", "HTTPS 证书"),
+    PRIVATE_KEY("https-key.pem", "HTTPS 证书密钥"),
+}
+
 enum class SettingAccessMode(val title: String, val caption: String) {
     REST(title = "核心配置模式", caption = "核心正在运行，更改将在点击保存设置后生效。"),
     CONFIG_FILE(title = "离线配置模式", caption = "核心未运行，更改将在下次启动时生效。"),
@@ -114,4 +122,6 @@ data class SettingSnapshot(
 data class SettingSaveResult(
     val restartRequired: Boolean,
     val accessMode: SettingAccessMode,
+    val guiTlsChanged: Boolean = false,
+    val restartInitiated: Boolean = false,
 )

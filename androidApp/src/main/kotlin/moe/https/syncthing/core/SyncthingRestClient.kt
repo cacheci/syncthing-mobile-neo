@@ -13,6 +13,9 @@ import java.time.LocalDateTime
 internal class SyncthingRestClient(
     private val apiKey: String,
     private val baseUrl: () -> String = { DEFAULT_BASE_URL },
+    private val openConnection: (URL) -> HttpURLConnection = {
+        it.openConnection() as HttpURLConnection
+    },
     private val onHttpError: (SyncthingRestException) -> Unit = {},
 ) {
     fun ping(): Boolean = runCatching {
@@ -484,6 +487,7 @@ internal class SyncthingRestClient(
             guiTheme = SettingConfiguration.GuiTheme.entries
                 .firstOrNull { it.apiValue == gui.optString("theme") }
                 ?: SettingConfiguration.GuiTheme.DEFAULT,
+            guiUseTls = gui.optBoolean("useTLS", false),
             listenAddresses = readStringArray(options.optJSONArray("listenAddresses")),
             maxSendKiBPerSecond = options.optInt("maxSendKbps", 0),
             maxReceiveKiBPerSecond = options.optInt("maxRecvKbps", 0),
@@ -549,6 +553,7 @@ internal class SyncthingRestClient(
         val currentGuiAddress = gui.optString("address")
         val currentGuiUser = gui.optString("user")
         val currentGuiTheme = gui.optString("theme")
+        val currentGuiUseTls = gui.optBoolean("useTLS", false)
         val currentGuiPassword = gui.optString("password")
         val currentGuiPasswordMatches = configuration.guiAuthenticationEnabled &&
             verifyPassword(managedGuiPassword, currentGuiPassword)
@@ -558,6 +563,7 @@ internal class SyncthingRestClient(
         val guiChanged = currentGuiAddress != desiredGuiAddress ||
             currentGuiUser != desiredGuiUser ||
             currentGuiTheme != configuration.guiTheme.apiValue ||
+            currentGuiUseTls != configuration.guiUseTls ||
             (configuration.guiAuthenticationEnabled && !currentGuiPasswordMatches) ||
             (!configuration.guiAuthenticationEnabled && currentGuiPassword.isNotBlank()) ||
             gui.optBoolean("sendBasicAuthPrompt", false) != desiredBasicAuthPrompt
@@ -565,6 +571,7 @@ internal class SyncthingRestClient(
             .put("address", desiredGuiAddress)
             .put("user", desiredGuiUser)
             .put("theme", configuration.guiTheme.apiValue)
+            .put("useTLS", configuration.guiUseTls)
             .put("sendBasicAuthPrompt", desiredBasicAuthPrompt)
         if (!configuration.guiAuthenticationEnabled) {
             gui.put("password", "")
@@ -592,6 +599,7 @@ internal class SyncthingRestClient(
         return SettingSaveResult(
             restartRequired = optionsRestartRequired || guiChanged,
             accessMode = SettingAccessMode.REST,
+            guiTlsChanged = currentGuiUseTls != configuration.guiUseTls,
         )
     }
 
@@ -656,7 +664,7 @@ internal class SyncthingRestClient(
         method: String = "GET",
         body: String? = null,
     ): String {
-        val connection = URL("${baseUrl()}$path").openConnection() as HttpURLConnection
+        val connection = openConnection(URL("${baseUrl()}$path"))
         return try {
             connection.requestMethod = method
             connection.connectTimeout = TIMEOUT_MILLIS

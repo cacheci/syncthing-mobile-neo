@@ -21,6 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import moe.https.syncthing.core.GuiTlsFile
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.core.SettingController
@@ -54,6 +55,7 @@ class SettingViewModel(
     private val mutableUiState = MutableStateFlow(SettingUiState())
     val uiState: StateFlow<SettingUiState> = mutableUiState.asStateFlow()
     private val operationMutex = Mutex()
+    private val pendingGuiTlsFiles = mutableMapOf<GuiTlsFile, ByteArray>()
     private val discoveryServerPingStates = mutableStateMapOf<String, DiscoveryServerPingState>()
     var autoStartMode by mutableStateOf(
         appSettingsStorage.getString(AppSettingPrivateStorage.KEY_AUTO_START_MODE)
@@ -294,6 +296,7 @@ class SettingViewModel(
         guiUser: String? = null,
         newGuiPassword: String? = null,
         guiTheme: SettingConfiguration.GuiTheme? = null,
+        guiUseTls: Boolean? = null,
         listenAddresses: String? = null,
         maxSendKiBPerSecond: String? = null,
         maxReceiveKiBPerSecond: String? = null,
@@ -322,6 +325,7 @@ class SettingViewModel(
             guiUser == null &&
             newGuiPassword == null &&
             guiTheme == null &&
+            guiUseTls == null &&
             listenAddresses == null &&
             maxSendKiBPerSecond == null &&
             maxReceiveKiBPerSecond == null &&
@@ -361,6 +365,7 @@ class SettingViewModel(
                     guiUser = guiUser ?: currentFormState.guiUser,
                     newGuiPassword = newGuiPassword ?: currentFormState.newGuiPassword,
                     guiTheme = guiTheme ?: currentFormState.guiTheme,
+                    guiUseTls = guiUseTls ?: currentFormState.guiUseTls,
                     listenAddresses = listenAddresses ?: currentFormState.listenAddresses,
                     maxSendKiBPerSecond =
                         maxSendKiBPerSecond ?: currentFormState.maxSendKiBPerSecond,
@@ -396,6 +401,26 @@ class SettingViewModel(
         }
     }
 
+    fun stageGuiTlsFile(type: GuiTlsFile, content: ByteArray) {
+        pendingGuiTlsFiles[type] = content.copyOf()
+        mutableUiState.update {
+            it.copy(
+                errorMessage = null,
+                noticeMessage = "${type.displayName}已选择，将在保存设置后生效",
+            )
+        }
+    }
+
+    fun onNoticeMessageShown() {
+        mutableUiState.update { it.copy(noticeMessage = null) }
+    }
+
+    fun reportError(message: String) {
+        mutableUiState.update {
+            it.copy(errorMessage = message, successMessage = null, noticeMessage = null)
+        }
+    }
+
     fun save() {
         val state = mutableUiState.value
         val settingRaw = state.settingRaw
@@ -421,6 +446,7 @@ class SettingViewModel(
             }
             return
         }
+        val guiTlsFiles = pendingGuiTlsFiles.mapValues { (_, content) -> content.copyOf() }
 
         viewModelScope.launch {
             operationMutex.withLock {
@@ -436,7 +462,12 @@ class SettingViewModel(
                     )
                 }
                 try {
-                    val result = controller.saveSetting(normalizedConfiguration)
+                    val result = controller.saveSetting(normalizedConfiguration, guiTlsFiles)
+                    guiTlsFiles.forEach { (type, savedContent) ->
+                        if (pendingGuiTlsFiles[type]?.contentEquals(savedContent) == true) {
+                            pendingGuiTlsFiles.remove(type)
+                        }
+                    }
                     val savedConfiguration = normalizedConfiguration.copy(
                         guiPasswordConfigured = if (result.accessMode == SettingAccessMode.STARTUP_ONLY) {
                             normalizedConfiguration.guiPasswordConfigured
@@ -633,6 +664,7 @@ private fun SettingConfiguration.toFormState(): SettingFormState {
         guiUser = guiUser,
         newGuiPassword = "",
         guiTheme = guiTheme,
+        guiUseTls = guiUseTls,
         maxSendKiBPerSecond = maxSendKiBPerSecond.editableStringUnless(defaults.maxSendKiBPerSecond),
         maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.editableStringUnless(defaults.maxReceiveKiBPerSecond),
         reconnectionIntervalSeconds =
@@ -682,6 +714,7 @@ private fun SettingFormState.toConfiguration(setting: SettingConfiguration): Set
         guiUser = guiUser,
         newGuiPassword = if (guiAuthenticationEnabled) newGuiPassword else "",
         guiTheme = guiTheme,
+        guiUseTls = guiUseTls,
         listenAddresses = listenAddresses.toValues(),
         maxSendKiBPerSecond = maxSendKiBPerSecond.toIntOrNull() ?: defaults.maxSendKiBPerSecond,
         maxReceiveKiBPerSecond = maxReceiveKiBPerSecond.toIntOrNull() ?: defaults.maxReceiveKiBPerSecond,
@@ -787,10 +820,10 @@ private fun SettingFormState.validationError(
 }
 
 private fun moe.https.syncthing.core.SettingSaveResult.successMessage(): String = when (accessMode) {
-    SettingAccessMode.REST -> if (restartRequired) {
-        "设置已保存，部分更改将在重启后生效。"
-    } else {
-        "设置已保存。"
+    SettingAccessMode.REST -> when {
+        restartInitiated -> "设置已保存，核心正在重启。"
+        restartRequired -> "设置已保存，部分更改将在重启后生效。"
+        else -> "设置已保存。"
     }
     SettingAccessMode.CONFIG_FILE -> "配置文件已更新，将在启动时生效。"
     SettingAccessMode.STARTUP_ONLY -> "启动参数已保存，将在首次启动时使用。"

@@ -85,6 +85,7 @@ class SyncthingCoreService : Service() {
         when (intent?.action) {
             ACTION_STOP -> requestManualStop()
             ACTION_START -> requestManualStart()
+            ACTION_RESTART -> requestManagedRestart()
             ACTION_REEVALUATE_AUTO_START -> configureAutomaticControl()
             else -> restoreDesiredMode()
         }
@@ -114,6 +115,16 @@ class SyncthingCoreService : Service() {
             shouldRun = false,
             stopServiceWhenStopped = !automaticControlActive,
         )
+    }
+
+    private fun requestManagedRestart() {
+        if (!preferences.getBoolean(KEY_DESIRED_RUNNING, false)) return
+        val runningSupervisor = supervisorJob
+        if (runningSupervisor == null) {
+            requestCoreRunning(true)
+        } else {
+            stopCore(stopServiceWhenStopped = false)
+        }
     }
 
     private fun restoreDesiredMode() {
@@ -349,6 +360,7 @@ class SyncthingCoreService : Service() {
     companion object {
         const val ACTION_START = "moe.https.syncthing.action.START_CORE"
         const val ACTION_STOP = "moe.https.syncthing.action.STOP_CORE"
+        private const val ACTION_RESTART = "moe.https.syncthing.action.RESTART_CORE"
         const val ACTION_REEVALUATE_AUTO_START =
             "moe.https.syncthing.action.REEVALUATE_AUTO_START"
 
@@ -365,6 +377,15 @@ class SyncthingCoreService : Service() {
         internal fun isDesiredRunning(context: android.content.Context): Boolean =
             context.getSharedPreferences(PREFERENCES, MODE_PRIVATE)
                 .getBoolean(KEY_DESIRED_RUNNING, false)
+
+        internal fun requestRestart(context: android.content.Context): Boolean {
+            if (!isDesiredRunning(context)) return false
+            return runCatching {
+                context.startService(
+                    Intent(context, SyncthingCoreService::class.java).setAction(ACTION_RESTART),
+                )
+            }.isSuccess
+        }
     }
 }
 

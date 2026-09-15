@@ -229,6 +229,7 @@ class MainActivity : ComponentActivity() {
                         url = url,
                         username = credentials?.first.orEmpty(),
                         password = credentials?.second.orEmpty(),
+                        isTrustedCertificate = applicationState.coreRuntime::isGuiCertificateTrusted,
                         reloadToken = reloadToken,
                         onScroll = onScroll,
                         modifier = modifier,

@@ -5,11 +5,14 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import android.net.http.SslCertificate
+import android.net.http.SslError
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.HttpAuthHandler
+import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -43,6 +46,7 @@ internal fun AndroidSystemWebView(
     url: String,
     username: String,
     password: String,
+    isTrustedCertificate: (ByteArray) -> Boolean,
     reloadToken: Int,
     onScroll: (deltaY: Float, isAtTop: Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -52,6 +56,7 @@ internal fun AndroidSystemWebView(
         var canGoBack by remember { mutableStateOf(false) }
         val appliedReloadToken = remember { intArrayOf(reloadToken) }
         val currentOnScroll by rememberUpdatedState(onScroll)
+        val currentIsTrustedCertificate by rememberUpdatedState(isTrustedCertificate)
         val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
         BackHandler(enabled = canGoBack) {
@@ -174,6 +179,24 @@ internal fun AndroidSystemWebView(
                                     errorMessage,
                                     "HTTP ${errorResponse.statusCode}",
                                 )
+                            }
+                        }
+
+                        override fun onReceivedSslError(
+                            view: WebView,
+                            handler: SslErrorHandler,
+                            error: SslError,
+                        ) {
+                            val certificateBytes = SslCertificate.saveState(error.certificate)
+                                .getByteArray("x509-certificate")
+                            val trusted = error.url.toUri().hasSameOrigin(url.toUri()) &&
+                                certificateBytes != null &&
+                                currentIsTrustedCertificate(certificateBytes)
+                            if (trusted) {
+                                handler.proceed()
+                            } else {
+                                handler.cancel()
+                                showError(errorPanel, errorMessage, "HTTPS 证书验证失败")
                             }
                         }
 

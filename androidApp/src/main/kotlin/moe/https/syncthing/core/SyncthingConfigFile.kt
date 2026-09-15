@@ -58,6 +58,7 @@ internal class SyncthingConfigFile(
             guiTheme = SettingConfiguration.GuiTheme.entries
                 .firstOrNull { it.apiValue == gui.childText(THEME_TAG) }
                 ?: SettingConfiguration.GuiTheme.DEFAULT,
+            guiUseTls = gui.getAttribute(TLS_ATTRIBUTE).toBoolean(),
             listenAddresses = options.childTexts(LISTEN_ADDRESS_TAG).ifEmpty { listOf("default") },
             maxSendKiBPerSecond = options.childInt(MAX_SEND_TAG, 0),
             maxReceiveKiBPerSecond = options.childInt(MAX_RECEIVE_TAG, 0),
@@ -115,6 +116,7 @@ internal class SyncthingConfigFile(
             }
         }
         gui.setChildText(document, THEME_TAG, configuration.guiTheme.apiValue)
+        gui.setAttribute(TLS_ATTRIBUTE, configuration.guiUseTls.toString())
 
         root.localDeviceElement(localDeviceId)?.setAttribute(NAME_ATTRIBUTE, configuration.deviceName)
         val minHomeDiskFree = options.ensureChild(document, MIN_HOME_DISK_FREE_TAG)
@@ -206,6 +208,17 @@ internal class SyncthingConfigFile(
         gui.setAttribute(SEND_BASIC_AUTH_PROMPT_ATTRIBUTE, enabled.toString())
         writeDocumentAtomically(document)
         return true
+    }
+
+    fun ensureGuiUseTls(enabled: Boolean) {
+        val document = readDocument()
+        val root = document.documentElement
+            ?.takeIf { it.tagName == CONFIGURATION_TAG }
+            ?: error("Syncthing 配置文件缺少 configuration 根节点")
+        val gui = root.ensureChild(document, GUI_TAG)
+        if (gui.getAttribute(TLS_ATTRIBUTE).toBoolean() == enabled) return
+        gui.setAttribute(TLS_ATTRIBUTE, enabled.toString())
+        writeDocumentAtomically(document)
     }
 
     fun validate() {
@@ -308,6 +321,7 @@ internal class SyncthingConfigFile(
         private const val PASSWORD_TAG = "password"
         private const val API_KEY_TAG = "apikey"
         private const val THEME_TAG = "theme"
+        private const val TLS_ATTRIBUTE = "tls"
         private const val SEND_BASIC_AUTH_PROMPT_ATTRIBUTE = "sendBasicAuthPrompt"
         private const val DEVICE_TAG = "device"
         private const val ID_ATTRIBUTE = "id"

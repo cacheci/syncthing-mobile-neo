@@ -1,8 +1,6 @@
+import com.android.build.api.variant.FilterConfiguration
 import com.android.build.api.variant.impl.VariantOutputImpl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.tasks.Exec
-import org.gradle.api.tasks.OutputDirectory
 import java.util.Properties
 
 /** 提交总数，用作 versionCode（等价于 `git rev-list --count HEAD`）。 */
@@ -24,7 +22,7 @@ plugins {
 
 val syncthingVersion = libs.versions.syncthing.version.get()
 val syncthingCommit = libs.versions.syncthing.commit.get()
-val androidArch = "arm64-v8a"
+val androidAbis = listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 val generatedSyncthingJniLibs = layout.buildDirectory.dir("generated/syncthing/jniLibs")
 val buildSyncthingScript = layout.projectDirectory.file("build-syncthing.py")
 val localProperties = Properties().apply {
@@ -57,7 +55,16 @@ android {
 
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters += androidArch
+            abiFilters += androidAbis
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include(*androidAbis.toTypedArray())
+            isUniversalApk = true
         }
     }
 
@@ -162,7 +169,7 @@ val pythonExecutable = sequenceOf(configuredPython)
 
 val buildBuiltInSyncthing = tasks.register<BuildBuiltInSyncthingTask>("buildBuiltInSyncthing") {
     group = "build"
-    description = "为 Android ARM64 编译内置 Syncthing 核心"
+    description = "Compile Syncthing Core"
     jniLibsDirectory.set(generatedSyncthingJniLibs)
     inputs.file(buildSyncthingScript)
     inputs.dir(syncthingSource)
@@ -171,8 +178,10 @@ val buildBuiltInSyncthing = tasks.register<BuildBuiltInSyncthingTask>("buildBuil
     inputs.property("ndkVersion", libs.versions.ndk)
     inputs.property("goVersion", libs.versions.go)
     inputs.property("minSdk", 28)
+    inputs.property("androidAbis", androidAbis)
     workingDir(rootProject.layout.projectDirectory)
     environment("PYTHONDONTWRITEBYTECODE", "1")
+    environment("PYTHONUNBUFFERED", "1")
     commandLine(
         pythonExecutable,
         buildSyncthingScript.asFile.absolutePath,
@@ -190,9 +199,13 @@ androidComponents {
         )
         if (variant.buildType == "release") {
             variant.outputs.forEach { output ->
+                val abi = output.filters
+                    .firstOrNull { it.filterType == FilterConfiguration.FilterType.ABI }
+                    ?.identifier
+                    ?: "universal"
                 (output as? VariantOutputImpl)?.outputFileName?.set(
                     output.versionName.zip(output.versionCode) { versionName, versionCode ->
-                        "syncthing-neo_android-${androidArch}_${versionName}_${versionCode}.apk"
+                        "syncthing-neo_android-${abi}_${versionName}_${versionCode}.apk"
                     },
                 )
             }

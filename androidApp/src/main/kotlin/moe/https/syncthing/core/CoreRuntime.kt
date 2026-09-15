@@ -73,7 +73,7 @@ class CoreRuntime(
         baseUrl = { formatGuiBaseUrl(activeGuiHost, activeGuiPort) },
         onHttpError = { error ->
             logError(
-                "REST 请求失败：${error.message}",
+                "REST request failed: ${error.message}",
                 error,
             )
         },
@@ -511,7 +511,7 @@ class CoreRuntime(
             val status = runCatching { restClient.status() }
                 .onFailure { error ->
                     logConnectionFailure(
-                        context = "刷新核心运行状态失败",
+                        context = "Failed to refresh core runtime status",
                         error = error,
                         terminal = false,
                     )
@@ -543,9 +543,9 @@ class CoreRuntime(
                 }
                 return@withLock
             }
-            if (!supportsArm64()) {
+            if (!supportsCoreAbi()) {
                 mutableSnapshot.update {
-                    it.copy(operationMessage = "当前设备不是 arm64-v8a，无法使用此外置核心")
+                    it.copy(operationMessage = "当前设备没有受支持的核心架构，无法使用外置核心")
                 }
                 return@withLock
             }
@@ -563,16 +563,16 @@ class CoreRuntime(
                     mutableSnapshot.value = idleSnapshot(
                         operationMessage = "已导入并选中外置核心 ${core.version}",
                     )
-                    if (core.version.contains("linux-arm64", ignoreCase = true)) {
+                    if (core.version.contains("linux-", ignoreCase = true)) {
                         logWarning(
-                            "已导入 linux-arm64 核心；该构建可能无法在 Android 上正确使用 DNS、网络接口、发现和中继功能，请优先使用 android-arm64 核心",
+                            "Imported a Linux core; DNS, network interfaces, discovery, and relay features may not work correctly on Android. Prefer an Android core built for the matching architecture",
                         )
                     } else {
-                        logInfo("外置核心导入成功：${redact(core.version)}")
+                        logInfo("External core imported successfully: ${redact(core.version)}")
                     }
                 }
                 .onFailure { error ->
-                    logError("外置核心导入失败", error)
+                    logError("Failed to import external core", error)
                     mutableSnapshot.value = idleSnapshot(
                         operationMessage = error.userMessage(),
                     )
@@ -582,8 +582,11 @@ class CoreRuntime(
 
     suspend fun runSession(): SessionResult = withContext(Dispatchers.IO) {
         val startedAt = System.currentTimeMillis()
-        if (!supportsArm64()) {
-            fail("当前设备不是 arm64-v8a")
+        if (!supportsCoreAbi()) {
+            fail(
+                message = "当前设备没有受支持的核心架构",
+                logMessage = "The current device has no supported core architecture",
+            )
             return@withContext SessionResult(started = false, runtimeMillis = 0, exitCode = null)
         }
 
@@ -624,10 +627,10 @@ class CoreRuntime(
             .takeIf { executable.source == CoreSource.EXTERNAL && it.contains("linux-arm64", ignoreCase = true) }
             ?.let {
                 logWarning(
-                    "当前外置核心为 linux-arm64 构建，Android 下 DNS、网络接口、发现和中继连接可能不可用",
+                    "The current external core is a linux-arm64 build; DNS, network interfaces, discovery, and relay connections may be unavailable on Android",
                 )
             }
-        logInfo("核心进程已创建，开始连接 REST API：${restApiAddress()}")
+        logInfo("Core process created; connecting to REST API: ${restApiAddress()}")
 
         mutableSnapshot.update {
             it.copy(
@@ -654,6 +657,12 @@ class CoreRuntime(
                 }
             fail(
                 message = message,
+                logMessage = if (exitCode == null) {
+                    "Core started, but the REST API did not become ready within the timeout" +
+                        apiWaitResult.lastError?.let { "; last error: ${connectionErrorLogSummary(it)}" }.orEmpty()
+                } else {
+                    "Core failed to start with exit code $exitCode"
+                },
                 includeCoreLogs = true,
             )
             launchedProcess.destroyForcibly()
@@ -667,7 +676,7 @@ class CoreRuntime(
         }
 
         mutableSnapshot.update { it.copy(state = CoreState.RUNNING, lastError = null) }
-        logInfo("核心 REST 接口已就绪：${restApiAddress()}")
+        logInfo("Core REST API is ready: ${restApiAddress()}")
         currentPid()
         monitorSession(launchedProcess)
         val exitCode = launchedProcess.exitCodeOrNull()
@@ -677,6 +686,7 @@ class CoreRuntime(
         if (mutableSnapshot.value.state != CoreState.STOPPING) {
             fail(
                 message = "核心意外退出${exitCode?.let { code -> "，退出码 $code" } ?: ""}",
+                logMessage = "Core exited unexpectedly${exitCode?.let { code -> " with exit code $code" } ?: ""}",
                 includeCoreLogs = true,
             )
         }
@@ -690,11 +700,11 @@ class CoreRuntime(
 
     suspend fun stop() = withContext(Dispatchers.IO) {
         mutableSnapshot.update { it.copy(state = CoreState.STOPPING, lastError = null) }
-        logInfo("正在请求核心停止")
+        logInfo("Requesting core shutdown")
         runCatching { restClient.shutdown() }
             .onFailure { error ->
                 logConnectionFailure(
-                    context = "REST 正常关闭请求失败，将尝试终止进程",
+                    context = "Graceful REST shutdown request failed; attempting to terminate the process",
                     error = error,
                     terminal = false,
                 )
@@ -721,15 +731,16 @@ class CoreRuntime(
         process = null
         clearProcessRecord()
         mutableSnapshot.value = idleSnapshot()
-        logInfo("核心已停止")
+        logInfo("Core stopped")
     }
 
     fun fail(
         message: String,
+        logMessage: String = message,
         error: Throwable? = null,
         includeCoreLogs: Boolean = false,
     ) {
-        logError(message, error)
+        logError(logMessage, error)
         if (includeCoreLogs) {
             logCoreLogTail()
         }
@@ -835,23 +846,23 @@ class CoreRuntime(
         repeat(API_READY_POLL_COUNT) { index ->
             val attempt = index + 1
             if (!currentProcess.isAlive) {
-                logError("REST API 就绪前核心进程已退出，已尝试 $attempt 次")
+                logError("Core process exited before the REST API became ready after $attempt attempts")
                 return ApiWaitResult(ready = false, lastError = lastError)
             }
 
             val result = runCatching { restClient.pingChecked() }
             if (result.isSuccess) {
                 val elapsed = SystemClock.elapsedRealtime() - startedAt
-                logInfo("REST API 连接成功，尝试 $attempt 次，耗时 ${elapsed}ms")
+                logInfo("Connected to REST API after $attempt attempts in ${elapsed}ms")
                 return ApiWaitResult(ready = true, lastError = null)
             }
 
-            val error = result.exceptionOrNull() ?: IOException("未知 REST 连接错误")
+            val error = result.exceptionOrNull() ?: IOException("Unknown REST connection error")
             lastError = error
             val signature = connectionErrorSignature(error)
             if (attempt == 1 || attempt % CONNECTION_RETRY_LOG_INTERVAL == 0 || signature != lastSignature) {
                 logConnectionFailure(
-                    context = "REST API 尚未就绪（第 $attempt/$API_READY_POLL_COUNT 次）",
+                    context = "REST API is not ready (attempt $attempt/$API_READY_POLL_COUNT)",
                     error = error,
                     terminal = false,
                 )
@@ -862,8 +873,8 @@ class CoreRuntime(
 
         val elapsed = SystemClock.elapsedRealtime() - startedAt
         logConnectionFailure(
-            context = "REST API 连接超时，尝试 $API_READY_POLL_COUNT 次，耗时 ${elapsed}ms",
-            error = lastError ?: IOException("未获得 REST 响应"),
+            context = "REST API connection timed out after $API_READY_POLL_COUNT attempts in ${elapsed}ms",
+            error = lastError ?: IOException("No REST response received"),
             terminal = true,
         )
         return ApiWaitResult(ready = false, lastError = lastError)
@@ -879,7 +890,7 @@ class CoreRuntime(
                 .onSuccess { status ->
                     rememberLocalDeviceId(status.myId)
                     if (consecutiveFailures > 0) {
-                        logInfo("REST 状态连接已恢复，此前连续失败 $consecutiveFailures 次")
+                        logInfo("REST status connection recovered after $consecutiveFailures consecutive failures")
                     }
                     consecutiveFailures = 0
                     lastSignature = null
@@ -903,7 +914,7 @@ class CoreRuntime(
                         signature != lastSignature
                     ) {
                         logConnectionFailure(
-                            context = "REST 状态轮询失败（连续 $consecutiveFailures 次）",
+                            context = "REST status polling failed ($consecutiveFailures consecutive failures)",
                             error = error,
                             terminal = false,
                         )
@@ -1051,8 +1062,8 @@ class CoreRuntime(
         managedGuiCredentials = credentials
     }
 
-    private fun supportsArm64(): Boolean =
-        Build.SUPPORTED_ABIS.any { it == "arm64-v8a" }
+    private fun supportsCoreAbi(): Boolean =
+        Build.SUPPORTED_ABIS.any { it in SUPPORTED_CORE_ABIS }
 
     private fun logError(message: String, error: Throwable? = null) {
         writeControllerLog("ERROR", message, error)
@@ -1078,7 +1089,7 @@ class CoreRuntime(
         error: Throwable,
         terminal: Boolean,
     ) {
-        val summary = "$context；${connectionErrorSummary(error)}"
+        val summary = "$context; ${connectionErrorLogSummary(error)}"
         if (terminal || isCriticalConnectionError(error)) {
             logError(summary, error)
         } else {
@@ -1103,6 +1114,25 @@ class CoreRuntime(
         }
         val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
         return "$category，异常=${error.javaClass.simpleName}，详情=${redact(detail)}，地址=${restApiAddress()}"
+    }
+
+    private fun connectionErrorLogSummary(error: Throwable): String {
+        val category = when (error) {
+            is UnknownServiceException, is SecurityException -> "Connection rejected by Android network security policy"
+            is SyncthingRestException -> when (error.responseCode) {
+                401, 403 -> "REST API authentication failed (HTTP ${error.responseCode})"
+                else -> "REST API returned an unexpected status (HTTP ${error.responseCode})"
+            }
+            is SocketTimeoutException -> "REST API connection or read timed out"
+            is ConnectException -> "REST API refused the connection"
+            is NoRouteToHostException -> "REST API address is unreachable"
+            is UnknownHostException -> "Failed to resolve REST API address"
+            is SocketException -> "REST API socket connection failed"
+            is IOException -> "REST API communication failed"
+            else -> "REST API request failed"
+        }
+        val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+        return "$category, exception=${error.javaClass.simpleName}, detail=${redact(detail)}, address=${restApiAddress()}"
     }
 
     private fun connectionErrorSignature(error: Throwable): String = when (error) {
@@ -1139,7 +1169,7 @@ class CoreRuntime(
                 file.appendText(line)
             }
         }.onFailure { logError ->
-            Log.w(TAG, "写入控制器日志失败", logError)
+            Log.w(TAG, "Failed to write controller log", logError)
         }
     }
 
@@ -1170,14 +1200,14 @@ class CoreRuntime(
             .replace(Regex("--gui-apikey=\\S+"), "--gui-apikey=$REDACTED_VALUE")
 
         if (report.isBlank()) {
-            Log.e(TAG, "核心日志文件不存在或为空")
+            Log.e(TAG, "Core log files do not exist or are empty")
             return
         }
         logCoreConnectionDiagnostics(report)
         report.takeLast(MAX_CORE_LOG_CHARS)
             .chunked(LOGCAT_CHUNK_CHARS)
             .forEachIndexed { index, chunk ->
-                Log.e(TAG, "核心日志尾部 ${index + 1}:\n$chunk")
+                Log.e(TAG, "Core log tail ${index + 1}:\n$chunk")
             }
     }
 
@@ -1187,15 +1217,15 @@ class CoreRuntime(
             .mapNotNull { line ->
                 when {
                     "lookup " in line && ":53" in line ->
-                        "核心 DNS 解析失败：当前核心尝试通过本机回环 DNS（[::1]:53）解析，发现或中继服务可能不可用"
+                        "Core DNS resolution failed: the core attempted to resolve through the local loopback DNS server ([::1]:53); discovery or relay services may be unavailable"
                     "Failed to list network interfaces" in line && "permission denied" in line ->
-                        "核心无权读取网络接口，UPnP/NAT 探测可能不可用"
+                        "Core cannot read network interfaces; UPnP/NAT detection may be unavailable"
                     "relays.syncthing.net" in line && "Service failed" in line ->
-                        "核心中继服务连接失败，请检查 DNS 和外网连接"
+                        "Core relay service connection failed; check DNS and internet connectivity"
                     "discover" in line && ("failed" in line.lowercase(Locale.US) || "error=" in line) ->
-                        "核心发现服务连接失败，请检查 DNS、网络权限和外网连接"
+                        "Core discovery service connection failed; check DNS, network permissions, and internet connectivity"
                     "api" in line && ("failed" in line.lowercase(Locale.US) || "error=" in line) ->
-                        "核心 REST/GUI 监听异常：${line.substringAfter("error=", line)}"
+                        "Core REST/GUI listener error: ${line.substringAfter("error=", line)}"
                     else -> null
                 }
             }
@@ -1205,7 +1235,7 @@ class CoreRuntime(
             .toList()
 
         warnings.forEach { diagnostic ->
-            if (diagnostic.startsWith("核心 DNS") || diagnostic.startsWith("核心 REST")) {
+            if (diagnostic.startsWith("Core DNS") || diagnostic.startsWith("Core REST")) {
                 logError(diagnostic)
             } else {
                 logWarning(diagnostic)
@@ -1222,7 +1252,7 @@ class CoreRuntime(
                 .ifBlank { null }
         }
     }.onFailure { error ->
-        Log.w(TAG, "读取核心日志失败：${file.name}", error)
+        Log.w(TAG, "Failed to read core log: ${file.name}", error)
     }.getOrNull()
 
     data class SessionResult(
@@ -1274,6 +1304,7 @@ class CoreRuntime(
         private const val CONTROLLER_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS"
         private const val MAX_CONTROLLER_LOG_BYTES = 1024L * 1024L
         private const val MAX_CORE_DIAGNOSTICS = 12
+        private val SUPPORTED_CORE_ABIS = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
         private val CONTROLLER_LOG_LOCK = Any()
     }
 
@@ -1316,7 +1347,7 @@ class CoreRuntime(
             isPortAvailable(host, port)
         } ?: throw IOException("GUI 端口 $configuredPort 及其后 $GUI_PORT_PROBE_LIMIT 个端口均不可用")
         if (selectedPort != configuredPort) {
-            logWarning("GUI 端口 $configuredPort 已被占用，本次启动临时改用 $selectedPort")
+            logWarning("GUI port $configuredPort is in use; temporarily using port $selectedPort for this session")
         }
         return formatGuiAddress(host, selectedPort)
     }

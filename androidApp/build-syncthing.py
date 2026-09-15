@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the bundled Syncthing Android ARM64 executable.
+"""Build the bundled Syncthing Android executables.
 
 The workflow is adapted to this project from researchxxl/syncthing-android's
 build-syncthing.py (MPL-2.0). Generated files stay outside the source tree.
@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 from typing import NoReturn, Optional
@@ -44,6 +45,21 @@ GO_ARCHIVES = {
 
 GO_INSTALL_MARKER = ".syncthing-go-archive"
 
+ANDROID_TARGETS = (
+    ("arm64-v8a", "arm64", "aarch64-linux-android28-clang", None),
+    ("armeabi-v7a", "arm", "armv7a-linux-androideabi28-clang", "7"),
+    ("x86", "386", "i686-linux-android28-clang", None),
+    ("x86_64", "amd64", "x86_64-linux-android28-clang", None),
+)
+
+
+def log(message: str) -> None:
+    print(f"[build-syncthing] {message}", flush=True)
+
+
+def log_error(message: str) -> None:
+    print(f"[build-syncthing] Error: {message}", file=sys.stderr, flush=True)
+
 
 def fail(message: str) -> NoReturn:
     raise RuntimeError(message)
@@ -55,7 +71,7 @@ def read_catalog_version(catalog: Path, key: str) -> str:
         match = pattern.match(line)
         if match:
             return match.group(1)
-    fail(f"版本目录缺少 {key}: {catalog}")
+    fail(f"Version catalog is missing {key}: {catalog}")
 
 
 def go_version(go: Path) -> Optional[str]:
@@ -76,7 +92,7 @@ def safely_extract(archive: Path, destination: Path) -> None:
         for member in tar.getmembers():
             member_path = (destination / member.name).resolve()
             if destination_root != member_path and destination_root not in member_path.parents:
-                fail(f"Go 源码压缩包包含不安全路径：{member.name}")
+                fail(f"Go source archive contains an unsafe path: {member.name}")
         try:
             tar.extractall(destination, filter="data")
         except TypeError:
@@ -97,7 +113,7 @@ def go_host() -> tuple[str, str]:
         "Linux": "linux",
     }.get(platform.system())
     if goos is None:
-        fail(f"不支持的构建主机：{platform.system()}")
+        fail(f"Unsupported build host: {platform.system()}")
 
     goarch = {
         "x86_64": "amd64",
@@ -106,7 +122,7 @@ def go_host() -> tuple[str, str]:
         "aarch64": "arm64",
     }.get(platform.machine().lower())
     if goarch is None:
-        fail(f"不支持的构建主机架构：{platform.machine()}")
+        fail(f"Unsupported build host architecture: {platform.machine()}")
     return goos, goarch
 
 
@@ -115,7 +131,7 @@ def downloaded_go(project_dir: Path, expected_version: str) -> Path:
     archive_info = GO_ARCHIVES.get((expected_version, goos, goarch))
     if archive_info is None:
         fail(
-            f"工具链校验失败："
+            f"Toolchain verification failed: "
             "{expected_version} {goos}-{goarch}",
         )
     filename, expected_sha256 = archive_info
@@ -147,12 +163,12 @@ def downloaded_go(project_dir: Path, expected_version: str) -> Path:
             archive_file = Path(temporary_archive.name)
 
         url = f"https://go.dev/dl/{filename}"
-        print(f"下载 Go 工具链 {expected_version}: {url}")
+        log(f"Downloading Go toolchain {expected_version}: {url}")
         urllib.request.urlretrieve(url, archive_file)
         actual_sha256 = sha256(archive_file)
         if actual_sha256 != expected_sha256:
             fail(
-                f"工具链校验失败：{expected_sha256} & {actual_sha256}",
+                f"Toolchain verification failed: {expected_sha256} & {actual_sha256}",
             )
 
         extraction_dir = Path(tempfile.mkdtemp(prefix=".go-extract-", dir=third_party_dir))
@@ -160,10 +176,10 @@ def downloaded_go(project_dir: Path, expected_version: str) -> Path:
         extracted_go = extraction_dir / "go"
         extracted_binary = extracted_go / "bin" / "go"
         if not extracted_binary.is_file():
-            fail(f"找不到工具链：{extracted_binary}")
+            fail(f"Toolchain not found: {extracted_binary}")
         actual_version = go_version(extracted_binary)
         if actual_version != expected_version:
-            fail(f"Go 工具链错误： {expected_version} & {actual_version or '无法读取'}")
+            fail(f"Incorrect Go toolchain: {expected_version} & {actual_version or 'unavailable'}")
 
         if install_dir.exists():
             shutil.rmtree(install_dir)
@@ -197,7 +213,7 @@ def find_ndk(project_dir: Path, expected_version: str) -> Path:
         sdk_value = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
         sdk = Path(sdk_value).expanduser() if sdk_value else read_local_sdk(project_dir)
         if sdk is None:
-            fail("找不到 Android SDK；请配置 local.properties、ANDROID_SDK_ROOT 或 ANDROID_HOME")
+            fail("Android SDK not found; configure local.properties, ANDROID_SDK_ROOT, or ANDROID_HOME")
         ndk = sdk / "ndk" / expected_version
 
     source_properties = ndk / "source.properties"
@@ -208,13 +224,13 @@ def find_ndk(project_dir: Path, expected_version: str) -> Path:
                 actual_version = line.partition("=")[2].strip()
                 break
     if actual_version != expected_version:
-        fail(f"Android NDK 版本不匹配：期望 {expected_version}，实际 {actual_version or '无法读取'}")
+        fail(f"Android NDK version mismatch: expected {expected_version}, actual {actual_version or 'unavailable'}")
     return ndk.resolve()
 
 
 def verify_source(source_dir: Path, expected_commit: str) -> None:
     if not (source_dir / "build.go").is_file():
-        fail("Syncthing 子模块未初始化，请先初始化 third_party/syncthing")
+        fail("Syncthing submodule is not initialized; initialize third_party/syncthing first")
     result = subprocess.run(
         ["git", "-C", str(source_dir), "rev-parse", "HEAD"],
         check=True,
@@ -223,70 +239,105 @@ def verify_source(source_dir: Path, expected_commit: str) -> None:
     )
     actual_commit = result.stdout.strip()
     if actual_commit != expected_commit:
-        fail(f"Syncthing 子模块 commit 不匹配：期望 {expected_commit}，实际 {actual_commit}")
+        fail(f"Syncthing submodule commit mismatch: expected {expected_commit}, actual {actual_commit}")
 
 
 def build(project_dir: Path, source_dir: Path, output_dir: Path) -> None:
+    started_at = time.monotonic()
     catalog = project_dir / "gradle" / "libs.versions.toml"
+    log(f"Reading version catalog: {catalog}")
     syncthing_version = read_catalog_version(catalog, "syncthing-version")
     syncthing_commit = read_catalog_version(catalog, "syncthing-commit")
     ndk_version = read_catalog_version(catalog, "ndk")
     expected_go_version = read_catalog_version(catalog, "go")
-    verify_source(source_dir, syncthing_commit)
+    log(
+        f"Build configuration: Syncthing v{syncthing_version}, "
+        f"Go {expected_go_version}, NDK {ndk_version}, "
+        f"{len(ANDROID_TARGETS)} target ABIs",
+    )
 
+    log(f"Verifying Syncthing source: {source_dir}")
+    verify_source(source_dir, syncthing_commit)
+    log(f"Syncthing source verified: {syncthing_commit}")
+
+    log("Preparing Go toolchain")
     go = downloaded_go(project_dir, expected_go_version)
+    log(f"Using Go toolchain: {go}")
+    log("Locating Android NDK")
     ndk = find_ndk(project_dir, ndk_version)
+    log(f"Using Android NDK: {ndk}")
     host_dir = HOST_TOOLCHAIN_DIRS.get(platform.system())
     if host_dir is None:
-        fail(f"不支持的构建主机：{platform.system()}")
-    compiler = ndk / "toolchains" / "llvm" / "prebuilt" / host_dir / "bin" / "aarch64-linux-android28-clang"
-    if not compiler.is_file():
-        fail(f"找不到 Android ARM64 编译器：{compiler}")
+        fail(f"Unsupported build host: {platform.system()}")
+    toolchain_bin = ndk / "toolchains" / "llvm" / "prebuilt" / host_dir / "bin"
 
-    output = output_dir / "arm64-v8a" / "libsyncthingnative.so"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "BUILD_HOST": "syncthingG",
-            "BUILD_USER": "reproducible-build",
-            "CGO_ENABLED": "1",
-            "EXTRA_LDFLAGS": "-checklinkname=0",
-            "GO111MODULE": "on",
-            "GOFLAGS": "-buildvcs=false",
-            "GOTOOLCHAIN": "local",
-            "PATH": f"{go.parent}{os.pathsep}{os.environ.get('PATH', '')}",
-            "SOURCE_DATE_EPOCH": "0",
-            "STTRACE": "",
-        }
-    )
-    subprocess.run(
-        [
-            str(go),
-            "run",
-            "build.go",
-            "-gocmd",
-            str(go),
-            "-goos",
-            "android",
-            "-goarch",
-            "arm64",
-            "-cc",
-            str(compiler),
-            "-version",
-            f"v{syncthing_version}",
-            "-no-upgrade",
-            "-build-out",
-            str(output),
-            "build",
-        ],
-        cwd=source_dir,
-        env=environment,
-        check=True,
-    )
-    if not output.is_file():
-        fail(f"Syncthing 构建失败：{output}")
-    print(f"Syncthing 构建成功：{output}")
+    for index, (android_abi, goarch, compiler_name, goarm) in enumerate(ANDROID_TARGETS, start=1):
+        target_started_at = time.monotonic()
+        compiler = toolchain_bin / compiler_name
+        if not compiler.is_file():
+            fail(f"Android {android_abi} compiler not found: {compiler}")
+
+        output = output_dir / android_abi / "libsyncthingnative.so"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        go_target = f"android/{goarch}" + (f" GOARM={goarm}" if goarm is not None else "")
+        log(f"[{index}/{len(ANDROID_TARGETS)}] Building:  {android_abi} ({go_target})")
+        log(f"[{index}/{len(ANDROID_TARGETS)}] Compiler: {compiler}")
+        log(f"[{index}/{len(ANDROID_TARGETS)}] Output: {output}")
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "BUILD_HOST": "syncthingG",
+                "BUILD_USER": "reproducible-build",
+                "BUILDDEBUG": "1",
+                "CGO_ENABLED": "1",
+                "EXTRA_LDFLAGS": "-checklinkname=0",
+                "GO111MODULE": "on",
+                "GOFLAGS": "-buildvcs=false",
+                "GOTOOLCHAIN": "local",
+                "PATH": f"{go.parent}{os.pathsep}{os.environ.get('PATH', '')}",
+                "SOURCE_DATE_EPOCH": "0",
+                "STTRACE": "",
+            }
+        )
+        if goarm is not None:
+            environment["GOARM"] = goarm
+        else:
+            environment.pop("GOARM", None)
+
+        try:
+            subprocess.run(
+                [
+                    str(go),
+                    "run",
+                    "build.go",
+                    "-gocmd",
+                    str(go),
+                    "-goos",
+                    "android",
+                    "-goarch",
+                    goarch,
+                    "-cc",
+                    str(compiler),
+                    "-version",
+                    f"v{syncthing_version}",
+                    "-no-upgrade",
+                    "-build-out",
+                    str(output),
+                    "build",
+                ],
+                cwd=source_dir,
+                env=environment,
+                check=True,
+            )
+        except subprocess.CalledProcessError as error:
+            fail(f"Syncthing {android_abi} build failed with exit code {error.returncode}")
+        if not output.is_file():
+            fail(f"Syncthing {android_abi} build failed: {output}")
+        elapsed = time.monotonic() - target_started_at
+        log(f"[{index}/{len(ANDROID_TARGETS)}] {android_abi} build succeeded in {elapsed:.1f} seconds")
+
+    total_elapsed = time.monotonic() - started_at
+    log(f"Built all {len(ANDROID_TARGETS)} ABIs in {total_elapsed:.1f} seconds")
 
 
 def main() -> int:
@@ -302,7 +353,7 @@ def main() -> int:
             arguments.output_dir.resolve(),
         )
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-        print(f"Syncthing 核心构建失败：{error}", file=sys.stderr)
+        log_error(f"Syncthing build failed: {error}")
         return 1
     return 0
 

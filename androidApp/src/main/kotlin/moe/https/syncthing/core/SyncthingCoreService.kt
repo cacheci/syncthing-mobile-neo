@@ -191,6 +191,7 @@ class SyncthingCoreService : Service() {
                 } catch (error: Throwable) {
                     runtime.fail(
                         message = error.message ?: error.javaClass.simpleName,
+                        logMessage = "Core supervisor caught an unhandled exception",
                         error = error,
                         includeCoreLogs = true,
                     )
@@ -208,6 +209,7 @@ class SyncthingCoreService : Service() {
                     preferences.edit { putBoolean(KEY_DESIRED_RUNNING, false) }
                     runtime.fail(
                         message = "核心连续启动失败，已停止自动重试",
+                        logMessage = "Core failed to start repeatedly; automatic retries have stopped",
                         includeCoreLogs = true,
                     )
                     break

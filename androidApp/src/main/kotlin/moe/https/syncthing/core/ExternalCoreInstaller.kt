@@ -2,6 +2,7 @@ package moe.https.syncthing.core
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.system.ErrnoException
 import android.system.Os
 import org.json.JSONObject
@@ -42,7 +43,7 @@ internal class ExternalCoreInstaller(context: Context) {
                 }
             } ?: throw IOException("无法读取所选核心文件")
 
-            validateArm64Elf(candidate)
+            validateElf(candidate)
             setExecutable(candidate)
             val version = readVersion(candidate)
             val id = UUID.randomUUID().toString()
@@ -112,7 +113,7 @@ internal class ExternalCoreInstaller(context: Context) {
         )
     }.getOrNull()
 
-    private fun validateArm64Elf(file: File) {
+    private fun validateElf(file: File) {
         val header = ByteArray(20)
         file.inputStream().use { input ->
             var offset = 0
@@ -129,13 +130,16 @@ internal class ExternalCoreInstaller(context: Context) {
                 header[2] == 'L'.code.toByte() &&
                 header[3] == 'F'.code.toByte()
         if (!hasElfMagic) throw IOException("所选文件不是 ELF 可执行文件")
-        if (header[4].toInt() != ELF_CLASS_64 || header[5].toInt() != ELF_LITTLE_ENDIAN) {
-            throw IOException("核心必须是 64 位小端 ELF 文件")
-        }
+        val elfClass = header[4].toInt() and 0xFF
+        if (header[5].toInt() != ELF_LITTLE_ENDIAN) throw IOException("核心必须是小端 ELF 文件")
         val machine =
             (header[18].toInt() and 0xFF) or
                 ((header[19].toInt() and 0xFF) shl 8)
-        if (machine != ELF_MACHINE_AARCH64) throw IOException("核心架构不是 arm64-v8a")
+        val abi = ELF_ABIS[elfClass to machine]
+            ?: throw IOException("核心架构不受支持")
+        if (abi !in Build.SUPPORTED_ABIS) {
+            throw IOException("核心架构 $abi 与当前设备不兼容")
+        }
     }
 
     private fun setExecutable(file: File) {
@@ -220,10 +224,20 @@ internal class ExternalCoreInstaller(context: Context) {
         private const val BINARY_FILE_NAME = "syncthing"
         private const val METADATA_FILE_NAME = "metadata.json"
         private const val EXECUTABLE_MODE = 448 // 0700
+        private const val ELF_CLASS_32 = 1
         private const val ELF_CLASS_64 = 2
         private const val ELF_LITTLE_ENDIAN = 1
+        private const val ELF_MACHINE_X86 = 3
+        private const val ELF_MACHINE_ARM = 40
+        private const val ELF_MACHINE_X86_64 = 62
         private const val ELF_MACHINE_AARCH64 = 183
         private const val VERSION_TIMEOUT_SECONDS = 5L
         private const val MAX_VERSION_LENGTH = 160
+        private val ELF_ABIS = mapOf(
+            (ELF_CLASS_64 to ELF_MACHINE_AARCH64) to "arm64-v8a",
+            (ELF_CLASS_32 to ELF_MACHINE_ARM) to "armeabi-v7a",
+            (ELF_CLASS_32 to ELF_MACHINE_X86) to "x86",
+            (ELF_CLASS_64 to ELF_MACHINE_X86_64) to "x86_64",
+        )
     }
 }

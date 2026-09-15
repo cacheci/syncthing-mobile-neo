@@ -222,7 +222,7 @@ jobs:
         env:
           APK_PATHS: ${{ steps.apk.outputs.apk_paths }}
           COMMIT_MESSAGES_B64: ${{ steps.release.outputs.commit_messages_b64 }}
-          TELEGRAM_BOT_API: ${{ vars.TELEGRAM_BOT_API }}
+          TELEGRAM_BOT_API: ${{ secrets.TELEGRAM_BOT_API }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_REPLY_TO_MESSAGE_ID: ${{ secrets.TELEGRAM_REPLY_TO_MESSAGE_ID }}

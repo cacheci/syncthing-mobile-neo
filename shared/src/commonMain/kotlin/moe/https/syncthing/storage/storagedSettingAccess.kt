@@ -31,5 +31,6 @@ interface AppSettingPrivateStorage {
         const val KEY_DISCOVERY_PREFERENCE = "discovery_prefer"
         const val KEY_BOTTOM_BAR_PAGES = "bottom_bar_pages"
         const val KEY_BOTTOM_BAR_DEFAULT_PAGE = "bottom_bar_default_page"
+        const val KEY_FLOATING_BOTTOM_BAR = "floating_bottom_bar"
     }
 }

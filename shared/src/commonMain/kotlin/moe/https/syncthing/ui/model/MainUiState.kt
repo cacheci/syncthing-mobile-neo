@@ -3,6 +3,7 @@ package moe.https.syncthing.ui.model
 data class MainUiState(
     val bottomBarPages: Set<AppPage> = DEFAULT_BOTTOM_BAR_PAGES,
     val defaultBottomBarPage: AppPage = AppPage.CORE,
+    val floatingBottomBar: Boolean = false,
 ) {
     val canSelectMoreBottomBarPages: Boolean
         get() = bottomBarPages.size < MAX_BOTTOM_BAR_PAGES

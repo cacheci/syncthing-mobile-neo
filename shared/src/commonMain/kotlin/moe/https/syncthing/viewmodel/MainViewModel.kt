@@ -41,6 +41,16 @@ class MainViewModel(
         mutableUiState.value = currentState.copy(defaultBottomBarPage = page)
     }
 
+    fun onFloatingBottomBarChanged(floating: Boolean) {
+        val currentState = mutableUiState.value
+        if (currentState.floatingBottomBar == floating) return
+        appSettingsStorage.putBoolean(
+            AppSettingPrivateStorage.KEY_FLOATING_BOTTOM_BAR,
+            floating,
+        )
+        mutableUiState.value = currentState.copy(floatingBottomBar = floating)
+    }
+
     private fun updateBottomBarPages(pages: Set<AppPage>) {
         val normalizedPages = normalizeBottomBarPages(pages)
         val normalizedDefaultPage = resolveDefaultBottomBarPage(
@@ -58,6 +68,7 @@ class MainViewModel(
         mutableUiState.value = MainUiState(
             bottomBarPages = normalizedPages,
             defaultBottomBarPage = normalizedDefaultPage,
+            floatingBottomBar = mutableUiState.value.floatingBottomBar,
         )
     }
 
@@ -82,6 +93,10 @@ class MainViewModel(
             defaultBottomBarPage = resolveDefaultBottomBarPage(
                 page = storedDefaultPage,
                 availablePages = bottomBarPages,
+            ),
+            floatingBottomBar = appSettingsStorage.getBoolean(
+                AppSettingPrivateStorage.KEY_FLOATING_BOTTOM_BAR,
+                false,
             ),
         )
     }

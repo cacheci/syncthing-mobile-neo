@@ -30,6 +30,7 @@ import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
+import moe.https.syncthing.ui.component.AppNavigationBar
 import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
@@ -68,8 +69,6 @@ import moe.https.syncthing.viewmodel.SettingViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
@@ -354,20 +353,26 @@ fun App(
                             )
                         }
                     },
+                    floatingToolbar = {
+                        if (mainUiState.floatingBottomBar) {
+                            AppNavigationBar(
+                                entries = AppPage.entries,
+                                visiblePages = mainUiState.bottomBarPages,
+                                currentPage = currentPageMain,
+                                onNavigationBarItemClick = ::requestSwitchToPageMain,
+                                floating = true
+                            )
+                        }
+                    },
                     bottomBar = {
-                        NavigationBar (
-                            color = MiuixTheme.colorScheme.background
-                        ) {
-                            AppPage.entries
-                                .filter(mainUiState.bottomBarPages::contains)
-                                .forEach { page ->
-                                    NavigationBarItem(
-                                        selected = currentPageMain == page,
-                                        onClick = { requestSwitchToPageMain(page) },
-                                        icon = page.icon,
-                                        label = page.title,
-                                    )
-                                }
+                        if (!mainUiState.floatingBottomBar) {
+                            AppNavigationBar(
+                                entries = AppPage.entries,
+                                visiblePages = mainUiState.bottomBarPages,
+                                currentPage = currentPageMain,
+                                onNavigationBarItemClick = ::requestSwitchToPageMain,
+                                floating = false
+                            )
                         }
                     },
                     snackbarHost = {
@@ -648,6 +653,7 @@ fun App(
                             uiState = mainUiState,
                             onPageToggle = mainViewModel::onBottomBarPageToggled,
                             onDefaultPageChange = mainViewModel::onDefaultBottomBarPageSelected,
+                            onFloatingBottomBarChange = mainViewModel::onFloatingBottomBarChanged,
                             navigateBack = navigateBack,
                         )
                     }

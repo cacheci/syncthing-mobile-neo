@@ -49,13 +49,13 @@ import moe.https.syncthing.core.GuiTlsFile
 import moe.https.syncthing.core.SettingAccessMode
 import moe.https.syncthing.core.SettingConfiguration
 import moe.https.syncthing.core.defaultFolderPath
-import moe.https.syncthing.icon
 import moe.https.syncthing.platform.FilePickerResult
 import moe.https.syncthing.platform.FolderPickerResult
 import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberFolderPicker
 import moe.https.syncthing.platform.rememberPemFilePicker
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
+import moe.https.syncthing.ui.component.AppNavigationBar
 import moe.https.syncthing.ui.component.CheckableInputValueRow
 import moe.https.syncthing.ui.component.CheckableRow
 import moe.https.syncthing.ui.component.DeleteBox
@@ -89,8 +89,6 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -1720,6 +1718,7 @@ internal fun SettingBottomBarCustomPage(
     uiState: MainUiState,
     onPageToggle: (AppPage) -> Unit,
     onDefaultPageChange: (AppPage) -> Unit,
+    onFloatingBottomBarChange: (Boolean) -> Unit,
     navigateBack: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -1743,62 +1742,58 @@ internal fun SettingBottomBarCustomPage(
             )
         },
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 20.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                MessageCard(
-                    title = "选择底栏项目",
-                    message = "最多选择 5 个项目。设置固定显示，以便随时调整底栏。",
-                )
-            }
-            item {
-                InfoSwitchCard (
-                    title = "底栏项目"
-                ) {
-                    AppPage.entries.forEach { page ->
-                        val selected = page in uiState.bottomBarPages
-                        CheckableRow(
-                            title = page.title,
-                            state = selected,
-                            enabled = page != AppPage.SETTINGS &&
-                                    (selected || uiState.canSelectMoreBottomBarPages),
-                            onClick = { onPageToggle(page) },
-                        )
-                    }
+            MessageCard(
+                title = "选择底栏项目",
+                message = "最多选择 5 个项目。设置固定显示，以便随时调整底栏。",
+            )
+
+            InfoSwitchCard (
+                title = "底栏项目"
+            ) {
+                AppPage.entries.forEach { page ->
+                    val selected = page in uiState.bottomBarPages
+                    CheckableRow(
+                        title = page.title,
+                        state = selected,
+                        enabled = page != AppPage.SETTINGS &&
+                                (selected || uiState.canSelectMoreBottomBarPages),
+                        onClick = { onPageToggle(page) },
+                    )
                 }
             }
-            item {
-                Card {
-                    Column {
-                        OverlayDropdownPreference(
-                            title = "默认页面",
-                            summary = "启动 App 时打开的底栏页面",
-                            items = selectedPagesInOrder.map(AppPage::title),
-                            selectedIndex = selectedPagesInOrder.indexOf(
-                                uiState.defaultBottomBarPage,
-                            ),
-                            onSelectedIndexChange = { index ->
-                                selectedPagesInOrder.getOrNull(index)?.let(onDefaultPageChange)
-                            },
+
+            Card( modifier = Modifier.padding(top = 12.dp) ) {
+                Column {
+                    OverlayDropdownPreference(
+                        title = "默认页面",
+                        summary = "启动 App 时打开的底栏页面",
+                        items = selectedPagesInOrder.map(AppPage::title),
+                        selectedIndex = selectedPagesInOrder.indexOf(
+                            uiState.defaultBottomBarPage,
+                        ),
+                        onSelectedIndexChange = { index ->
+                            selectedPagesInOrder.getOrNull(index)?.let(onDefaultPageChange)
+                        },
+                    )
+                    InfoSwitch(
+                        title = "悬浮底栏",
+                        checked = uiState.floatingBottomBar,
+                        onCheckedChange = onFloatingBottomBarChange,
+                    )
+                    Box (modifier = Modifier.padding(top = 8.dp)) {
+                        AppNavigationBar(
+                            navbarColor = MiuixTheme.colorScheme.background,
+                            entries = AppPage.entries,
+                            visiblePages = uiState.bottomBarPages,
+                            currentPage = uiState.defaultBottomBarPage,
+                            floating = uiState.floatingBottomBar,
                         )
-                        NavigationBar(
-                            color = MiuixTheme.colorScheme.background,
-                            defaultWindowInsetsPadding = false,
-                        ) {
-                            selectedPagesInOrder.forEach { page ->
-                                NavigationBarItem(
-                                    selected = page == uiState.defaultBottomBarPage,
-                                    onClick = {},
-                                    icon = page.icon,
-                                    label = page.title,
-                                )
-                            }
-                        }
                     }
                 }
             }

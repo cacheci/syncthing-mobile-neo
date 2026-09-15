@@ -62,8 +62,10 @@ import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_qr
+import moe.https.syncthing.icon
 import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberClipboard
+import moe.https.syncthing.ui.model.AppPage
 import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -71,6 +73,8 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NumberPicker
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
@@ -81,6 +85,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
+import kotlin.enums.EnumEntries
 
 @Composable
 fun ValueRow(
@@ -731,6 +736,54 @@ internal fun CheckableRow(
             state = ToggleableState(state),
             enabled = enabled,
             onClick = onClick,
+        )
+    }
+}
+
+@Composable
+internal fun AppNavigationBar(
+    entries: EnumEntries<AppPage>,
+    visiblePages: Set<AppPage>,
+    currentPage: AppPage,
+    floating: Boolean = false, //TODO
+    onNavigationBarItemClick: (AppPage) -> Unit = {},
+    navbarColor: Color = MiuixTheme.colorScheme.background,
+    defaultWindowInsetsPadding: Boolean = true,
+) {
+    if (!floating) {
+        NavigationBar(
+            color = navbarColor,
+            defaultWindowInsetsPadding = defaultWindowInsetsPadding,
+        ) {
+            entries
+                .filter(visiblePages::contains)
+                .forEach { page ->
+                    NavigationBarItem(
+                        selected = currentPage == page,
+                        onClick = { onNavigationBarItemClick(page) },
+                        icon = page.icon,
+                        label = page.title,
+                    )
+                }
+        }
+    } else {
+        FloatingNavigationBar(
+            color = navbarColor,
+            shadowElevation = 0.dp,
+            showDivider = true,
+            defaultWindowInsetsPadding = defaultWindowInsetsPadding,
+            bottomContent = entries
+                .filter(visiblePages::contains)
+                .map { page ->
+                    @Composable {
+                        FloatingNavItem(
+                            selected = currentPage == page,
+                            onClick = { onNavigationBarItemClick(page) },
+                            icon = page.icon,
+                            label = page.title,
+                        )
+                    }
+                }
         )
     }
 }

@@ -2,20 +2,36 @@ package moe.https.syncthing.ui.component
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,27 +41,38 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.DropdownArrowEndAction
 import top.yukonga.miuix.kmp.basic.DropdownColors
 import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarDefaults
+import top.yukonga.miuix.kmp.basic.FloatingToolbarDefaults
+import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
@@ -57,6 +84,8 @@ import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.Platform
+import top.yukonga.miuix.kmp.utils.platform
 
 @Composable
 fun AdaptiveTopAppBar(
@@ -341,6 +370,175 @@ internal fun TextWithOptionField(
             }
         },
     )
+}
+
+@Composable
+fun FloatingNavigationBar(
+    modifier: Modifier = Modifier,
+    color: Color = MiuixTheme.colorScheme.surfaceContainer,
+    cornerRadius: Dp = FloatingToolbarDefaults.CornerRadius,
+    horizontalAlignment: Alignment.Horizontal = CenterHorizontally,
+    horizontalOutSidePadding: Dp = FloatingNavigationBarDefaults.HorizontalOutSidePadding,
+    shadowElevation: Dp = FloatingNavigationBarDefaults.ShadowElevation,
+    showDivider: Boolean = false,
+    defaultWindowInsetsPadding: Boolean = true,
+    bottomContent: List<@Composable () -> Unit>,
+) {
+    val shape = RoundedCornerShape(cornerRadius)
+
+    val navBarBottomPadding = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
+    val bottomPaddingValue = when (platform()) {
+        Platform.IOS -> 36.dp
+
+        else -> {
+            if (navBarBottomPadding != 0.dp) 0.dp + navBarBottomPadding else 10.dp
+        }
+    }
+
+    val captionBarBottomPaddingValue = WindowInsets.captionBar.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
+    val animatedCaptionBarHeight by animateDpAsState(
+        targetValue = if (captionBarBottomPaddingValue > 0.dp) captionBarBottomPaddingValue else 0.dp,
+        animationSpec = tween(durationMillis = 300),
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = if (horizontalAlignment == Alignment.Start) horizontalOutSidePadding else 20.dp,
+                end = if (horizontalAlignment == Alignment.End) horizontalOutSidePadding else 20.dp,
+            ),
+    ) {
+        Row(
+            modifier = Modifier
+                .selectableGroup()
+                .padding(bottom = bottomPaddingValue)
+                .defaultMinSize(minHeight = 52.dp)
+                .then(
+                    if (defaultWindowInsetsPadding) {
+                        Modifier.padding(bottom = animatedCaptionBarHeight)
+                    } else {
+                        Modifier
+                    },
+                )
+                .then(
+                    if (showDivider) {
+                        Modifier
+                            .squircleBackground(
+                                color = MiuixTheme.colorScheme.dividerLine,
+                                cornerRadius = cornerRadius,
+                            )
+                            .padding(0.75.dp)
+                    } else {
+                        Modifier
+                    },
+                )
+                .then(
+                    if (shadowElevation > 0.dp) {
+                        Modifier.dropShadow(
+                            shape = shape,
+                            shadow = Shadow(
+                                radius = 10.dp,
+                                color = Color.Black,
+                                alpha = 0.2f,
+                            ),
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                .squircleBackground(color = color, cornerRadius = cornerRadius)
+                .then(modifier)
+                .padding(horizontal = FloatingNavigationBarDefaults.HorizontalPadding)
+                .align(horizontalAlignment)
+                .pointerInput(Unit) {
+                    detectTapGestures { /* Consume click */ }
+                },
+            horizontalArrangement = Arrangement.spacedBy(FloatingNavigationBarDefaults.ItemSpacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            bottomContent.forEach {
+                Box (
+                    modifier = Modifier
+                        .height(NavigationBarDefaults.ItemHeight)
+                        .weight(1f)
+                ){ it() }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun FloatingNavItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    badge: (@Composable () -> Unit)? = null,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val onSurfaceContainerColor = MiuixTheme.colorScheme.onSurfaceContainer
+    val tint = when {
+        isPressed -> if (selected) {
+            onSurfaceContainerColor.copy(alpha = NavigationBarDefaults.SelectedPressedAlpha)
+        } else {
+            onSurfaceContainerColor.copy(alpha = NavigationBarDefaults.UnselectedPressedAlpha)
+        }
+
+        selected -> onSurfaceContainerColor
+
+        else -> onSurfaceContainerColor.copy(NavigationBarDefaults.UnselectedAlpha)
+    }
+    val fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                enabled = enabled,
+                role = Role.Tab,
+                interactionSource = interactionSource,
+                indication = null,
+            ),
+        horizontalAlignment = CenterHorizontally,
+        verticalArrangement = Arrangement.Top,
+    ) {
+        NavigationItemIcon(
+            badge = badge,
+            modifier = Modifier.padding(top = NavigationBarDefaults.IconTopPadding),
+        ) {iconModifier ->
+            Image(
+                modifier = iconModifier.size(NavigationBarDefaults.IconSize),
+                imageVector = icon,
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(tint),
+            )
+        }
+        Text(
+            modifier = Modifier.padding(bottom = NavigationBarDefaults.BottomPadding),
+            text = label,
+            color = tint,
+            textAlign = TextAlign.Center,
+            fontSize = NavigationBarDefaults.LabelFontSize,
+            fontWeight = fontWeight,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+internal fun NavigationItemIcon(
+    badge: (@Composable () -> Unit)?,
+    modifier: Modifier = Modifier,
+    content: @Composable (Modifier) -> Unit,
+) {
+    BadgedBox(modifier = modifier, badge = { badge?.invoke() }) { content(Modifier) }
 }
 
 private enum class LabelAnimState { Hidden, Placeholder, Normal, Floating }

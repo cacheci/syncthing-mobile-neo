@@ -524,6 +524,7 @@ class AndroidBackupManager(
             "discovery_prefer",
             "bottom_bar_pages",
             "bottom_bar_default_page",
+            "floating_bottom_bar",
         )
         val backupJson = Json {
             ignoreUnknownKeys = true

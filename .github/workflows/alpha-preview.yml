@@ -91,26 +91,42 @@ jobs:
               -maxdepth 1 \
               -type f \
               -name '*.apk' \
-              -print
+              -print \
+              | sort
           )
 
-          if (( ${#apks[@]} != 1 )); then
-            echo "Expected exactly one release APK, found ${#apks[@]}." >&2
-            printf '%s\n' "${apks[@]}" >&2
+          if (( ${#apks[@]} == 0 )); then
+            echo "No APK files found in androidApp/build/outputs/apk/release" >&2
             exit 1
           fi
 
-          echo "path=${apks[0]}" >> "$GITHUB_OUTPUT"
+          {
+            echo "apk_paths<<EOF"
+            printf '%s\n' "${apks[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "apk_names<<EOF"
+            for apk in "${apks[@]}"; do
+              basename "$apk"
+            done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publish Alpha Preview release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          APK_PATH: ${{ steps.apk.outputs.path }}
+          APK_PATHS: ${{ steps.apk.outputs.apk_paths }}
+          APK_NAMES: ${{ steps.apk.outputs.apk_names }}
         run: |
           short_sha="${GITHUB_SHA:0:12}"
           tag="alpha-preview"
-          current_apk_name="$(basename "$APK_PATH")"
+
+          mapfile -t apk_paths <<< "$APK_PATHS"
+          mapfile -t apk_names <<< "$APK_NAMES"
+
           previous_sha="$(
             gh api \
               "repos/${GITHUB_REPOSITORY}/git/ref/tags/$tag" \
@@ -154,17 +170,26 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$APK_PATH" --clobber
+            gh release upload "$tag" "${apk_paths[@]}" --clobber
+
             mapfile -t obsolete_apks < <(
               gh release view "$tag" \
                 --json assets \
                 --jq '.assets[].name | select(endswith(".apk"))'
             )
             for obsolete_apk in "${obsolete_apks[@]}"; do
-              if [[ "$obsolete_apk" != "$current_apk_name" ]]; then
+              keep=false
+              for name in "${apk_names[@]}"; do
+                if [[ "$obsolete_apk" == "$name" ]]; then
+                  keep=true
+                  break
+                fi
+              done
+              if [[ "$keep" == false ]]; then
                 gh release delete-asset "$tag" "$obsolete_apk" --yes
               fi
             done
+
             gh release edit "$tag" \
               --title "Alpha Preview $short_sha" \
               --notes "$release_notes" \
@@ -172,7 +197,7 @@ jobs:
               --draft=false \
               --latest=false
           else
-            gh release create "$tag" "$APK_PATH" \
+            gh release create "$tag" "${apk_paths[@]}" \
               --target "$GITHUB_SHA" \
               --title "Alpha Preview $short_sha" \
               --notes "$release_notes" \
@@ -187,7 +212,7 @@ jobs:
       - name: Upload Alpha Preview to Telegram
         if: steps.release.outputs.published == 'true'
         env:
-          APK_PATH: ${{ steps.apk.outputs.path }}
+          APK_PATHS: ${{ steps.apk.outputs.apk_paths }}
           COMMIT_MESSAGES_B64: ${{ steps.release.outputs.commit_messages_b64 }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -209,6 +234,8 @@ jobs:
             echo "TELEGRAM_REPLY_TO_MESSAGE_ID must be a positive integer." >&2
             exit 1
           fi
+
+          mapfile -t apk_paths <<< "$APK_PATHS"
 
           short_sha="${GITHUB_SHA:0:12}"
           reply_parameters="$(printf '{\"message_id\":%s}' "$TELEGRAM_REPLY_TO_MESSAGE_ID")"
@@ -249,14 +276,30 @@ jobs:
 
           $escaped_warning"
 
-          curl \
-            --silent \
-            --show-error \
-            --fail-with-body \
-            --retry 3 \
-            --form-string "chat_id=$TELEGRAM_CHAT_ID" \
-            --form "document=@$APK_PATH" \
-            --form-string "caption=$telegram_caption" \
-            --form-string "parse_mode=MarkdownV2" \
-            --form-string "reply_parameters=$reply_parameters" \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+          first=true
+          for apk_path in "${apk_paths[@]}"; do
+            if [[ "$first" == true ]]; then
+              curl \
+                --silent \
+                --show-error \
+                --fail-with-body \
+                --retry 3 \
+                --form-string "chat_id=$TELEGRAM_CHAT_ID" \
+                --form "document=@$apk_path" \
+                --form-string "caption=$telegram_caption" \
+                --form-string "parse_mode=MarkdownV2" \
+                --form-string "reply_parameters=$reply_parameters" \
+                "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+              first=false
+            else
+              curl \
+                --silent \
+                --show-error \
+                --fail-with-body \
+                --retry 3 \
+                --form-string "chat_id=$TELEGRAM_CHAT_ID" \
+                --form "document=@$apk_path" \
+                --form-string "reply_parameters=$reply_parameters" \
+                "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+            fi
+          done

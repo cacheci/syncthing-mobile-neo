@@ -222,12 +222,13 @@ jobs:
         env:
           APK_PATHS: ${{ steps.apk.outputs.apk_paths }}
           COMMIT_MESSAGES_B64: ${{ steps.release.outputs.commit_messages_b64 }}
+          TELEGRAM_BOT_API: ${{ vars.TELEGRAM_BOT_API }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_REPLY_TO_MESSAGE_ID: ${{ secrets.TELEGRAM_REPLY_TO_MESSAGE_ID }}
         run: |
           missing=()
-          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_REPLY_TO_MESSAGE_ID; do
+          for name in TELEGRAM_BOT_API TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_REPLY_TO_MESSAGE_ID; do
             if [[ -z "${!name}" ]]; then
               missing+=("$name")
             fi
@@ -235,6 +236,12 @@ jobs:
 
           if (( ${#missing[@]} > 0 )); then
             echo "Missing required GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+          TELEGRAM_BOT_API="${TELEGRAM_BOT_API%/}"
+          if [[ ! "$TELEGRAM_BOT_API" =~ ^https?://[^[:space:]]+/bot$ ]]; then
+            echo "TELEGRAM_BOT_API must use the format https://example.com/bot." >&2
             exit 1
           fi
 
@@ -333,7 +340,7 @@ jobs:
                 --form-string "caption=$telegram_caption" \
                 --form-string "parse_mode=MarkdownV2" \
                 --form-string "reply_parameters=$reply_parameters" \
-                "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+                "${TELEGRAM_BOT_API}${TELEGRAM_BOT_TOKEN}/sendDocument"
             )"
           else
             args=(
@@ -361,7 +368,7 @@ jobs:
             response="$(
               curl \
                 "${args[@]}" \
-                "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMediaGroup"
+                "${TELEGRAM_BOT_API}${TELEGRAM_BOT_TOKEN}/sendMediaGroup"
             )"
           fi
 

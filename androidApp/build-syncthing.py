@@ -29,17 +29,17 @@ HOST_TOOLCHAIN_DIRS = {
 }
 
 GO_ARCHIVES = {
-    ("1.26.5", "darwin", "arm64"): (
-        "go1.26.5.darwin-arm64.tar.gz",
-        "efb87ff28af9a188d0536ef5d42e63dd52ba8263cd7344a993cc48dd11dedb6a",
+    ("1.27.1", "darwin", "arm64"): (
+        "go1.27.1.darwin-arm64.tar.gz",
+        "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12",
     ),
-    ("1.26.5", "linux", "amd64"): (
-        "go1.26.5.linux-amd64.tar.gz",
-        "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053",
+    ("1.27.1", "linux", "amd64"): (
+        "go1.27.1.linux-amd64.tar.gz",
+        "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445",
     ),
-    ("1.26.5", "linux", "arm64"): (
-        "go1.26.5.linux-arm64.tar.gz",
-        "fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49",
+    ("1.27.1", "linux", "arm64"): (
+        "go1.27.1.linux-arm64.tar.gz",
+        "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec",
     ),
 }
 

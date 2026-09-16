@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -224,9 +225,12 @@ internal fun InputValueRow(
             )
             if (!value.isNotEmpty()) {
                 Text(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then( if (singleLine) Modifier.basicMarquee() else Modifier ),
                     text = valueLabel,
                     textAlign = TextAlign.End,
+                    maxLines = if (singleLine) 1 else Int.MAX_VALUE,
                     color = MiuixTheme.colorScheme.onSecondaryContainer,
                 )
             }

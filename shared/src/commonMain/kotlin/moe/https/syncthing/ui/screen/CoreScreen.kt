@@ -2,6 +2,7 @@ package moe.https.syncthing.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.https.syncthing.ui.component.MessageCard
@@ -38,6 +40,8 @@ internal fun CoreScreen(
     snackbarHostState: SnackbarHostState,
     onStartAction: () -> Unit,
     modifier: Modifier = Modifier,
+    uiPadding: PaddingValues,
+    pagePaddingHorizontal: Dp,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
 ) {
@@ -48,7 +52,8 @@ internal fun CoreScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(uiPadding)
+            .padding(horizontal = pagePaddingHorizontal),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Card(modifier = Modifier.fillMaxWidth()) {

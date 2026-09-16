@@ -1,6 +1,8 @@
 package moe.https.syncthing.ui.screen
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -22,6 +24,7 @@ internal fun WebviewScreen(
         modifier: Modifier,
     ) -> Unit,
     modifier: Modifier = Modifier,
+    uiPadding: PaddingValues,
 ) {
     if (coreState == CoreState.RUNNING && webUiUrl != null) {
         LaunchedEffect(webUiUrl, topAppBarScrollBehavior) {
@@ -40,7 +43,12 @@ internal fun WebviewScreen(
                 }
             }
         }
-        webView(webUiUrl, reloadToken, onScroll, modifier.fillMaxSize())
+        webView(
+            webUiUrl, reloadToken, onScroll,
+            modifier
+                .fillMaxSize()
+                .padding(uiPadding)
+        )
         return
     }
 

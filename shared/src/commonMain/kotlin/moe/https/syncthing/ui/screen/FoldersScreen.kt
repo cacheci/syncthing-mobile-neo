@@ -12,6 +12,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
@@ -109,6 +111,8 @@ internal fun FoldersScreen(
     onSetFolderPaused: (folderId: String, paused: Boolean) -> Unit,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
+    uiPadding: PaddingValues,
+    pagePaddingHorizontal: Dp,
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
 
@@ -118,38 +122,40 @@ internal fun FoldersScreen(
         }
     }
 
-    PullToRefresh(
-        isRefreshing = uiState.isLoading,
-        onRefresh = onRefresh,
-        pullToRefreshState = pullToRefreshState,
-        topAppBarScrollBehavior = topAppBarScrollBehavior,
-        refreshTexts = listOf("下拉刷新", "松手刷新"),
-    ) {
-        when {
-            coreState != CoreState.RUNNING -> CoreNotReadyTakePlace(
-                title = "核心未运行",
-                message = "启动后才能读取文件夹状态。",
-            )
+    when {
+        coreState != CoreState.RUNNING -> CoreNotReadyTakePlace(
+            title = "核心未运行",
+            message = "启动后才能读取文件夹状态。",
+        )
 
-            uiState.isLoading && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> {}
+        uiState.isLoading && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> {}
 
-            uiState.loadError != null -> CoreNotReadyTakePlace(
-                title = "读取失败",
-                message = uiState.loadError,
-                isError = true,
-            )
+        uiState.loadError != null -> CoreNotReadyTakePlace(
+            title = "读取失败",
+            message = uiState.loadError,
+            isError = true,
+        )
 
-            uiState.hasLoaded && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> CoreNotReadyTakePlace(
-                title = "暂无文件夹",
-                message = "当前还没有配置文件夹。",
-            )
+        uiState.hasLoaded && uiState.folders.isEmpty() && uiState.pendingFolders.isEmpty() -> CoreNotReadyTakePlace(
+            title = "暂无文件夹",
+            message = "当前还没有配置文件夹。",
+        )
 
-            else -> {
+        else -> {
+            PullToRefresh(
+                modifier = Modifier.padding(top = uiPadding.calculateTopPadding()),
+                isRefreshing = uiState.isLoading,
+                onRefresh = onRefresh,
+                pullToRefreshState = pullToRefreshState,
+                topAppBarScrollBehavior = topAppBarScrollBehavior,
+                refreshTexts = listOf("下拉刷新", "松手刷新"),
+            ) {
                 Column(
                     modifier = modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
+                        .padding(bottom = uiPadding.calculateBottomPadding())
+                        .padding(horizontal = pagePaddingHorizontal),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     uiState.pendingFolders.forEach { folder ->
@@ -357,17 +363,18 @@ private fun NewFolderCard(
 
 @Composable
 internal fun AddFolderScreen(
-    modifier: Modifier = Modifier,
     isSubmitting: Boolean,
-    actionError: String? = null,
     devices: List<SyncthingDevice>,
-    existingFolder: SyncthingFolder? = null,
-    pendingFolder: SyncthingPendingFolder? = null,
     selectedFolderPath: String?,
     onConfirm: (NewFolderConfiguration) -> Unit,
     onRedirectToPathChooserPage: (folderId: String) -> Unit,
-    onDeleteFolder: (folderId: String, deleteLocalFiles: Boolean) -> Unit = { _, _ -> },
     navigateBack: () -> Unit,
+    pagePaddingHorizontal: Dp,
+    modifier: Modifier = Modifier,
+    actionError: String? = null,
+    existingFolder: SyncthingFolder? = null,
+    pendingFolder: SyncthingPendingFolder? = null,
+    onDeleteFolder: (folderId: String, deleteLocalFiles: Boolean) -> Unit = { _, _ -> },
 ) {
     val isEditingFolder = (existingFolder != null)
     val isAddingRemote = (pendingFolder != null)
@@ -557,7 +564,7 @@ internal fun AddFolderScreen(
                 modifier = modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(vertical = 20.dp, horizontal = 20.dp),
+                    .padding(horizontal = pagePaddingHorizontal),
             )
             {
                 InfoSwitchCard(
@@ -837,7 +844,7 @@ internal fun AddFolderScreen(
                 onDismissFinished = { showEditorBottomSheet = false },
                 startAction = {
                     IconButton(
-                        modifier = Modifier.padding(start = 20.dp),
+                        modifier = Modifier.padding(start = pagePaddingHorizontal),
                         onClick = {
                             ignoreEditorController.setDocument(acceptedIgnoreText)
                             showEditorBottomSheet = false
@@ -852,7 +859,7 @@ internal fun AddFolderScreen(
                 },
                 endAction = {
                     IconButton(
-                        modifier = Modifier.padding(end = 20.dp),
+                        modifier = Modifier.padding(end = pagePaddingHorizontal),
                         onClick = {
                             acceptedIgnoreText = ignoreEditorController.getText()
                             showEditorBottomSheet = false
@@ -871,7 +878,7 @@ internal fun AddFolderScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Row (
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth(),
+                        modifier = Modifier.padding(horizontal = pagePaddingHorizontal).fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
@@ -910,7 +917,7 @@ internal fun AddFolderScreen(
                         )
                         TextButton(
                             text = "确定",
-                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                            modifier = Modifier.padding(horizontal = pagePaddingHorizontal).fillMaxWidth(),
                             onClick = { showStIgnoreHelp = false }
                         )
                     } else {

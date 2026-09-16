@@ -113,6 +113,7 @@ fun AdaptiveTopAppBar(
             )
         } else {
             TopAppBar(
+                modifier = Modifier.padding(bottom = 12.dp),
                 title = title,
                 subtitle = subtitle,
                 color = color,
@@ -391,7 +392,7 @@ fun FloatingNavigationBar(
         Platform.IOS -> 36.dp
 
         else -> {
-            if (navBarBottomPadding != 0.dp) 0.dp + navBarBottomPadding else 10.dp
+            if (navBarBottomPadding != 0.dp) 16.dp + navBarBottomPadding else 26.dp
         }
     }
 

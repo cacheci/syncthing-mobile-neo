@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.BackupImportFormat
@@ -116,6 +118,8 @@ internal fun SettingScreen(
     uiState: SettingUiState,
     settingViewModel: SettingViewModel,
     modifier: Modifier = Modifier,
+    uiPadding: PaddingValues,
+    pagePaddingHorizontal: Dp,
     developerModeEnabled: Boolean,
     onModifyDeveloperMode: () -> Unit,
     onEditingDiscoverServers: () -> Unit,
@@ -145,7 +149,8 @@ internal fun SettingScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(uiPadding)
+            .padding(pagePaddingHorizontal),
     ) {
         // TODO: 异步加载
         when {
@@ -600,12 +605,13 @@ private fun SettingForm(
 
 @Composable
 internal fun SettingEditListenScreen(
-    modifier: Modifier = Modifier,
     settingViewModel: SettingViewModel,
+    pagePaddingHorizontal: Dp,
+    modifier: Modifier = Modifier,
 ) {
     val isSettingProtocolStackCustom = settingViewModel.addressProtocolStack == SettingProtocolStack.CUSTOM
 
-    Column( modifier = modifier.fillMaxSize().padding(20.dp) ) {
+    Column( modifier = modifier.fillMaxSize().padding(pagePaddingHorizontal) ) {
         Card {
             OverlayDropdownPreference(
                 title = "协议栈",
@@ -637,8 +643,6 @@ internal fun SettingEditListenScreen(
                 ) },
             )
         }
-
-        HorizontalDivider( modifier = Modifier.padding(vertical = 20.dp) )
 
         Row (
             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp, start = 16.dp),
@@ -705,10 +709,11 @@ internal fun SettingEditListenScreen(
 
 @Composable
 internal fun SettingEditDiscoveryScreen(
+    settingViewModel: SettingViewModel,
+    pagePaddingHorizontal: Dp,
     modifier: Modifier = Modifier,
-    settingViewModel: SettingViewModel
 ) {
-    Column ( modifier = modifier.fillMaxSize().padding(20.dp) ) {
+    Column ( modifier = modifier.fillMaxSize().padding(pagePaddingHorizontal) ) {
         Card (modifier = Modifier.padding(bottom = 16.dp)) {
             Text(
                 "Syncthing 依赖发现服务器来查找互联网上某处的其他设备。" +
@@ -829,10 +834,11 @@ internal fun SettingEditDiscoveryScreen(
 internal fun SettingStoragePermissionPage(
     granted: Boolean,
     onRequestPermission: () -> Unit,
+    navigateBack: () -> Unit,
+    pagePaddingHorizontal: Dp,
     folderId: String? = null,
     selectedFolderPath: String? = null,
     onFolderPathSelected: ((String?) -> Unit)? = null,
-    navigateBack: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
@@ -894,7 +900,7 @@ internal fun SettingStoragePermissionPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = pagePaddingHorizontal),
             ) {
                 if (!granted || (folderId == null)) {
                     MessageCard(
@@ -947,6 +953,7 @@ internal fun SettingCoreSelectScreen(
     onCoreSelected: (String) -> Unit,
     onImportCore: () -> Unit,
     onCoreDelete: (String) -> Unit,
+    pagePaddingHorizontal: Dp,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(uiState.operationMessage) {
@@ -955,7 +962,7 @@ internal fun SettingCoreSelectScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(20.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(pagePaddingHorizontal)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp, start = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1009,6 +1016,7 @@ internal fun SettingBackgroundRunningPage(
     onBatteryOptimizationRequest: () -> Unit,
     onOpenAppDetailsSettings: () -> Unit,
     navigateBack: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
     var selectedTabIndex by remember { mutableStateOf(BackgroundRunningSystemType.ANDROID) }
     val scrollBehavior = MiuixScrollBehavior()
@@ -1037,7 +1045,7 @@ internal fun SettingBackgroundRunningPage(
                 .padding(padding)
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = pagePaddingHorizontal),
         ) {
             var showBackgroundLockOverlay by rememberSaveable { mutableStateOf(false) }
 
@@ -1047,7 +1055,7 @@ internal fun SettingBackgroundRunningPage(
                 onTabSelected = { index ->
                     selectedTabIndex = BackgroundRunningSystemType.entries[index]
                 },
-                modifier = Modifier.padding(vertical = 20.dp)
+                modifier = Modifier.padding(vertical = pagePaddingHorizontal)
             )
 
             when (selectedTabIndex) {
@@ -1127,6 +1135,7 @@ internal fun SettingBackgroundRunningNetworkPage(
     locationServiceEnabled: Boolean,
     onRequestWifiNameAccess: () -> Unit,
     onOpenLocationSettings: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
     val autoStartCondition = settingViewModel.autoStartCondition
     val condition = autoStartCondition.network
@@ -1151,7 +1160,7 @@ internal fun SettingBackgroundRunningNetworkPage(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = pagePaddingHorizontal),
     ) {
         if (!wifiNameAccessGranted) {
             MessageCard(
@@ -1275,6 +1284,7 @@ internal fun SettingBackgroundRunningNetworkPage(
 @Composable
 internal fun SettingBackgroundRunningBatteryPage(
     settingViewModel: SettingViewModel,
+    pagePaddingHorizontal: Dp,
 ) {
     val autoStartCondition = settingViewModel.autoStartCondition
     val condition = autoStartCondition.battery
@@ -1289,7 +1299,7 @@ internal fun SettingBackgroundRunningBatteryPage(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = pagePaddingHorizontal),
     ) {
         InfoSwitchCard(title = "电源") {
             WindowDropdownPreference(
@@ -1340,10 +1350,11 @@ internal fun SettingBackgroundRunningBatteryPage(
 @Composable
 internal fun SettingBackgroundRunningDurationPage(
     settingViewModel: SettingViewModel,
+    pagePaddingHorizontal: Dp,
 ) {
     val autoStartCondition = settingViewModel.autoStartCondition
 
-    Column(modifier = Modifier.fillMaxSize().padding( horizontal = 20.dp, vertical = 10.dp )) {
+    Column(modifier = Modifier.fillMaxSize().padding( horizontal = pagePaddingHorizontal )) {
         Card ( Modifier.padding(bottom = 10.dp )) {
             InfoSwitch(
                 title = "按时间表运行",
@@ -1563,6 +1574,7 @@ private fun SettingBackgroundRunningDurationPickRow(
 @Composable
 internal fun SettingBackgroundRunningAdvancedPage(
     settingViewModel: SettingViewModel,
+    pagePaddingHorizontal: Dp,
 ) {
     val condition = settingViewModel.autoStartCondition
 
@@ -1570,7 +1582,7 @@ internal fun SettingBackgroundRunningAdvancedPage(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = pagePaddingHorizontal),
     ) {
         MessageCard(
             title = "Cron 触发器",
@@ -1659,8 +1671,9 @@ internal fun SettingPermissionPage(
     onEditingBackgroundPermission: () -> Unit,
     onEditingStoragePermission: () -> Unit,
     onEditingPositionPermission: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
-    Card ( modifier = Modifier.padding( horizontal = 20.dp ) ) {
+    Card ( modifier = Modifier.padding( horizontal = pagePaddingHorizontal ) ) {
         Column {
             ArrowPreference(
                 title = "后台运行权限",
@@ -1685,9 +1698,10 @@ internal fun SettingPositionPermissionPage(
     wifiNameAccessGranted: Boolean,
     onRequestWifiNameAccess: () -> Unit,
     onOpenLocationSettings: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
     Column (
-        modifier = Modifier.padding( horizontal = 20.dp, vertical = 10.dp ),
+        modifier = Modifier.padding( horizontal = pagePaddingHorizontal ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         MessageCard(
@@ -1720,6 +1734,7 @@ internal fun SettingBottomBarCustomPage(
     onDefaultPageChange: (AppPage) -> Unit,
     onFloatingBottomBarChange: (Boolean) -> Unit,
     navigateBack: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val selectedPagesInOrder = AppPage.entries.filter(uiState.bottomBarPages::contains)
@@ -1746,7 +1761,7 @@ internal fun SettingBottomBarCustomPage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 10.dp),
+                .padding(horizontal = pagePaddingHorizontal),
         ) {
             MessageCard(
                 title = "选择底栏项目",
@@ -1810,6 +1825,7 @@ internal fun SettingBackupPage(
     onConfirmImport: (password: String?) -> Unit,
     onCancelImport: () -> Unit,
     onMessageShown: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
     var showEncryptedExportDialog by rememberSaveable { mutableStateOf(false) }
     var exportPassword by remember { mutableStateOf(TextFieldValue()) }
@@ -1857,7 +1873,7 @@ internal fun SettingBackupPage(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = pagePaddingHorizontal),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         InfoSwitchCard(
@@ -2030,6 +2046,7 @@ internal fun SettingBackupPage(
 internal fun SettingWebuiAdvancedPage(
     uiState: SettingUiState,
     settingViewModel: SettingViewModel,
+    pagePaddingHorizontal: Dp,
 ) {
     val openCertificatePicker = rememberPemFilePicker { result ->
         when (result) {
@@ -2052,7 +2069,7 @@ internal fun SettingWebuiAdvancedPage(
         }
     }
 
-    Card(modifier = Modifier.padding(horizontal = 20.dp)) {
+    Card(modifier = Modifier.padding(horizontal = pagePaddingHorizontal)) {
         Column {
             WindowDropdownPreference(
                 title = "WebUI 主题",

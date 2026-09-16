@@ -8,6 +8,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -18,11 +20,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import kotlinx.serialization.Serializable
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingDevice
@@ -264,6 +268,8 @@ fun App(
             LayoutDirection.Rtl -> NavSwipeDirection.RightToLeft
         }
 
+        val pagePaddingHorizontal = 20.dp
+
         PredictiveBackHandler(
             enabled = navController.backStack.size == 1 &&
                 currentPageMain != mainUiState.defaultBottomBarPage,
@@ -353,26 +359,25 @@ fun App(
                             )
                         }
                     },
-                    floatingToolbar = {
-                        if (mainUiState.floatingBottomBar) {
-                            AppNavigationBar(
-                                entries = AppPage.entries,
-                                visiblePages = mainUiState.bottomBarPages,
-                                currentPage = currentPageMain,
-                                onNavigationBarItemClick = ::requestSwitchToPageMain,
-                                floating = true
-                            )
-                        }
-                    },
                     bottomBar = {
-                        if (!mainUiState.floatingBottomBar) {
-                            AppNavigationBar(
-                                entries = AppPage.entries,
-                                visiblePages = mainUiState.bottomBarPages,
-                                currentPage = currentPageMain,
-                                onNavigationBarItemClick = ::requestSwitchToPageMain,
-                                floating = false
-                            )
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                            if (!mainUiState.floatingBottomBar) {
+                                AppNavigationBar(
+                                    entries = AppPage.entries,
+                                    visiblePages = mainUiState.bottomBarPages,
+                                    currentPage = currentPageMain,
+                                    onNavigationBarItemClick = ::requestSwitchToPageMain,
+                                    floating = false
+                                )
+                            } else {
+                                AppNavigationBar(
+                                    entries = AppPage.entries,
+                                    visiblePages = mainUiState.bottomBarPages,
+                                    currentPage = currentPageMain,
+                                    onNavigationBarItemClick = ::requestSwitchToPageMain,
+                                    floating = true
+                                )
+                            }
                         }
                     },
                     snackbarHost = {
@@ -381,7 +386,13 @@ fun App(
                 ) { padding ->
                     Box(
                         modifier = Modifier
-                            .padding(padding)
+                            .then(
+                                if (!mainUiState.floatingBottomBar) {
+                                    Modifier.padding(padding)
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .nestedScroll(mainScrollBehavior.nestedScrollConnection),
                     ) {
                         AnimatedContent(
@@ -397,8 +408,15 @@ fun App(
                             },
                             label = "MainPageTransition",
                         ) { page ->
+                            val uiPadding = if (mainUiState.floatingBottomBar) PaddingValues(
+                                top = padding.calculateTopPadding(),
+                                bottom = padding.calculateBottomPadding()
+                            ) else PaddingValues(0.dp)
+
                             when (page) {
                                 AppPage.DEVICES -> DevicesScreen(
+                                    uiPadding = uiPadding,
+                                    pagePaddingHorizontal = pagePaddingHorizontal,
                                     uiState = devicesUiState,
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
@@ -419,6 +437,8 @@ fun App(
                                 )
 
                                 AppPage.FOLDERS -> FoldersScreen(
+                                    uiPadding = uiPadding,
+                                    pagePaddingHorizontal = pagePaddingHorizontal,
                                     uiState = foldersUiState,
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
@@ -446,6 +466,8 @@ fun App(
                                 )
 
                                 AppPage.SETTINGS -> SettingScreen(
+                                    uiPadding = uiPadding,
+                                    pagePaddingHorizontal = pagePaddingHorizontal,
                                     uiState = settingUiState,
                                     settingViewModel = settingViewModel,
                                     developerModeEnabled = developerModeEnabled,
@@ -498,6 +520,8 @@ fun App(
                                 )
 
                                 AppPage.CORE -> CoreScreen(
+                                    uiPadding = uiPadding,
+                                    pagePaddingHorizontal = pagePaddingHorizontal,
                                     uiState = coreUiState,
                                     onStartAction = if (coreUiState.isStarted) {
                                         coreViewModel::onStopClicked
@@ -510,6 +534,7 @@ fun App(
                                 )
 
                                 AppPage.WEBUI -> WebviewScreen(
+                                    uiPadding = uiPadding,
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
                                     webUiUrl = if (coreUiState.state == CoreState.RUNNING) {
@@ -522,6 +547,8 @@ fun App(
                                 )
 
                                 AppPage.RECENT_CHANGES -> RecentChangesScreen(
+                                    uiPadding = uiPadding,
+                                    pagePaddingHorizontal = pagePaddingHorizontal,
                                     uiState = recentChangesUiState,
                                     coreState = coreUiState.state,
                                     topAppBarScrollBehavior = mainScrollBehavior,
@@ -568,11 +595,13 @@ fun App(
                             selectedFolderPath = selectedFolderPath,
                             onFolderPathSelected = { selectedFolderPath = it },
                             navigateBack = navigateBack,
+                            pagePaddingHorizontal = pagePaddingHorizontal,
                         )
                     }
 
                     AppSubPage.DEVICE_ADD -> {
                         AddDeviceScreen(
+                            pagePaddingHorizontal = pagePaddingHorizontal,
                             isSubmitting = devicesUiState.isLoading,
                             existingDevice = editingDevice,
                             pendingDevice = pendingDeviceToAdd,
@@ -621,6 +650,7 @@ fun App(
                                 )
                             },
                             navigateBack = navigateBack,
+                            pagePaddingHorizontal = pagePaddingHorizontal,
                         )
                     }
 
@@ -645,6 +675,7 @@ fun App(
                             onBatteryOptimizationRequest = onBatteryOptimizationRequest,
                             onOpenAppDetailsSettings = onOpenAppDetailsSettings,
                             navigateBack = navigateBack,
+                            pagePaddingHorizontal = pagePaddingHorizontal,
                         )
                     }
 
@@ -655,6 +686,7 @@ fun App(
                             onDefaultPageChange = mainViewModel::onDefaultBottomBarPageSelected,
                             onFloatingBottomBarChange = mainViewModel::onFloatingBottomBarChanged,
                             navigateBack = navigateBack,
+                            pagePaddingHorizontal = pagePaddingHorizontal,
                         )
                     }
 
@@ -701,12 +733,14 @@ fun App(
                                     AppSubPage.SETTINGS_LISTEN_EDIT -> {
                                         SettingEditListenScreen(
                                             settingViewModel = settingViewModel,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
                                     AppSubPage.SETTINGS_DISCOVERY_EDIT -> {
                                         SettingEditDiscoveryScreen(
                                             settingViewModel = settingViewModel,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
@@ -717,6 +751,7 @@ fun App(
                                             onCoreSelected = coreViewModel::onCoreSelected,
                                             onImportCore = coreViewModel::onImportCoreClicked,
                                             onCoreDelete = coreViewModel::onCoreDelete,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
@@ -728,24 +763,28 @@ fun App(
                                             locationServiceEnabled = locationServiceEnabled,
                                             onRequestWifiNameAccess = onRequestWifiNameAccess,
                                             onOpenLocationSettings = onOpenLocationSettings,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
                                     AppSubPage.SETTINGS_BACKGROUND_RUNNING_BATTERY -> {
                                         SettingBackgroundRunningBatteryPage(
-                                            settingViewModel = settingViewModel
+                                            settingViewModel = settingViewModel,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
                                     AppSubPage.SETTINGS_BACKGROUND_RUNNING_DURATION -> {
                                         SettingBackgroundRunningDurationPage(
-                                            settingViewModel = settingViewModel
+                                            settingViewModel = settingViewModel,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
                                     AppSubPage.SETTINGS_BACKGROUND_RUNNING_ADVANCED -> {
                                         SettingBackgroundRunningAdvancedPage(
                                             settingViewModel = settingViewModel,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
@@ -760,7 +799,8 @@ fun App(
                                             },
                                             onEditingPositionPermission = {
                                                 navigateTo(AppSubPage.SETTINGS_POSITION_PERMISSION)
-                                            }
+                                            },
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
@@ -769,6 +809,7 @@ fun App(
                                             wifiNameAccessGranted = wifiNameAccessGranted,
                                             onRequestWifiNameAccess = onRequestWifiNameAccess,
                                             onOpenLocationSettings = onOpenLocationSettings,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
@@ -781,6 +822,7 @@ fun App(
                                             onConfirmImport = backupViewModel::confirmImport,
                                             onCancelImport = backupViewModel::cancelImport,
                                             onMessageShown = backupViewModel::clearMessage,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
 
@@ -788,6 +830,7 @@ fun App(
                                         SettingWebuiAdvancedPage(
                                             uiState = settingUiState,
                                             settingViewModel = settingViewModel,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
                                         )
                                     }
                                 }

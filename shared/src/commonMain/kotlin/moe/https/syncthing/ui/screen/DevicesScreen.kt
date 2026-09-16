@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.https.syncthing.core.CoreState
@@ -90,44 +92,48 @@ internal fun DevicesScreen(
     onDeleteDevice: (String) -> Unit,
     onEditDevice: (SyncthingDevice) -> Unit,
     modifier: Modifier = Modifier,
+    uiPadding: PaddingValues,
+    pagePaddingHorizontal: Dp,
 ) {
 
     val pullToRefreshState = rememberPullToRefreshState()
 
-    PullToRefresh (
-        isRefreshing = uiState.isLoading,
-        onRefresh = onRefresh,
-        pullToRefreshState = pullToRefreshState,
-        topAppBarScrollBehavior = topAppBarScrollBehavior,
-        refreshTexts = listOf("下拉刷新", "松手刷新"),
-    ) {
-        if (coreState != CoreState.RUNNING) {
-            CoreNotReadyTakePlace(
-                title = "核心未运行",
-                message = "启动后才能读取设备连接状态。",
-            )
-        } else if (uiState.isLoading && uiState.devices.isEmpty() && uiState.pendingDevices.isEmpty()) {
-            CoreNotReadyTakePlace(
-                title = "正在读取设备",
-                message = "正在获取设备列表…",
-            )
-        } else if (uiState.errorMessage != null) {
-            CoreNotReadyTakePlace(
-                title = "读取失败",
-                message = uiState.errorMessage,
-                isError = true,
-            )
-        } else if (uiState.hasLoaded && uiState.devices.isEmpty() && uiState.pendingDevices.isEmpty()) {
-            CoreNotReadyTakePlace(
-                title = "暂无设备",
-                message = "当前还没有配置的设备。",
-            )
-        } else {
+    if (coreState != CoreState.RUNNING) {
+        CoreNotReadyTakePlace(
+            title = "核心未运行",
+            message = "启动后才能读取设备连接状态。",
+        )
+    } else if (uiState.isLoading && uiState.devices.isEmpty() && uiState.pendingDevices.isEmpty()) {
+        CoreNotReadyTakePlace(
+            title = "正在读取设备",
+            message = "正在获取设备列表…",
+        )
+    } else if (uiState.errorMessage != null) {
+        CoreNotReadyTakePlace(
+            title = "读取失败",
+            message = uiState.errorMessage,
+            isError = true,
+        )
+    } else if (uiState.hasLoaded && uiState.devices.isEmpty() && uiState.pendingDevices.isEmpty()) {
+        CoreNotReadyTakePlace(
+            title = "暂无设备",
+            message = "当前还没有配置的设备。",
+        )
+    } else {
+        PullToRefresh(
+            modifier = Modifier.padding(top = uiPadding.calculateTopPadding()),
+            isRefreshing = uiState.isLoading,
+            onRefresh = onRefresh,
+            pullToRefreshState = pullToRefreshState,
+            topAppBarScrollBehavior = topAppBarScrollBehavior,
+            refreshTexts = listOf("下拉刷新", "松手刷新"),
+        ) {
             Column(
                 modifier = modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
+                    .padding(bottom = uiPadding.calculateBottomPadding())
+                    .padding(horizontal = pagePaddingHorizontal),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 uiState.pendingDevices.forEach { device ->
@@ -157,7 +163,6 @@ internal fun DevicesScreen(
             }
         }
     }
-
 }
 
 @Composable
@@ -634,6 +639,7 @@ internal fun AddDeviceScreen(
     onScanQrCode: () -> Unit,
     onConfirm: (NewDeviceConfiguration) -> Unit,
     navigateBack: () -> Unit,
+    pagePaddingHorizontal: Dp,
 ) {
     var deviceId by remember(existingDevice, pendingDevice, scannedDeviceId) {
         mutableStateOf(
@@ -736,6 +742,7 @@ internal fun AddDeviceScreen(
         Box (
             modifier = Modifier
                 .padding(padding)
+                .padding(horizontal = pagePaddingHorizontal)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,
                 )
@@ -744,7 +751,6 @@ internal fun AddDeviceScreen(
                 modifier = modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(vertical = 20.dp, horizontal = 20.dp),
             ) {
                 InfoSwitchCard(
                     title = "设备",

@@ -57,7 +57,6 @@ import moe.https.syncthing.core.SyncthingDevice
 import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.core.defaultFolderPath
-import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
@@ -77,6 +76,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
@@ -482,10 +482,8 @@ internal fun AddFolderScreen(
     }
 
     Scaffold(
-        topBar = { AdaptiveTopAppBar(
+        topBar = { SmallTopAppBar(
             title = if (isEditingFolder) "编辑文件夹" else "添加文件夹",
-            showTopAppBar = true,
-            isWideScreen = false,
             scrollBehavior = scrollBehavior,
             navigationIcon = {
                 IconButton(onClick = navigateBack) {

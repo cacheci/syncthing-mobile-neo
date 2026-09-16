@@ -46,7 +46,6 @@ import moe.https.syncthing.core.SyncthingDiscoveryStatus
 import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingPendingDevice
-import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
 import moe.https.syncthing.ui.component.InfoSwitch
@@ -65,6 +64,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
@@ -674,10 +674,8 @@ internal fun AddDeviceScreen(
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
-        topBar = { AdaptiveTopAppBar(
+        topBar = { SmallTopAppBar(
             title = if ( existingDevice != null ) "添加设备" else "编辑设备",
-            showTopAppBar = true,
-            isWideScreen = false,
             scrollBehavior = scrollBehavior,
             navigationIcon = {
                 IconButton(onClick = navigateBack) {

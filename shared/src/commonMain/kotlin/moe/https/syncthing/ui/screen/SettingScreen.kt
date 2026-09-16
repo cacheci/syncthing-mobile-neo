@@ -56,7 +56,6 @@ import moe.https.syncthing.platform.FolderPickerResult
 import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberFolderPicker
 import moe.https.syncthing.platform.rememberPemFilePicker
-import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.AppNavigationBar
 import moe.https.syncthing.ui.component.CheckableInputValueRow
 import moe.https.syncthing.ui.component.CheckableRow
@@ -92,7 +91,9 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SliderDefaults
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -871,10 +872,8 @@ internal fun SettingStoragePermissionPage(
     }
 
     Scaffold(
-        topBar = { AdaptiveTopAppBar(
+        topBar = { SmallTopAppBar(
             title = "存储权限",
-            showTopAppBar = true,
-            isWideScreen = false,
             scrollBehavior = scrollBehavior,
             navigationIcon = {
                 IconButton( onClick = navigateBack ) {
@@ -1023,10 +1022,8 @@ internal fun SettingBackgroundRunningPage(
 
     Scaffold(
         topBar = {
-            AdaptiveTopAppBar(
+            SmallTopAppBar(
                 title = "后台运行",
-                showTopAppBar = true,
-                isWideScreen = false,
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = navigateBack) {
@@ -1734,17 +1731,15 @@ internal fun SettingBottomBarCustomPage(
     onDefaultPageChange: (AppPage) -> Unit,
     onFloatingBottomBarChange: (Boolean) -> Unit,
     navigateBack: () -> Unit,
+    scrollBehavior: ScrollBehavior,
     pagePaddingHorizontal: Dp,
 ) {
-    val scrollBehavior = MiuixScrollBehavior()
     val selectedPagesInOrder = AppPage.entries.filter(uiState.bottomBarPages::contains)
 
     Scaffold(
         topBar = {
-            AdaptiveTopAppBar(
+            SmallTopAppBar(
                 title = "底栏设置",
-                showTopAppBar = true,
-                isWideScreen = false,
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = navigateBack) {
@@ -1761,7 +1756,8 @@ internal fun SettingBottomBarCustomPage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = pagePaddingHorizontal),
+                .padding(horizontal = pagePaddingHorizontal)
+                .verticalScroll(rememberScrollState()),
         ) {
             MessageCard(
                 title = "选择底栏项目",

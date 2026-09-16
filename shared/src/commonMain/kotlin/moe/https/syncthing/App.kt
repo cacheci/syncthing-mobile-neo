@@ -74,6 +74,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -686,6 +687,7 @@ fun App(
                             onDefaultPageChange = mainViewModel::onDefaultBottomBarPageSelected,
                             onFloatingBottomBarChange = mainViewModel::onFloatingBottomBarChanged,
                             navigateBack = navigateBack,
+                            scrollBehavior = mainScrollBehavior,
                             pagePaddingHorizontal = pagePaddingHorizontal,
                         )
                     }
@@ -693,10 +695,8 @@ fun App(
                     else -> {
                         Scaffold(
                             topBar = {
-                                AdaptiveTopAppBar(
+                                SmallTopAppBar(
                                     title = currentPagePlain.title,
-                                    showTopAppBar = true,
-                                    isWideScreen = false,
                                     scrollBehavior = mainScrollBehavior,
                                     navigationIcon = {
                                         IconButton(onClick = navigateBack) {

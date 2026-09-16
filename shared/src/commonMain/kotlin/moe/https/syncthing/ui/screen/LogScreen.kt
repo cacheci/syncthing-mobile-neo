@@ -18,13 +18,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreLogSource
-import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.model.LogUiState
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -46,10 +46,8 @@ internal fun LogScreen(
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
-        topBar = { AdaptiveTopAppBar(
+        topBar = { SmallTopAppBar(
             title = "DEBUG*",
-            showTopAppBar = true,
-            isWideScreen = false,
             scrollBehavior = scrollBehavior,
             navigationIcon = {
                 IconButton( onClick = navigateBack ) {

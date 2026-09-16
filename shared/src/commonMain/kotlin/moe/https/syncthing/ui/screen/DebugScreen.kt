@@ -11,14 +11,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
-import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.AppSubPage
-import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.InfoSwitchCard
+import moe.https.syncthing.ui.model.AppPage
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -35,10 +35,8 @@ internal fun DevSettingPage(
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
-        topBar = { AdaptiveTopAppBar(
+        topBar = { SmallTopAppBar(
             title = "DEBUG*",
-            showTopAppBar = true,
-            isWideScreen = false,
             scrollBehavior = scrollBehavior,
             navigationIcon = {
                 IconButton( onClick = navigateBack ) {

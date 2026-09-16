@@ -260,8 +260,8 @@ jobs:
             fi
 
             size="$(stat -c '%s' "$apk_path")"
-            if (( size > 50*1024*1024 )); then
-              echo "::warning file=$apk_path::Skipping APK larger than Telegram's 50 MB upload limit."
+            if (( size > 2000*1024*1024 )); then
+              echo "::warning file=$apk_path::Skipping APK larger than Telegram's 2000 MB upload limit."
               continue
             fi
             eligible_apks+=("$apk_path")

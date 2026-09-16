@@ -68,6 +68,17 @@
             </intent-filter>
         </service>
 
+        <provider
+            android:name=".storage.SyncthingDocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
         <receiver
             android:name=".core.AutoStartBootReceiver"
             android:enabled="true"

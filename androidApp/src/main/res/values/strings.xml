@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">Syncthing GUI</string>
     <string name="notification_channel_core">Syncthing 核心</string>
+    <string name="saf_root_title">Syncthing</string>
 </resources>

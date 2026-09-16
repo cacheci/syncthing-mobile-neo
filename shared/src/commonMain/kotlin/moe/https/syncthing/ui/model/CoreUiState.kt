@@ -7,7 +7,13 @@ import moe.https.syncthing.core.CoreState
 data class CoreUiState(
     val state: CoreState = CoreState.NOT_INSTALLED,
     val version: String? = null,
+    val deviceName: String? = null,
     val uptimeSeconds: Long? = null,
+    val downloadBytesPerSecond: Long? = null,
+    val uploadBytesPerSecond: Long? = null,
+    val downloadedBytes: Long? = null,
+    val uploadedBytes: Long? = null,
+    val totalFileSizeBytes: Long? = null,
     val rssBytes: Long? = null,
     val allocatedBytes: Long? = null,
     val systemBytes: Long? = null,
@@ -38,9 +44,6 @@ data class CoreUiState(
             CoreState.STOPPING,
         )
 
-    val actionBtnText: String
-        get() = if (state == CoreState.STOPPED) "启动" else "停止"
-
     companion object {
         fun from(snapshot: CoreSnapshot): CoreUiState = CoreUiState(
             state = snapshot.state,
@@ -48,7 +51,13 @@ data class CoreUiState(
                 ?.split(" ")
                 ?.take(2)
                 ?.joinToString(" "),
+            deviceName = snapshot.deviceName,
             uptimeSeconds = snapshot.uptimeSeconds,
+            downloadBytesPerSecond = snapshot.downloadBytesPerSecond,
+            uploadBytesPerSecond = snapshot.uploadBytesPerSecond,
+            downloadedBytes = snapshot.downloadedBytes,
+            uploadedBytes = snapshot.uploadedBytes,
+            totalFileSizeBytes = snapshot.totalFileSizeBytes,
             rssBytes = snapshot.rssBytes,
             allocatedBytes = snapshot.allocatedBytes,
             systemBytes = snapshot.systemBytes,

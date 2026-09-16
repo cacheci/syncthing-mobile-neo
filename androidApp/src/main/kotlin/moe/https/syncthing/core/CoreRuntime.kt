@@ -112,6 +112,7 @@ class CoreRuntime(
         return CoreSnapshot(
             state = effectiveState,
             version = selected.version,
+            deviceName = configuredDeviceName(),
             operationMessage = operationMessage,
             selectedCoreId = selected.id,
             selectedCoreSource = selected.source,
@@ -534,6 +535,7 @@ class CoreRuntime(
                 (guiTlsFiles.isNotEmpty() || savedResult.guiTlsChanged)
             val restartInitiated = guiTlsRestartNeeded &&
                 SyncthingCoreService.requestRestart(applicationContext)
+            mutableSnapshot.update { it.copy(deviceName = effectiveConfiguration.deviceName) }
             if (restartInitiated) {
                 result.copy(restartRequired = false, restartInitiated = true)
             } else {
@@ -597,8 +599,17 @@ class CoreRuntime(
                 }
                 .getOrNull()
             rememberLocalDeviceId(status?.myId)
+            val transferTotals = runCatching { restClient.connectionTotals() }.getOrNull()
             mutableSnapshot.value = idleSnapshot(state = CoreState.RUNNING).copy(
+                deviceName = status?.myId?.let { deviceId ->
+                    runCatching { restClient.deviceName(deviceId) }.getOrNull()
+                } ?: configuredDeviceName(),
                 uptimeSeconds = status?.uptimeSeconds,
+                downloadBytesPerSecond = transferTotals?.receivedBytes?.let { 0L },
+                uploadBytesPerSecond = transferTotals?.sentBytes?.let { 0L },
+                downloadedBytes = transferTotals?.receivedBytes,
+                uploadedBytes = transferTotals?.sentBytes,
+                totalFileSizeBytes = runCatching { restClient.totalFileSizeBytes() }.getOrNull(),
                 rssBytes = readRssBytes(currentPid()),
                 allocatedBytes = status?.allocatedBytes,
                 systemBytes = status?.systemBytes,
@@ -717,7 +728,13 @@ class CoreRuntime(
                 lastError = null,
                 operationMessage = null,
                 canSelectCore = false,
+                deviceName = configuredDeviceName(),
                 uptimeSeconds = null,
+                downloadBytesPerSecond = null,
+                uploadBytesPerSecond = null,
+                downloadedBytes = null,
+                uploadedBytes = null,
+                totalFileSizeBytes = null,
                 rssBytes = null,
                 allocatedBytes = null,
                 systemBytes = null,
@@ -826,7 +843,13 @@ class CoreRuntime(
         mutableSnapshot.update {
             it.copy(
                 state = CoreState.FAILED,
+                deviceName = configuredDeviceName(),
                 uptimeSeconds = null,
+                downloadBytesPerSecond = null,
+                uploadBytesPerSecond = null,
+                downloadedBytes = null,
+                uploadedBytes = null,
+                totalFileSizeBytes = null,
                 rssBytes = null,
                 allocatedBytes = null,
                 systemBytes = null,
@@ -972,12 +995,44 @@ class CoreRuntime(
     private suspend fun monitorSession(process: Process?) {
         var consecutiveFailures = 0
         var lastSignature: String? = null
+        var previousTransferSample: TransferSample? = null
         while (currentCoroutineContext().isActive) {
             if (process != null && !process.isAlive) break
 
             runCatching { restClient.status() }
                 .onSuccess { status ->
                     rememberLocalDeviceId(status.myId)
+                    val deviceName = status.myId?.let { deviceId ->
+                        runCatching { restClient.deviceName(deviceId) }.getOrNull()
+                    }
+                    val transferTotals = runCatching { restClient.connectionTotals() }.getOrNull()
+                    val currentTransferSample = transferTotals?.let {
+                        TransferSample(
+                            receivedBytes = it.receivedBytes,
+                            sentBytes = it.sentBytes,
+                            elapsedRealtimeMillis = SystemClock.elapsedRealtime(),
+                        )
+                    }
+                    val downloadBytesPerSecond = transferRate(
+                        previous = previousTransferSample?.receivedBytes,
+                        current = currentTransferSample?.receivedBytes,
+                        elapsedMillis = currentTransferSample?.elapsedRealtimeMillis?.minus(
+                            previousTransferSample?.elapsedRealtimeMillis ?: 0L,
+                        ),
+                    )
+                    val uploadBytesPerSecond = transferRate(
+                        previous = previousTransferSample?.sentBytes,
+                        current = currentTransferSample?.sentBytes,
+                        elapsedMillis = currentTransferSample?.elapsedRealtimeMillis?.minus(
+                            previousTransferSample?.elapsedRealtimeMillis ?: 0L,
+                        ),
+                    )
+                    if (currentTransferSample != null) {
+                        previousTransferSample = currentTransferSample
+                    }
+                    val totalFileSizeBytes = runCatching {
+                        restClient.totalFileSizeBytes()
+                    }.getOrNull()
                     if (consecutiveFailures > 0) {
                         logInfo("REST status connection recovered after $consecutiveFailures consecutive failures")
                     }
@@ -986,7 +1041,13 @@ class CoreRuntime(
                     mutableSnapshot.update {
                         it.copy(
                             state = CoreState.RUNNING,
+                            deviceName = deviceName ?: configuredDeviceName(),
                             uptimeSeconds = status.uptimeSeconds,
+                            downloadBytesPerSecond = downloadBytesPerSecond,
+                            uploadBytesPerSecond = uploadBytesPerSecond,
+                            downloadedBytes = currentTransferSample?.receivedBytes,
+                            uploadedBytes = currentTransferSample?.sentBytes,
+                            totalFileSizeBytes = totalFileSizeBytes ?: it.totalFileSizeBytes,
                             rssBytes = readRssBytes(currentPid()),
                             allocatedBytes = status.allocatedBytes,
                             systemBytes = status.systemBytes,
@@ -1014,6 +1075,23 @@ class CoreRuntime(
             delay(STATUS_POLL_INTERVAL_MILLIS.milliseconds)
         }
     }
+
+    private fun transferRate(
+        previous: Long?,
+        current: Long?,
+        elapsedMillis: Long?,
+    ): Long? {
+        if (current == null) return null
+        if (previous == null || elapsedMillis == null || elapsedMillis <= 0L) return 0L
+        if (current < previous) return 0L
+        return ((current - previous).toDouble() * 1_000.0 / elapsedMillis).toLong()
+    }
+
+    private data class TransferSample(
+        val receivedBytes: Long?,
+        val sentBytes: Long?,
+        val elapsedRealtimeMillis: Long,
+    )
 
     private fun currentPid(): Long? {
         val rememberedPid = preferences.getLong(KEY_PID, -1L).takeIf { it > 0 }
@@ -1569,6 +1647,14 @@ class CoreRuntime(
         }
     } else {
         preferences.getBoolean(KEY_GUI_USE_TLS, false)
+    }
+
+    private fun configuredDeviceName(): String = if (configFile.exists) {
+        runCatching {
+            configFile.read(loadGuiPortConflictBehavior(), rememberedLocalDeviceId()).deviceName
+        }.getOrDefault("Syncthing")
+    } else {
+        startupSetting(loadGuiPortConflictBehavior()).deviceName
     }
 
     private fun initialGuiPort(): Int {

@@ -44,6 +44,24 @@ internal class SyncthingRestClient(
         )
     }
 
+    fun deviceName(deviceId: String): String? {
+        val encodedDeviceId = encodePathSegment(deviceId)
+        return request("/rest/config/devices/$encodedDeviceId")
+            .optString("name")
+            .takeIf(String::isNotBlank)
+    }
+
+    fun connectionTotals(): RestConnectionTotals {
+        val total = request("/rest/system/connections").optJSONObject("total")
+        return RestConnectionTotals(
+            receivedBytes = total?.optLongOrNull("inBytesTotal"),
+            sentBytes = total?.optLongOrNull("outBytesTotal"),
+        )
+    }
+
+    fun totalFileSizeBytes(): Long? =
+        request("/rest/db/completion").optLongOrNull("globalBytes")
+
     fun discoveryCache(): Map<String, List<String>> {
         val json = request("/rest/system/discovery")
         return buildMap {
@@ -721,6 +739,11 @@ internal class SyncthingRestClient(
         val discoveryEnabled: Boolean,
         val discoveryStatus: List<RestDiscoveryStatus>,
         val listenAddresses: List<RestListenAddress>,
+    )
+
+    data class RestConnectionTotals(
+        val receivedBytes: Long?,
+        val sentBytes: Long?,
     )
 
     data class RestDiscoveryStatus(

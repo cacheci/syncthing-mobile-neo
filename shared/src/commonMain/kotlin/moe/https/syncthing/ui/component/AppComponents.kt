@@ -59,7 +59,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
-import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_qr
 import moe.https.syncthing.icon
@@ -786,22 +785,4 @@ internal fun AppNavigationBar(
                 }
         )
     }
-}
-
-@Composable
-fun CoreState.displayColor(): Color = when (this) {
-    CoreState.RUNNING -> StatusColor.OK.color
-    CoreState.FAILED -> StatusColor.FAIL.color
-    CoreState.STARTING,
-    CoreState.STOPPING,
-    CoreState.INSTALLING -> StatusColor.PENDING.color
-    else -> StatusColor.DOWN.color
-}
-
-internal enum class StatusColor ( val color: Color ){
-    OK(Color(0xFF2E7D32)),
-    FAIL(Color(0xFFFF3728)),
-    PENDING(Color(0xFFB26A00)),
-    PAUSED(Color(0xFF7a48a3)),
-    DOWN(Color(0xFF666666)),
 }

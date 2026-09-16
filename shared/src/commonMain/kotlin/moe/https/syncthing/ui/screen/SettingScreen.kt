@@ -64,7 +64,6 @@ import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MessageCard
-import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.component.TimePicker
 import moe.https.syncthing.ui.model.AppPage
@@ -73,6 +72,7 @@ import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.model.MainUiState
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
+import moe.https.syncthing.ui.resources.StatusColor
 import moe.https.syncthing.ui.util.AutoStartModeType
 import moe.https.syncthing.ui.util.BatteryRunCondition
 import moe.https.syncthing.ui.util.CronTrigger
@@ -133,8 +133,6 @@ internal fun SettingScreen(
     onEditingRunningConditionDuration: () -> Unit,
     onEditingRunningConditionAdvanced: () -> Unit,
     onEditingWebuiAdvanced: () -> Unit,
-    onChangeToAbout: () -> Unit,
-    onChangeToLicence: () -> Unit,
     onRedirectingToDeveloperPage: () -> Unit,
     onRedirectingToWebuiPage: () -> Unit,
     onRedirectingToBackupPage: () -> Unit,
@@ -270,20 +268,6 @@ internal fun SettingScreen(
             ArrowPreference(
                 title = "备份配置",
                 onClick = onRedirectingToBackupPage,
-            )
-        }
-
-        InfoSwitchCard( title = "关于" ) {
-            ArrowPreference(
-                title = "关于",
-                summary = "关于此 App",
-                onClick = { onChangeToAbout() },
-            )
-
-            ArrowPreference(
-                title = "开源许可",
-                summary = "使用到的第三方开源项目",
-                onClick = { onChangeToLicence() },
             )
         }
     }

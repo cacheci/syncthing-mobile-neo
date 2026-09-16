@@ -24,7 +24,13 @@ enum class CoreAvailability {
 data class CoreSnapshot(
     val state: CoreState = CoreState.NOT_INSTALLED,
     val version: String? = null,
+    val deviceName: String? = null,
     val uptimeSeconds: Long? = null,
+    val downloadBytesPerSecond: Long? = null,
+    val uploadBytesPerSecond: Long? = null,
+    val downloadedBytes: Long? = null,
+    val uploadedBytes: Long? = null,
+    val totalFileSizeBytes: Long? = null,
     val rssBytes: Long? = null,
     val allocatedBytes: Long? = null,
     val systemBytes: Long? = null,

@@ -53,8 +53,8 @@ import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
-import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.model.DevicesUiState
+import moe.https.syncthing.ui.resources.StatusColor
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -133,7 +133,7 @@ internal fun DevicesScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = uiPadding.calculateBottomPadding())
-                    .padding(horizontal = pagePaddingHorizontal),
+                    .padding(horizontal = pagePaddingHorizontal, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 uiState.pendingDevices.forEach { device ->

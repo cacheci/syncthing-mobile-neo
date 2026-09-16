@@ -24,7 +24,7 @@ data class MainUiState(
 enum class AppPage(val title: String) {
     DEVICES("连接"),
     FOLDERS("文件夹"),
-    CORE("Syncthing"),
+    CORE("主页"),
     WEBUI("WebUI"),
     RECENT_CHANGES("最近变化"),
     SETTINGS("设置"),

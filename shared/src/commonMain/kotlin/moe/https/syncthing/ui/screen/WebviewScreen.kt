@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
@@ -47,7 +48,10 @@ internal fun WebviewScreen(
             webUiUrl, reloadToken, onScroll,
             modifier
                 .fillMaxSize()
-                .padding(uiPadding)
+                .padding(
+                    top = uiPadding.calculateTopPadding(),
+                    bottom = uiPadding.calculateBottomPadding() + 8.dp,
+                )
         )
         return
     }

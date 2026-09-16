@@ -18,9 +18,9 @@ import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreState
 import moe.https.syncthing.core.SyncthingRecentChange
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
-import moe.https.syncthing.ui.component.StatusColor
 import moe.https.syncthing.ui.component.ValueRow
 import moe.https.syncthing.ui.model.RecentChangesUiState
+import moe.https.syncthing.ui.resources.StatusColor
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon

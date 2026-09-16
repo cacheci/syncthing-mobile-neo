@@ -113,7 +113,6 @@ fun AdaptiveTopAppBar(
             )
         } else {
             TopAppBar(
-                modifier = Modifier.padding(bottom = 12.dp),
                 title = title,
                 subtitle = subtitle,
                 color = color,

@@ -154,6 +154,7 @@ fun App(
     val plainPageSnackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController<AppRoute>(AppRoute.Main)
     val mainScrollBehavior = MiuixScrollBehavior()
+    val plainScrollBehavior = MiuixScrollBehavior()
 
     val controller = remember {
         ThemeController(
@@ -473,9 +474,6 @@ fun App(
                                     settingViewModel = settingViewModel,
                                     developerModeEnabled = developerModeEnabled,
                                     onModifyDeveloperMode = onModifyDeveloperMode,
-                                    onChangeToAbout = {
-                                        navigateTo(AppSubPage.ABOUT)
-                                    },
                                     onEditingListenAddresses = {
                                         navigateTo(AppSubPage.SETTINGS_LISTEN_EDIT)
                                     },
@@ -484,9 +482,6 @@ fun App(
                                     },
                                     onEditingCores = {
                                         navigateTo(AppSubPage.SETTINGS_CORE_MANAGE)
-                                    },
-                                    onChangeToLicence = {
-                                        navigateTo(AppSubPage.LICENCE)
                                     },
                                     onRedirectingToDeveloperPage = {
                                         navigateTo(AppSubPage.DEV)
@@ -532,6 +527,12 @@ fun App(
                                     snackbarHostState = snackbarHostState,
                                     developerModeEnabled = developerModeEnabled,
                                     onModifyDeveloperMode = onModifyDeveloperMode,
+                                    onChangeToAbout = {
+                                        navigateTo(AppSubPage.ABOUT)
+                                    },
+                                    onChangeToLicence = {
+                                        navigateTo(AppSubPage.LICENCE)
+                                    },
                                 )
 
                                 AppPage.WEBUI -> WebviewScreen(
@@ -687,7 +688,7 @@ fun App(
                             onDefaultPageChange = mainViewModel::onDefaultBottomBarPageSelected,
                             onFloatingBottomBarChange = mainViewModel::onFloatingBottomBarChanged,
                             navigateBack = navigateBack,
-                            scrollBehavior = mainScrollBehavior,
+                            scrollBehavior = plainScrollBehavior,
                             pagePaddingHorizontal = pagePaddingHorizontal,
                         )
                     }
@@ -697,7 +698,7 @@ fun App(
                             topBar = {
                                 SmallTopAppBar(
                                     title = currentPagePlain.title,
-                                    scrollBehavior = mainScrollBehavior,
+                                    scrollBehavior = plainScrollBehavior,
                                     navigationIcon = {
                                         IconButton(onClick = navigateBack) {
                                             Icon(
@@ -716,7 +717,7 @@ fun App(
                                 modifier = Modifier
                                     .padding(padding)
                                     .nestedScroll(
-                                        mainScrollBehavior.nestedScrollConnection,
+                                        plainScrollBehavior.nestedScrollConnection,
                                     )
                             ) {
                                 when (currentPagePlain) {

@@ -3,6 +3,7 @@ package moe.https.syncthing.ui.util
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import moe.https.syncthing.core.CoreState
+import kotlin.math.round
 
 internal fun CoreState.displayName(): String = when (this) {
     CoreState.NOT_INSTALLED -> "未安装"
@@ -14,8 +15,8 @@ internal fun CoreState.displayName(): String = when (this) {
     CoreState.FAILED -> "运行异常"
 }
 
-internal fun formatBytes(value: Long?): String {
-    if (value == null) return "—"
+internal fun formatBytes(value: Long?): String? {
+    if (value == null) return null
     val units = listOf("B", "KiB", "MiB", "GiB")
     var number = value.toDouble()
     var unit = 0
@@ -30,8 +31,30 @@ internal fun formatBytes(value: Long?): String {
     }
 }
 
-internal fun formatDuration(seconds: Long?): String {
-    if (seconds == null) return "—"
+internal fun formatBitsPerSecond(bytesPerSecond: Long?): String? {
+    if (bytesPerSecond == null) return null
+    val units = listOf("bps", "kbps", "Mbps", "Gbps", "Tbps")
+    var number = bytesPerSecond.toDouble() * 8.0
+    var unit = 0
+    while (number > 1_000.0 && unit < units.lastIndex) {
+        number /= 1_000.0
+        unit++
+    }
+    val rounded = when {
+        unit == 0 || number >= 100.0 -> round(number)
+        number >= 10.0 -> round(number * 10.0) / 10.0
+        else -> round(number * 100.0) / 100.0
+    }
+    val displayValue = if (rounded % 1.0 == 0.0) {
+        rounded.toLong().toString()
+    } else {
+        rounded.toString()
+    }
+    return "$displayValue ${units[unit]}"
+}
+
+internal fun formatDuration(seconds: Long?): String? {
+    if (seconds == null) return null
     val days = seconds / 86_400
     val hours = seconds % 86_400 / 3_600
     val minutes = seconds % 3_600 / 60

@@ -369,7 +369,7 @@ private fun AboutCard(
                 startAction = {},
                 onClick = onClick,
             )
-            HorizontalDivider( modifier = Modifier.padding(horizontal = 6.dp) )
+            HorizontalDivider( modifier = Modifier.padding(horizontal = 12.dp) )
             ArrowPreference(
                 title = summary ?: "",
                 onClick = onShowLicence,

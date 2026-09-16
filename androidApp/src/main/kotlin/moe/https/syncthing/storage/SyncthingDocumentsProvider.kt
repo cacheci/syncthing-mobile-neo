@@ -322,15 +322,16 @@ class SyncthingDocumentsProvider : DocumentsProvider() {
         )
     }
 
-    private companion object {
-        const val AUTHORITY = BuildConfig.APPLICATION_ID + ".documents"
-        const val ROOT_ID = "default-sync-directory"
-        const val ROOT_DOCUMENT_ID = "root"
-        const val DOCUMENT_ID_PREFIX = "file:"
-        const val DEFAULT_SYNC_DIRECTORY = "syncfolders"
-        const val MAX_UNIQUE_NAME_ATTEMPTS = 10_000
+    companion object {
+        internal const val AUTHORITY = BuildConfig.APPLICATION_ID + ".documents"
+        internal const val ROOT_DOCUMENT_ID = "root"
 
-        val DEFAULT_ROOT_PROJECTION = arrayOf(
+        private const val ROOT_ID = "default-sync-directory"
+        private const val DOCUMENT_ID_PREFIX = "file:"
+        private const val DEFAULT_SYNC_DIRECTORY = "syncfolders"
+        private const val MAX_UNIQUE_NAME_ATTEMPTS = 10_000
+
+        private val DEFAULT_ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,
             Root.COLUMN_DOCUMENT_ID,
             Root.COLUMN_TITLE,
@@ -341,7 +342,7 @@ class SyncthingDocumentsProvider : DocumentsProvider() {
             Root.COLUMN_AVAILABLE_BYTES,
         )
 
-        val DEFAULT_DOCUMENT_PROJECTION = arrayOf(
+        private val DEFAULT_DOCUMENT_PROJECTION = arrayOf(
             Document.COLUMN_DOCUMENT_ID,
             Document.COLUMN_DISPLAY_NAME,
             Document.COLUMN_MIME_TYPE,

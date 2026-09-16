@@ -4,6 +4,8 @@ data class MainUiState(
     val bottomBarPages: Set<AppPage> = DEFAULT_BOTTOM_BAR_PAGES,
     val defaultBottomBarPage: AppPage = AppPage.CORE,
     val floatingBottomBar: Boolean = false,
+    val topBarBlurEnabled: Boolean = true,
+    val bottomBarBlurEnabled: Boolean = true,
 ) {
     val canSelectMoreBottomBarPages: Boolean
         get() = bottomBarPages.size < MAX_BOTTOM_BAR_PAGES

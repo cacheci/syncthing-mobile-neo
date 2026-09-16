@@ -57,6 +57,7 @@ import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberFolderPicker
 import moe.https.syncthing.platform.rememberPemFilePicker
 import moe.https.syncthing.ui.component.AppNavigationBar
+import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
 import moe.https.syncthing.ui.component.CheckableInputValueRow
 import moe.https.syncthing.ui.component.CheckableRow
 import moe.https.syncthing.ui.component.DeleteBox
@@ -66,6 +67,8 @@ import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.component.TextWithOptionField
 import moe.https.syncthing.ui.component.TimePicker
+import moe.https.syncthing.ui.component.barBackdropSource
+import moe.https.syncthing.ui.component.isBarBlurSupported
 import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.ui.model.BackupUiState
 import moe.https.syncthing.ui.model.CoreUiState
@@ -93,7 +96,6 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SliderDefaults
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -102,6 +104,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TextFieldColors
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -251,7 +254,7 @@ internal fun SettingScreen(
 
         InfoSwitchCard("应用设置") {
             ArrowPreference(
-                title = "底栏设置",
+                title = "主题设置",
                 onClick = onEditingBottomBar,
             )
 
@@ -820,6 +823,7 @@ internal fun SettingStoragePermissionPage(
     onRequestPermission: () -> Unit,
     navigateBack: () -> Unit,
     pagePaddingHorizontal: Dp,
+    barBackdrop: LayerBackdrop?,
     folderId: String? = null,
     selectedFolderPath: String? = null,
     onFolderPathSelected: ((String?) -> Unit)? = null,
@@ -855,9 +859,10 @@ internal fun SettingStoragePermissionPage(
     }
 
     Scaffold(
-        topBar = { SmallTopAppBar(
+        topBar = { BlurredSmallTopAppBar(
             title = "存储权限",
             scrollBehavior = scrollBehavior,
+            backdrop = barBackdrop,
             navigationIcon = {
                 IconButton( onClick = navigateBack ) {
                     Icon(
@@ -873,6 +878,7 @@ internal fun SettingStoragePermissionPage(
     ) { padding ->
         Box (
             modifier = Modifier
+                .barBackdropSource(barBackdrop)
                 .padding(padding)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,
@@ -999,15 +1005,17 @@ internal fun SettingBackgroundRunningPage(
     onOpenAppDetailsSettings: () -> Unit,
     navigateBack: () -> Unit,
     pagePaddingHorizontal: Dp,
+    barBackdrop: LayerBackdrop?,
 ) {
     var selectedTabIndex by remember { mutableStateOf(BackgroundRunningSystemType.ANDROID) }
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            BlurredSmallTopAppBar(
                 title = "后台运行",
                 scrollBehavior = scrollBehavior,
+                backdrop = barBackdrop,
                 navigationIcon = {
                     IconButton(onClick = navigateBack) {
                         Icon(
@@ -1022,6 +1030,7 @@ internal fun SettingBackgroundRunningPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .barBackdropSource(barBackdrop)
                 .padding(padding)
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
@@ -1713,17 +1722,22 @@ internal fun SettingBottomBarCustomPage(
     onPageToggle: (AppPage) -> Unit,
     onDefaultPageChange: (AppPage) -> Unit,
     onFloatingBottomBarChange: (Boolean) -> Unit,
+    onTopBarBlurChange: (Boolean) -> Unit,
+    onBottomBarBlurChange: (Boolean) -> Unit,
     navigateBack: () -> Unit,
     scrollBehavior: ScrollBehavior,
     pagePaddingHorizontal: Dp,
+    barBackdrop: LayerBackdrop?,
 ) {
     val selectedPagesInOrder = AppPage.entries.filter(uiState.bottomBarPages::contains)
+    val blurSupported = isBarBlurSupported()
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
-                title = "底栏设置",
+            BlurredSmallTopAppBar(
+                title = "主题设置",
                 scrollBehavior = scrollBehavior,
+                backdrop = barBackdrop.takeIf { uiState.topBarBlurEnabled },
                 navigationIcon = {
                     IconButton(onClick = navigateBack) {
                         Icon(
@@ -1738,14 +1752,22 @@ internal fun SettingBottomBarCustomPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .barBackdropSource(barBackdrop)
                 .padding(padding)
                 .padding(horizontal = pagePaddingHorizontal)
                 .verticalScroll(rememberScrollState()),
         ) {
-            MessageCard(
-                title = "选择底栏项目",
-                message = "最多选择 5 个项目。设置固定显示，以便随时调整底栏。",
-            )
+            if (blurSupported) {
+                InfoSwitchCard (
+                    title = "顶栏设置"
+                ) {
+                    InfoSwitch(
+                        title = "顶栏模糊",
+                        checked = uiState.topBarBlurEnabled,
+                        onCheckedChange = onTopBarBlurChange,
+                    )
+                }
+            }
 
             InfoSwitchCard (
                 title = "底栏项目"
@@ -1762,7 +1784,10 @@ internal fun SettingBottomBarCustomPage(
                 }
             }
 
-            Card( modifier = Modifier.padding(top = 12.dp) ) {
+            InfoSwitchCard (
+                title = "底栏设置",
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
                 Column {
                     OverlayDropdownPreference(
                         title = "默认页面",
@@ -1780,6 +1805,13 @@ internal fun SettingBottomBarCustomPage(
                         checked = uiState.floatingBottomBar,
                         onCheckedChange = onFloatingBottomBarChange,
                     )
+                    if (blurSupported) {
+                        InfoSwitch(
+                            title = "底栏模糊",
+                            checked = uiState.bottomBarBlurEnabled,
+                            onCheckedChange = onBottomBarBlurChange,
+                        )
+                    }
                     Box (modifier = Modifier.padding(top = 8.dp)) {
                         AppNavigationBar(
                             navbarColor = MiuixTheme.colorScheme.background,
@@ -1787,6 +1819,7 @@ internal fun SettingBottomBarCustomPage(
                             visiblePages = uiState.bottomBarPages,
                             currentPage = uiState.defaultBottomBarPage,
                             floating = uiState.floatingBottomBar,
+                            backdrop = null,
                         )
                     }
                 }

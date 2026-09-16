@@ -58,11 +58,13 @@ import moe.https.syncthing.core.SyncthingFolder
 import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.core.defaultFolderPath
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
+import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
+import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.resources.StatusColor
 import moe.https.syncthing.ui.util.formatBytes
@@ -76,12 +78,12 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Help
@@ -370,6 +372,7 @@ internal fun AddFolderScreen(
     onRedirectToPathChooserPage: (folderId: String) -> Unit,
     navigateBack: () -> Unit,
     pagePaddingHorizontal: Dp,
+    barBackdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
     actionError: String? = null,
     existingFolder: SyncthingFolder? = null,
@@ -474,7 +477,6 @@ internal fun AddFolderScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
-
     LaunchedEffect(actionError) {
         actionError?.takeIf(String::isNotBlank)?.let { message ->
             snackbarHostState.showSnackbar(message)
@@ -482,9 +484,10 @@ internal fun AddFolderScreen(
     }
 
     Scaffold(
-        topBar = { SmallTopAppBar(
+        topBar = { BlurredSmallTopAppBar(
             title = if (isEditingFolder) "编辑文件夹" else "添加文件夹",
             scrollBehavior = scrollBehavior,
+            backdrop = barBackdrop,
             navigationIcon = {
                 IconButton(onClick = navigateBack) {
                     Icon(
@@ -553,6 +556,7 @@ internal fun AddFolderScreen(
     ) { padding ->
         Box (
             modifier = Modifier
+                .barBackdropSource(barBackdrop)
                 .padding(padding)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,

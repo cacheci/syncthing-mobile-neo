@@ -47,6 +47,8 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.takeOrElse
@@ -79,6 +81,13 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextFieldColors
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.VerticalDivider
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.popup.OverlayDropdownPopup
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
@@ -87,12 +96,75 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.Platform
 import top.yukonga.miuix.kmp.utils.platform
 
+fun isBarBlurSupported(): Boolean = isRuntimeShaderSupported()
+
+@Composable
+fun rememberBarBackdrop(enabled: Boolean = true): LayerBackdrop? {
+    if (!enabled || !isBarBlurSupported()) return null
+
+    val backgroundColor = MiuixTheme.colorScheme.surface
+    return rememberLayerBackdrop {
+        drawRect(backgroundColor)
+        drawContent()
+    }
+}
+
+fun Modifier.barBackdropSource(backdrop: LayerBackdrop?): Modifier =
+    if (backdrop != null) this.layerBackdrop(backdrop) else this
+
+@Composable
+internal fun Modifier.barBackdropBlur(
+    backdrop: LayerBackdrop?,
+    shape: Shape,
+    tint: Color,
+): Modifier {
+    if (backdrop == null) return this
+
+    val blurColors = BlurDefaults.blurColors(
+        blendColors = listOf(BlendColorEntry(tint.copy(alpha = 0.72f))),
+        saturation = 1.1f,
+    )
+    return textureBlur(
+        backdrop = backdrop,
+        shape = shape,
+        blurRadius = 20f,
+        colors = blurColors,
+    )
+}
+
+@Composable
+fun BlurredSmallTopAppBar(
+    title: String,
+    scrollBehavior: ScrollBehavior,
+    backdrop: LayerBackdrop?,
+    modifier: Modifier = Modifier,
+    subtitle: String = "",
+    color: Color = MiuixTheme.colorScheme.surface,
+    defaultWindowInsetsPadding: Boolean = true,
+    navigationIcon: @Composable () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
+    bottomContent: @Composable () -> Unit = {},
+) {
+    SmallTopAppBar(
+        title = title,
+        modifier = modifier.barBackdropBlur(backdrop, RectangleShape, color),
+        subtitle = subtitle,
+        color = if (backdrop != null) Color.Transparent else color,
+        scrollBehavior = scrollBehavior,
+        defaultWindowInsetsPadding = defaultWindowInsetsPadding,
+        navigationIcon = navigationIcon,
+        actions = actions,
+        bottomContent = bottomContent,
+    )
+}
+
 @Composable
 fun AdaptiveTopAppBar(
     title: String,
     showTopAppBar: Boolean,
     isWideScreen: Boolean,
     scrollBehavior: ScrollBehavior,
+    backdrop: LayerBackdrop? = null,
     subtitle: String = "",
     color: Color = MiuixTheme.colorScheme.surface,
     navigationIcon: @Composable () -> Unit = {},
@@ -101,11 +173,12 @@ fun AdaptiveTopAppBar(
 ) {
     if (showTopAppBar) {
         if (isWideScreen) {
-            SmallTopAppBar(
+            BlurredSmallTopAppBar(
                 title = title,
                 subtitle = subtitle,
                 color = color,
                 scrollBehavior = scrollBehavior,
+                backdrop = backdrop,
                 defaultWindowInsetsPadding = false,
                 navigationIcon = navigationIcon,
                 actions = actions,
@@ -114,8 +187,9 @@ fun AdaptiveTopAppBar(
         } else {
             TopAppBar(
                 title = title,
+                modifier = Modifier.barBackdropBlur(backdrop, RectangleShape, color),
                 subtitle = subtitle,
-                color = color,
+                color = if (backdrop != null) Color.Transparent else color,
                 scrollBehavior = scrollBehavior,
                 navigationIcon = navigationIcon,
                 actions = actions,

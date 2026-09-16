@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -72,6 +73,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
+import top.yukonga.miuix.kmp.basic.FloatingToolbarDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -80,6 +82,7 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
@@ -241,6 +244,7 @@ internal fun InputValueRow(
 @Composable
 internal fun InfoSwitchCard(
     title: String,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     SmallTitle(
@@ -248,7 +252,7 @@ internal fun InfoSwitchCard(
         modifier = Modifier.padding(top = 10.dp),
         insideMargin = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
     )
-    Card {
+    Card (modifier = modifier) {
         Column(content = { content() })
     }
 }
@@ -752,10 +756,12 @@ internal fun AppNavigationBar(
     onNavigationBarItemClick: (AppPage) -> Unit = {},
     navbarColor: Color = MiuixTheme.colorScheme.background,
     defaultWindowInsetsPadding: Boolean = true,
+    backdrop: LayerBackdrop? = null,
 ) {
     if (!floating) {
         NavigationBar(
-            color = navbarColor,
+            modifier = Modifier.barBackdropBlur(backdrop, RectangleShape, navbarColor),
+            color = if (backdrop != null) Color.Transparent else navbarColor,
             defaultWindowInsetsPadding = defaultWindowInsetsPadding,
         ) {
             entries
@@ -771,7 +777,12 @@ internal fun AppNavigationBar(
         }
     } else {
         FloatingNavigationBar(
-            color = navbarColor,
+            modifier = Modifier.barBackdropBlur(
+                backdrop = backdrop,
+                shape = RoundedCornerShape(FloatingToolbarDefaults.CornerRadius),
+                tint = navbarColor,
+            ),
+            color = if (backdrop != null) Color.Transparent else navbarColor,
             shadowElevation = 0.dp,
             showDivider = true,
             defaultWindowInsetsPadding = defaultWindowInsetsPadding,

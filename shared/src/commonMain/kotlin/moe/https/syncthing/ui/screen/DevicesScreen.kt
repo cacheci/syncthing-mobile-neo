@@ -47,12 +47,14 @@ import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
+import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
 import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.InputValueRow
 import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
+import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.DevicesUiState
 import moe.https.syncthing.ui.resources.StatusColor
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -64,13 +66,13 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
@@ -640,6 +642,7 @@ internal fun AddDeviceScreen(
     onConfirm: (NewDeviceConfiguration) -> Unit,
     navigateBack: () -> Unit,
     pagePaddingHorizontal: Dp,
+    barBackdrop: LayerBackdrop?,
 ) {
     var deviceId by remember(existingDevice, pendingDevice, scannedDeviceId) {
         mutableStateOf(
@@ -672,11 +675,11 @@ internal fun AddDeviceScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
-
     Scaffold(
-        topBar = { SmallTopAppBar(
+        topBar = { BlurredSmallTopAppBar(
             title = if ( existingDevice != null ) "添加设备" else "编辑设备",
             scrollBehavior = scrollBehavior,
+            backdrop = barBackdrop,
             navigationIcon = {
                 IconButton(onClick = navigateBack) {
                     Icon(
@@ -739,6 +742,7 @@ internal fun AddDeviceScreen(
     ) { padding ->
         Box (
             modifier = Modifier
+                .barBackdropSource(barBackdrop)
                 .padding(padding)
                 .padding(horizontal = pagePaddingHorizontal)
                 .nestedScroll(

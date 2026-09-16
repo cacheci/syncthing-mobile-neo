@@ -35,6 +35,9 @@ import moe.https.syncthing.core.SyncthingPendingDevice
 import moe.https.syncthing.core.SyncthingPendingFolder
 import moe.https.syncthing.ui.component.AdaptiveTopAppBar
 import moe.https.syncthing.ui.component.AppNavigationBar
+import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
+import moe.https.syncthing.ui.component.barBackdropSource
+import moe.https.syncthing.ui.component.rememberBarBackdrop
 import moe.https.syncthing.ui.model.AppPage
 import moe.https.syncthing.ui.screen.AboutScreen
 import moe.https.syncthing.ui.screen.AddDeviceScreen
@@ -74,7 +77,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -271,6 +273,9 @@ fun App(
         }
 
         val pagePaddingHorizontal = 20.dp
+        val anyBarBlurEnabled = mainUiState.topBarBlurEnabled || mainUiState.bottomBarBlurEnabled
+        val mainBarBackdrop = rememberBarBackdrop(enabled = anyBarBlurEnabled)
+        val plainBarBackdrop = rememberBarBackdrop(enabled = anyBarBlurEnabled)
 
         PredictiveBackHandler(
             enabled = navController.backStack.size == 1 &&
@@ -298,6 +303,7 @@ fun App(
                                 title = page.title,
                                 showTopAppBar = true,
                                 scrollBehavior = mainScrollBehavior,
+                                backdrop = mainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                                 actions = {
                                     if (page == AppPage.DEVICES && coreUiState.state == CoreState.RUNNING) {
                                         IconButton(
@@ -369,7 +375,8 @@ fun App(
                                     visiblePages = mainUiState.bottomBarPages,
                                     currentPage = currentPageMain,
                                     onNavigationBarItemClick = ::requestSwitchToPageMain,
-                                    floating = false
+                                    floating = false,
+                                    backdrop = mainBarBackdrop.takeIf { mainUiState.bottomBarBlurEnabled },
                                 )
                             } else {
                                 AppNavigationBar(
@@ -377,7 +384,8 @@ fun App(
                                     visiblePages = mainUiState.bottomBarPages,
                                     currentPage = currentPageMain,
                                     onNavigationBarItemClick = ::requestSwitchToPageMain,
-                                    floating = true
+                                    floating = true,
+                                    backdrop = mainBarBackdrop.takeIf { mainUiState.bottomBarBlurEnabled },
                                 )
                             }
                         }
@@ -388,13 +396,7 @@ fun App(
                 ) { padding ->
                     Box(
                         modifier = Modifier
-                            .then(
-                                if (!mainUiState.floatingBottomBar) {
-                                    Modifier.padding(padding)
-                                } else {
-                                    Modifier
-                                },
-                            )
+                            .barBackdropSource(mainBarBackdrop)
                             .nestedScroll(mainScrollBehavior.nestedScrollConnection),
                     ) {
                         AnimatedContent(
@@ -410,10 +412,10 @@ fun App(
                             },
                             label = "MainPageTransition",
                         ) { page ->
-                            val uiPadding = if (mainUiState.floatingBottomBar) PaddingValues(
+                            val uiPadding = PaddingValues(
                                 top = padding.calculateTopPadding(),
                                 bottom = padding.calculateBottomPadding()
-                            ) else PaddingValues(0.dp)
+                            )
 
                             when (page) {
                                 AppPage.DEVICES -> DevicesScreen(
@@ -587,6 +589,7 @@ fun App(
                             uiState = logUiState,
                             onSourceSelected = logViewModel::onSourceSelected,
                             navigateBack = navigateBack,
+                            barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
                     AppSubPage.SETTINGS_STORAGE_PERMISSION -> {
@@ -598,6 +601,7 @@ fun App(
                             onFolderPathSelected = { selectedFolderPath = it },
                             navigateBack = navigateBack,
                             pagePaddingHorizontal = pagePaddingHorizontal,
+                            barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
 
@@ -619,6 +623,7 @@ fun App(
                                 navigateBack()
                             },
                             navigateBack = navigateBack,
+                            barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
 
@@ -653,6 +658,7 @@ fun App(
                             },
                             navigateBack = navigateBack,
                             pagePaddingHorizontal = pagePaddingHorizontal,
+                            barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
 
@@ -668,6 +674,7 @@ fun App(
                                 }
                             },
                             navigateBack = navigateBack,
+                            barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
 
@@ -678,6 +685,7 @@ fun App(
                             onOpenAppDetailsSettings = onOpenAppDetailsSettings,
                             navigateBack = navigateBack,
                             pagePaddingHorizontal = pagePaddingHorizontal,
+                            barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
 
@@ -687,18 +695,22 @@ fun App(
                             onPageToggle = mainViewModel::onBottomBarPageToggled,
                             onDefaultPageChange = mainViewModel::onDefaultBottomBarPageSelected,
                             onFloatingBottomBarChange = mainViewModel::onFloatingBottomBarChanged,
+                            onTopBarBlurChange = mainViewModel::onTopBarBlurChanged,
+                            onBottomBarBlurChange = mainViewModel::onBottomBarBlurChanged,
                             navigateBack = navigateBack,
                             scrollBehavior = plainScrollBehavior,
                             pagePaddingHorizontal = pagePaddingHorizontal,
+                            barBackdrop = plainBarBackdrop,
                         )
                     }
 
                     else -> {
                         Scaffold(
                             topBar = {
-                                SmallTopAppBar(
+                                BlurredSmallTopAppBar(
                                     title = currentPagePlain.title,
                                     scrollBehavior = plainScrollBehavior,
+                                    backdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                                     navigationIcon = {
                                         IconButton(onClick = navigateBack) {
                                             Icon(
@@ -715,6 +727,7 @@ fun App(
                         ) { padding ->
                             Box (
                                 modifier = Modifier
+                                    .barBackdropSource(plainBarBackdrop)
                                     .padding(padding)
                                     .nestedScroll(
                                         plainScrollBehavior.nestedScrollConnection,
@@ -881,7 +894,7 @@ internal enum class AppSubPage(val title: String) {
     SETTINGS_BACKGROUND_RUNNING_ADVANCED("高级"),
     SETTINGS_POSITION_PERMISSION("定位权限"),
     SETTINGS_PERMISSIONS("权限设置"),
-    SETTINGS_BOTTOM_BAR("底栏设置"),
+    SETTINGS_BOTTOM_BAR("主题设置"),
     SETTINGS_BACKUP("备份"),
     SETTINGS_WEBUI_ADVANCED("WebUI 高级设置"),
     DEV("开发者设置"),

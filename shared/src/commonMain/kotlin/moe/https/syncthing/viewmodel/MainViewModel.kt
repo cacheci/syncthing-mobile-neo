@@ -51,6 +51,26 @@ class MainViewModel(
         mutableUiState.value = currentState.copy(floatingBottomBar = floating)
     }
 
+    fun onTopBarBlurChanged(enabled: Boolean) {
+        val currentState = mutableUiState.value
+        if (currentState.topBarBlurEnabled == enabled) return
+        appSettingsStorage.putBoolean(
+            AppSettingPrivateStorage.KEY_TOP_BAR_BLUR,
+            enabled,
+        )
+        mutableUiState.value = currentState.copy(topBarBlurEnabled = enabled)
+    }
+
+    fun onBottomBarBlurChanged(enabled: Boolean) {
+        val currentState = mutableUiState.value
+        if (currentState.bottomBarBlurEnabled == enabled) return
+        appSettingsStorage.putBoolean(
+            AppSettingPrivateStorage.KEY_BOTTOM_BAR_BLUR,
+            enabled,
+        )
+        mutableUiState.value = currentState.copy(bottomBarBlurEnabled = enabled)
+    }
+
     private fun updateBottomBarPages(pages: Set<AppPage>) {
         val normalizedPages = normalizeBottomBarPages(pages)
         val normalizedDefaultPage = resolveDefaultBottomBarPage(
@@ -65,10 +85,9 @@ class MainViewModel(
             AppSettingPrivateStorage.KEY_BOTTOM_BAR_DEFAULT_PAGE,
             normalizedDefaultPage.name,
         )
-        mutableUiState.value = MainUiState(
+        mutableUiState.value = mutableUiState.value.copy(
             bottomBarPages = normalizedPages,
             defaultBottomBarPage = normalizedDefaultPage,
-            floatingBottomBar = mutableUiState.value.floatingBottomBar,
         )
     }
 
@@ -97,6 +116,14 @@ class MainViewModel(
             floatingBottomBar = appSettingsStorage.getBoolean(
                 AppSettingPrivateStorage.KEY_FLOATING_BOTTOM_BAR,
                 false,
+            ),
+            topBarBlurEnabled = appSettingsStorage.getBoolean(
+                AppSettingPrivateStorage.KEY_TOP_BAR_BLUR,
+                true,
+            ),
+            bottomBarBlurEnabled = appSettingsStorage.getBoolean(
+                AppSettingPrivateStorage.KEY_BOTTOM_BAR_BLUR,
+                true,
             ),
         )
     }

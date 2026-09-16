@@ -18,17 +18,19 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.core.CoreLogSource
+import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
+import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.LogUiState
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -38,17 +40,18 @@ internal fun LogScreen(
     uiState: LogUiState,
     onSourceSelected: (CoreLogSource) -> Unit,
     navigateBack: () -> Unit,
+    barBackdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
-
     Scaffold(
-        topBar = { SmallTopAppBar(
+        topBar = { BlurredSmallTopAppBar(
             title = "DEBUG*",
             scrollBehavior = scrollBehavior,
+            backdrop = barBackdrop,
             navigationIcon = {
                 IconButton( onClick = navigateBack ) {
                     Icon(
@@ -64,6 +67,7 @@ internal fun LogScreen(
     ) { padding ->
         Box (
             modifier = Modifier
+                .barBackdropSource(barBackdrop)
                 .padding(padding)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,

@@ -526,7 +526,6 @@ private fun SettingForm(
                     },
                     label = "IPv6 组播地址",
                     valueLabel = "[ff12::8384]:21027",
-                    singleLine = false,
                     allowEdit = fullSettingEnabled,
                 )
             }

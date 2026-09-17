@@ -68,6 +68,7 @@ import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.FoldersUiState
 import moe.https.syncthing.ui.resources.StatusColor
 import moe.https.syncthing.ui.util.formatBytes
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
@@ -809,11 +810,21 @@ internal fun AddFolderScreen(
                         }
 
                         existingFolder?.ignoreError?.let { error ->
-                            Text(
-                                text = "读取 .stignore 时出错：$error",
-                                color = MiuixTheme.colorScheme.error,
-                                style = MiuixTheme.textStyles.main,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            BasicComponent(
+                                title = "读取 .stignore 时出错",
+                                summary = error,
+                                endActions = {
+                                    Icon(
+                                        imageVector = MiuixIcons.Close,
+                                        contentDescription = "警告",
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .clip(RoundedCornerShape(13.dp))
+                                            .background(MiuixTheme.colorScheme.error)
+                                            .padding(4.dp),
+                                        tint = MiuixTheme.colorScheme.background
+                                    )
+                                }
                             )
                         }
                     }

@@ -1174,98 +1174,130 @@ internal fun SettingBackgroundRunningNetworkPage(
             }
         }
 
-        InfoSwitchCard(title = "WLAN") {
+        MessageCard(
+            title = "遵循网络条件",
+            message = "启用后，自动运行会遵循网络条件。",
+        ) {
             InfoSwitch(
-                title = "在使用 WLAN 时运行",
-                checked = condition.runOnWifi,
-                enabled = true,
-                onCheckedChange = { updateCondition(condition.copy(runOnWifi = it)) },
+                title = "遵循网络条件",
+                checked = condition.enabled,
+                onCheckedChange = {
+                    updateCondition(condition.copy(enabled = it))
+                },
             )
-            AnimatedVisibility(
-                visible = condition.runOnWifi,
-                enter = expandVertically(animationSpec = tween(durationMillis = 300)),
-                exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
-            ) {
-                Column {
+        }
+
+        AnimatedVisibility(
+            visible = condition.enabled,
+            enter = expandVertically(animationSpec = tween(durationMillis = 300)),
+            exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
+        ) {
+            Column {
+                InfoSwitchCard(title = "WLAN") {
                     InfoSwitch(
-                        title = "在使用按流量计费的 WLAN 时运行",
-                        checked = condition.runOnMeteredWifi,
+                        title = "在使用 WLAN 时运行",
+                        checked = condition.runOnWifi,
                         enabled = true,
-                        onCheckedChange = {
-                            updateCondition(condition.copy(runOnMeteredWifi = it, restrictWifiNames = false))
-                        },
-                    )
-                    InfoSwitch(
-                        title = "仅在使用指定 WLAN 时运行",
-                        checked = condition.restrictWifiNames,
-                        enabled = true,
-                        onCheckedChange = {
-                            updateCondition(condition.copy(restrictWifiNames = it, runOnMeteredWifi = false))
-                        },
+                        onCheckedChange = { updateCondition(condition.copy(runOnWifi = it)) },
                     )
                     AnimatedVisibility(
-                        visible = condition.restrictWifiNames,
+                        visible = condition.runOnWifi,
                         enter = expandVertically(animationSpec = tween(durationMillis = 300)),
                         exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
                     ) {
                         Column {
-                            ArrowPreference(
-                                title = "添加当前 WLAN",
-                                summary = currentWifiName ?: "当前未连接 WLAN 或系统隐藏了网络名称",
-                                enabled = currentWifiName != null,
-                                onClick = {
-                                    currentWifiName?.let { wifiName ->
-                                        val updatedNames = condition.wifiNames + wifiName
-                                        wifiNamesText = updatedNames.sorted().joinToString("\n")
-                                        updateCondition(condition.copy(wifiNames = updatedNames))
-                                    }
+                            InfoSwitch(
+                                title = "在使用按流量计费的 WLAN 时运行",
+                                checked = condition.runOnMeteredWifi,
+                                enabled = true,
+                                onCheckedChange = {
+                                    updateCondition(
+                                        condition.copy(
+                                            runOnMeteredWifi = it,
+                                            restrictWifiNames = false
+                                        )
+                                    )
                                 },
                             )
-                            InputValueRow(
-                                value = wifiNamesText,
-                                onValueChange = { value ->
-                                    wifiNamesText = value
-                                    updateCondition(condition.copy(wifiNames = value.toWifiNames()))
+                            InfoSwitch(
+                                title = "仅在使用指定 WLAN 时运行",
+                                checked = condition.restrictWifiNames,
+                                enabled = true,
+                                onCheckedChange = {
+                                    updateCondition(
+                                        condition.copy(
+                                            restrictWifiNames = it,
+                                            runOnMeteredWifi = false
+                                        )
+                                    )
                                 },
-                                label = "WLAN 名称",
-                                valueLabel = "每行一个",
-                                singleLine = false,
                             )
+                            AnimatedVisibility(
+                                visible = condition.restrictWifiNames,
+                                enter = expandVertically(animationSpec = tween(durationMillis = 300)),
+                                exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
+                            ) {
+                                Column {
+                                    ArrowPreference(
+                                        title = "添加当前 WLAN",
+                                        summary = currentWifiName
+                                            ?: "当前未连接 WLAN 或系统隐藏了网络名称",
+                                        enabled = currentWifiName != null,
+                                        onClick = {
+                                            currentWifiName?.let { wifiName ->
+                                                val updatedNames = condition.wifiNames + wifiName
+                                                wifiNamesText = updatedNames.sorted().joinToString("\n")
+                                                updateCondition(condition.copy(wifiNames = updatedNames))
+                                            }
+                                        },
+                                    )
+                                    InputValueRow(
+                                        value = wifiNamesText,
+                                        onValueChange = { value ->
+                                            wifiNamesText = value
+                                            updateCondition(condition.copy(wifiNames = value.toWifiNames()))
+                                        },
+                                        label = "WLAN 名称",
+                                        valueLabel = "每行一个",
+                                        singleLine = false,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
 
-        InfoSwitchCard(title = "移动数据") {
-            InfoSwitch(
-                title = "在使用移动数据时运行",
-                checked = condition.runOnMobileData,
-                enabled = true,
-                onCheckedChange = { updateCondition(condition.copy(runOnMobileData = it)) },
-            )
-            AnimatedVisibility(
-                visible = condition.runOnMobileData,
-                enter = expandVertically(animationSpec = tween(durationMillis = 300)),
-                exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
-            ) {
-                InfoSwitch(
-                    title = "漫游时运行",
-                    checked = condition.runOnRoaming,
-                    enabled = true,
-                    onCheckedChange = { updateCondition(condition.copy(runOnRoaming = it)) },
-                )
-            }
-        }
+                InfoSwitchCard(title = "移动数据") {
+                    InfoSwitch(
+                        title = "在使用移动数据时运行",
+                        checked = condition.runOnMobileData,
+                        enabled = true,
+                        onCheckedChange = { updateCondition(condition.copy(runOnMobileData = it)) },
+                    )
+                    AnimatedVisibility(
+                        visible = condition.runOnMobileData,
+                        enter = expandVertically(animationSpec = tween(durationMillis = 300)),
+                        exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
+                    ) {
+                        InfoSwitch(
+                            title = "漫游时运行",
+                            checked = condition.runOnRoaming,
+                            enabled = true,
+                            onCheckedChange = { updateCondition(condition.copy(runOnRoaming = it)) },
+                        )
+                    }
+                }
 
-        InfoSwitchCard(title = "高级") {
-            InfoSwitch(
-                title = "无网络连接时运行",
-                summary = "对于某些设备，开启飞行模式后网络检测 WLAN 可能会出现问题。启用该开关可缓解该问题。",
-                checked = condition.runWithoutNetwork,
-                enabled = true,
-                onCheckedChange = { updateCondition(condition.copy(runWithoutNetwork = it)) },
-            )
+                InfoSwitchCard(title = "高级") {
+                    InfoSwitch(
+                        title = "无网络连接时运行",
+                        summary = "对于某些设备，开启飞行模式后网络检测 WLAN 可能会出现问题。启用该开关可缓解该问题。",
+                        checked = condition.runWithoutNetwork,
+                        enabled = true,
+                        onCheckedChange = { updateCondition(condition.copy(runWithoutNetwork = it)) },
+                    )
+                }
+            }
         }
     }
 }
@@ -1315,23 +1347,38 @@ internal fun SettingBackgroundRunningBatteryPage(
                 },
             )
 
-            RangeSliderPreference(
-                value = condition.minimumPercent.toFloat()..condition.maximumPercent.toFloat(),
-                onValueChange = { range ->
-                    updateCondition(
-                        condition.copy(
-                            minimumPercent = range.start.toInt(),
-                            maximumPercent = range.endInclusive.toInt(),
-                        ),
-                    )
-                },
+            InfoSwitch(
                 title = "在电量范围运行",
-                valueText = "${condition.minimumPercent}% – ${condition.maximumPercent}%",
-                valueRange = 0f..100f,
-                showKeyPoints = true,
-                hapticEffect = SliderDefaults.SliderHapticEffect.Step,
-                keyPoints = listOf(0f, 20f, 40f, 60f, 80f, 100f),
+                summary = "在一定电量范围内时运行",
+                checked = condition.levelRangeEnabled,
+                onCheckedChange = {
+                    updateCondition(condition.copy(levelRangeEnabled = it))
+                },
             )
+
+            AnimatedVisibility(
+                visible = condition.levelRangeEnabled,
+                enter = expandVertically(animationSpec = tween(durationMillis = 300)),
+                exit = shrinkVertically(animationSpec = tween(durationMillis = 300)),
+            ) {
+                RangeSliderPreference(
+                    value = condition.minimumPercent.toFloat()..condition.maximumPercent.toFloat(),
+                    onValueChange = { range ->
+                        updateCondition(
+                            condition.copy(
+                                minimumPercent = range.start.toInt(),
+                                maximumPercent = range.endInclusive.toInt(),
+                            ),
+                        )
+                    },
+                    title = "电量范围",
+                    valueText = "${condition.minimumPercent}% – ${condition.maximumPercent}%",
+                    valueRange = 0f..100f,
+                    showKeyPoints = true,
+                    hapticEffect = SliderDefaults.SliderHapticEffect.Step,
+                    keyPoints = listOf(0f, 20f, 40f, 60f, 80f, 100f),
+                )
+            }
         }
     }
 }
@@ -1645,6 +1692,14 @@ private fun CronTriggerEditor(
                                 onDelete = { onDelete(trigger.id) },
                             )
                         }
+                        InfoSwitch(
+                            title = "遵循条件",
+                            summary = "遵循设置的网络、电池条件",
+                            checked = trigger.respectConditions,
+                            onCheckedChange = { respectConditions ->
+                                onUpdate(trigger.copy(respectConditions = respectConditions))
+                            },
+                        )
                         if (index != triggers.lastIndex) {
                             HorizontalDivider(modifier = Modifier.fillMaxWidth(0.9f))
                         }

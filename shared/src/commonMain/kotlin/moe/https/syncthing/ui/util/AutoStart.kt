@@ -26,6 +26,7 @@ data class AutoStartCondition(
 
 @Serializable
 data class NetworkRunCondition(
+    val enabled: Boolean = true,
     val runOnWifi: Boolean = true,
     val runOnMeteredWifi: Boolean = false,
     val restrictWifiNames: Boolean = false,
@@ -39,6 +40,7 @@ data class NetworkRunCondition(
 data class BatteryRunCondition(
     val poweredBy: SettingConfiguration.RunningOnPoweredBy =
         SettingConfiguration.RunningOnPoweredBy.BOTH,
+    val levelRangeEnabled: Boolean = true,
     val minimumPercent: Int = 20,
     val maximumPercent: Int = 100,
     val respectPowerSaveMode: Boolean = true,
@@ -56,6 +58,7 @@ enum class ExecuteScheduleType(
 data class CronTrigger(
     val id: Long,
     val expression: String = "0 5 * * *",
+    val respectConditions: Boolean = true,
 )
 
 @Serializable

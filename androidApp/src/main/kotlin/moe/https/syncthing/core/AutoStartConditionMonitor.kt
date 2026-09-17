@@ -154,6 +154,7 @@ internal class AutoStartConditionMonitor(
 
     private fun networkMatches(condition: AutoStartCondition): Boolean {
         val networkCondition = condition.network
+        if (!networkCondition.enabled) return true
         val capabilities = activeTransportCapabilities()
             ?: return networkCondition.runWithoutNetwork
 
@@ -222,7 +223,9 @@ internal class AutoStartConditionMonitor(
         val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         if (level < 0 || scale <= 0) return false
         val percent = level * 100 / scale
-        if (percent !in condition.battery.minimumPercent..condition.battery.maximumPercent) {
+        if (condition.battery.levelRangeEnabled &&
+            percent !in condition.battery.minimumPercent..condition.battery.maximumPercent
+        ) {
             return false
         }
         val powered = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
@@ -292,33 +295,37 @@ internal class AutoStartConditionMonitor(
             handledCronTriggers.clear()
         }
 
-        val matchedStartKeys = condition.startCronTriggers.mapNotNull { trigger ->
+        val matchedStartTriggers = condition.startCronTriggers.mapNotNull { trigger ->
             val key = "start:${trigger.id}"
             if (key !in handledCronTriggers &&
                 CronExpression.parse(trigger.expression)?.matches(calendar) == true
             ) {
-                key
+                trigger
             } else {
                 null
             }
         }
-        val matchedStopKeys = condition.stopCronTriggers.mapNotNull { trigger ->
+        val matchedStopTriggers = condition.stopCronTriggers.mapNotNull { trigger ->
             val key = "stop:${trigger.id}"
             if (key !in handledCronTriggers &&
                 CronExpression.parse(trigger.expression)?.matches(calendar) == true
             ) {
-                key
+                trigger
             } else {
                 null
             }
         }
 
-        handledCronTriggers += matchedStartKeys
-        handledCronTriggers += matchedStopKeys
-        if (!networkAndBatterySatisfied) return
+        handledCronTriggers += matchedStartTriggers.map { "start:${it.id}" }
+        handledCronTriggers += matchedStopTriggers.map { "stop:${it.id}" }
         when {
-            matchedStopKeys.isNotEmpty() -> onStopTriggered()
-            matchedStartKeys.isNotEmpty() -> onStartTriggered()
+            matchedStopTriggers.any {
+                !it.respectConditions || networkAndBatterySatisfied
+            } -> onStopTriggered()
+
+            matchedStartTriggers.any {
+                !it.respectConditions || networkAndBatterySatisfied
+            } -> onStartTriggered()
         }
     }
 }

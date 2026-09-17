@@ -274,7 +274,9 @@ fun App(
 
         val pagePaddingHorizontal = 20.dp
         val anyBarBlurEnabled = mainUiState.topBarBlurEnabled || mainUiState.bottomBarBlurEnabled
-        val mainBarBackdrop = rememberBarBackdrop(enabled = anyBarBlurEnabled)
+        val mainBarBackdrop = rememberBarBackdrop(
+            enabled = anyBarBlurEnabled && currentPageMain != AppPage.WEBUI,
+        )
         val plainBarBackdrop = rememberBarBackdrop(enabled = anyBarBlurEnabled)
 
         PredictiveBackHandler(

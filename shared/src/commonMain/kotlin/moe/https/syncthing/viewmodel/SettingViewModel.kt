@@ -834,4 +834,4 @@ private fun List<String>.normalizedValues(): List<String> = map(String::trim)
     .distinct()
 
 private fun Throwable.userMessage(): String =
-    message?.takeIf(String::isNotBlank) ?: javaClass.simpleName
+    message?.takeIf(String::isNotBlank) ?: this::class.simpleName ?: "Throwable"

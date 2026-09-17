@@ -45,3 +45,12 @@
 - [ ] 扩大设备兼容范围
   - [x] 支持 `armeabi-v7a`、`x86` 和 `x86_64` 核心架构
   - [ ] 低版本 Android 兼容
+
+## iOS
+
+- Xcode 工程：`iosApp/iosApp.xcodeproj`
+- Deployment target：iOS 16.0
+- Kotlin target：`iosArm64`
+- Xcode 构建时会通过 Gradle 的 `:shared:embedAndSignAppleFrameworkForXcode` 任务生成并链接 `Shared.framework`
+
+当前 iOS target 仅为 UI Demo。业务代码未生效。

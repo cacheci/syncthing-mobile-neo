@@ -46,7 +46,8 @@ class RecentChangesViewModel(
                             hasLoaded = true,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }

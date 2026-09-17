@@ -22,6 +22,11 @@ local.properties
 .externalNativeBuild/
 .cxx/
 
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+
 # Downloaded Go toolchain
 /third_party/go/
 

@@ -46,8 +46,8 @@ import moe.https.syncthing.core.SyncthingDiscoveryStatus
 import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingPendingDevice
-import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
+import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
 import moe.https.syncthing.ui.component.InfoSwitch
 import moe.https.syncthing.ui.component.InfoSwitchCard
@@ -81,6 +81,7 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import kotlin.jvm.JvmName
 
 @Composable
 internal fun DevicesScreen(
@@ -319,7 +320,7 @@ private fun RemoteDeviceCard(
                     device.lastConnectionAt?.let { lastConnectionAt ->
                         MultipleValueRow(
                             label = "最后连接",
-                            values = listOf(lastConnectionAt.toString()),
+                            values = listOf(lastConnectionAt),
                         )
                     }
 

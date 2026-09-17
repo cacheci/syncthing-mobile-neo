@@ -9,6 +9,17 @@ plugins {
 }
 
 kotlin {
+    val iosTargets = listOf(
+        iosArm64(),
+    )
+
+    iosTargets.forEach { target ->
+        target.binaries.framework {
+            baseName = "Shared"
+            isStatic = true
+        }
+    }
+
     android {
         namespace = "moe.https.syncthing.shared"
         compileSdk {

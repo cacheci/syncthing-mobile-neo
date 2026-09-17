@@ -43,7 +43,8 @@ class DevicesViewModel(
                             hasLoaded = true,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }
@@ -82,7 +83,8 @@ class DevicesViewModel(
                             isLoading = false,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }
@@ -129,7 +131,8 @@ class DevicesViewModel(
                             isPendingDeviceActionInProgress = false,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }
@@ -176,7 +179,8 @@ class DevicesViewModel(
                             isLoading = false,
                             errorMessage = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }

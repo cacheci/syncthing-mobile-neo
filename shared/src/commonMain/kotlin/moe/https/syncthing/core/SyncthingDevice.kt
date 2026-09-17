@@ -1,7 +1,5 @@
 package moe.https.syncthing.core
 
-import java.time.LocalDateTime
-
 data class SyncthingDevice(
     val id: String,
     val name: String?,
@@ -9,7 +7,7 @@ data class SyncthingDevice(
     val connected: Boolean,
     val connectionAddress: String?,
     val clientVersion: String?,
-    val lastConnectionAt: LocalDateTime?,
+    val lastConnectionAt: String?,
     val paused: Boolean,
     val isLocal: Boolean,
     val discoveredAddresses: List<String> = emptyList(),

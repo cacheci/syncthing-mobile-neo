@@ -343,7 +343,7 @@ internal class SyncthingRestClient(
                             ?.takeIf { localDateTime ->
                                 localDateTime.year > 1970
                             }
-                        ,
+                            ?.toString(),
                     ),
                 )
             }
@@ -775,7 +775,7 @@ internal class SyncthingRestClient(
         val connected: Boolean,
         val address: String?,
         val clientVersion: String?,
-        val lastConnectionAt: LocalDateTime?,
+        val lastConnectionAt: String?,
     )
 
     data class RestFolder(

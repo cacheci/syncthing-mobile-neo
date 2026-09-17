@@ -43,7 +43,8 @@ class FoldersViewModel(
                             hasLoaded = true,
                             loadError = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }
@@ -114,7 +115,8 @@ class FoldersViewModel(
                             isPendingFolderActionInProgress = false,
                             actionError = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }
@@ -150,7 +152,8 @@ class FoldersViewModel(
                             isLoading = false,
                             actionError = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }
@@ -206,7 +209,8 @@ class FoldersViewModel(
                             isLoading = false,
                             actionError = error.message
                                 ?.takeIf(String::isNotBlank)
-                                ?: error.javaClass.simpleName,
+                                ?: error::class.simpleName
+                                ?: "Throwable",
                         )
                     }
                 }

@@ -944,6 +944,7 @@ internal class SyncthingRestClient(
                 NewFolderConfiguration.Type.SEND_RECEIVE -> "sendreceive"
                 NewFolderConfiguration.Type.RECEIVE_ONLY -> "receiveonly"
                 NewFolderConfiguration.Type.SEND_ONLY -> "sendonly"
+                NewFolderConfiguration.Type.RECEIVE_ENCRYPTED -> "receiveencrypted"
             },
         )
 

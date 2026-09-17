@@ -80,6 +80,7 @@ data class NewFolderConfiguration(
         SEND_RECEIVE,
         RECEIVE_ONLY,
         SEND_ONLY,
+        RECEIVE_ENCRYPTED,
     }
 }
 

@@ -192,6 +192,7 @@ internal fun InputValueRow(
     valueLabel: String,
     value: String,
     onValueChange: ((String) -> Unit),
+    summary: String? = null,
     valueValidator: (String) -> Boolean = { true },
     singleLine: Boolean = true,
     allowEdit: Boolean = true,
@@ -202,16 +203,23 @@ internal fun InputValueRow(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(0.5f),
-            color = if (valueValidator(value)) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.error,
-            style = MiuixTheme.textStyles.main.copy(
+        Column (modifier = Modifier.weight(0.65f)) {
+            Text(
+                text = label,
+                fontSize = MiuixTheme.textStyles.headline1.fontSize,
                 fontWeight = FontWeight.Medium,
+                color = if (valueValidator(value)) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.error,
             )
-        )
+            if (summary != null) {
+                Text(
+                    text = summary,
+                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            }
+        }
         Box (
-            modifier = Modifier.weight(0.4f),
+            modifier = Modifier.weight(0.3f),
         ) {
             BasicTextField(
                 modifier = Modifier.fillMaxWidth(),

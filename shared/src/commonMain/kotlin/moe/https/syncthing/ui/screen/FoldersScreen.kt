@@ -428,10 +428,26 @@ internal fun AddFolderScreen(
             when (existingFolder?.type) {
                 "receiveonly" -> NewFolderConfiguration.Type.RECEIVE_ONLY
                 "sendonly" -> NewFolderConfiguration.Type.SEND_ONLY
+                "receiveencrypted" -> NewFolderConfiguration.Type.RECEIVE_ENCRYPTED
                 else -> NewFolderConfiguration.Type.SEND_RECEIVE
             },
         )
     }
+    val folderTypeOptions = if (isEditingFolder) {
+        NewFolderConfiguration.Type.entries.filter { type ->
+            type != NewFolderConfiguration.Type.RECEIVE_ENCRYPTED ||
+                folderType == NewFolderConfiguration.Type.RECEIVE_ENCRYPTED
+        }
+    } else {
+        NewFolderConfiguration.Type.entries
+    }
+    val folderTypeNames = mapOf(
+        NewFolderConfiguration.Type.SEND_RECEIVE to "发送和接收",
+        NewFolderConfiguration.Type.RECEIVE_ONLY to "仅接收",
+        NewFolderConfiguration.Type.SEND_ONLY to "仅发送",
+        NewFolderConfiguration.Type.RECEIVE_ENCRYPTED to "加密接收",
+    )
+    val isReceiveEncrypted = folderType == NewFolderConfiguration.Type.RECEIVE_ENCRYPTED
     val remoteDevices = devices.filterNot { it.isLocal }
     val remoteDeviceIds = remoteDevices.map { it.id }
     var selectedDeviceIds by remember(existingFolder, pendingFolder, remoteDeviceIds) {
@@ -451,7 +467,6 @@ internal fun AddFolderScreen(
     val defaultPath = if (folderId.isBlank()) null else {
         defaultFolderPath(folderId.trim())
     }
-    val displayedFolderPath = selectedFolderPath ?: defaultPath
     val canSubmit = (
             (folderId.trim().isNotBlank()) &&
             (listOf(
@@ -462,7 +477,7 @@ internal fun AddFolderScreen(
             ).all { value -> (value.toIntWithDefaultForEmpty(0))?.let{ it >= 0 } == true }) &&
             (cleanupIntervalSeconds.toIntWithDefaultForEmpty(3600)?.let{ it <= 31_536_000 } == true) &&
             (versioning != NewFolderConfiguration.Versioning.EXTERNAL || externalCommand.trim().isNotBlank()) &&
-            (remoteDevices
+            (isReceiveEncrypted || remoteDevices
                 .filter { it.untrusted && it.id in selectedDeviceIds }
                 .all { device -> devicePasswords[device.id].orEmpty().isNotBlank() }) &&
             (!isSubmitting)
@@ -531,7 +546,11 @@ internal fun AddFolderScreen(
                                     .map { device ->
                                         FolderDeviceConfiguration(
                                             deviceId = device.id,
-                                            encryptionPassword = devicePasswords[device.id].orEmpty(),
+                                            encryptionPassword = if (isReceiveEncrypted) {
+                                                ""
+                                            } else {
+                                                devicePasswords[device.id].orEmpty()
+                                            },
                                         )
                                     },
                                 availableDeviceIds = remoteDeviceIds.toSet(),
@@ -567,13 +586,13 @@ internal fun AddFolderScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = pagePaddingHorizontal),
-            )
-            {
+            ) {
                 InfoSwitchCard(
                     title = "文件夹",
                     content = {
                         InputValueRow(
                             label = "文件夹 ID",
+                            summary = "区分大小写，所有设备上必须相同",
                             value = folderId,
                             valueLabel = "必填，唯一",
                             allowEdit = !isSubmitting && !isEditingFolder && !isAddingRemote,
@@ -590,6 +609,7 @@ internal fun AddFolderScreen(
 
                         InputValueRow(
                             label = "文件夹组",
+                            summary = "文件夹的可选分组",
                             value = group,
                             valueLabel = "可选",
                             allowEdit = !isSubmitting,
@@ -598,7 +618,7 @@ internal fun AddFolderScreen(
 
                         ArrowPreference(
                             title = "文件夹位置",
-                            summary = displayedFolderPath,
+                            summary = selectedFolderPath ?: defaultPath ?: "本地计算机上文件夹的路径",
                             onClick = {
                                 onRedirectToPathChooserPage(folderId.trim())
                             },
@@ -626,7 +646,9 @@ internal fun AddFolderScreen(
                                     remoteFolderState = existingFolder?.devices
                                         ?.firstOrNull { it.deviceId == device.id }
                                         ?.remoteFolderState,
-                                    encryptionPassword = devicePasswords[device.id].orEmpty(),
+                                    encryptionPassword = if (isReceiveEncrypted) null else {
+                                        devicePasswords[device.id].orEmpty()
+                                    },
                                     onSelectedChange = { selected ->
                                         selectedDeviceIds = if (selected) {
                                             selectedDeviceIds + device.id
@@ -648,14 +670,25 @@ internal fun AddFolderScreen(
                     content = {
                         WindowDropdownPreference(
                             title = "文件版本控制",
-                            summary = if (existingFolder?.versioningSupported == false) {
-                                "当前版本控制类型暂不支持编辑"
-                            } else {
-                                null
+                            summary = when {
+                                isReceiveEncrypted -> "接收加密数据不支持文件版本控制"
+                                versioning == NewFolderConfiguration.Versioning.TRASHCAN ->
+                                    "当 Syncthing 替换或删除文件时，文件将移动到 .stversions 目录。"
+                                versioning == NewFolderConfiguration.Versioning.SIMPLE ->
+                                    "当 Syncthing 替换或删除文件时，文件将移动到 .stversions 目录，文件名带有时间戳。"
+                                versioning == NewFolderConfiguration.Versioning.STAGGERED ->
+                                    "当 Syncthing 替换或删除文件时，文件将移动到 .stversions 目录，文件名带有时间戳。超过最长保留时间，或超过一定份数，则会自动删除。"
+                                versioning == NewFolderConfiguration.Versioning.EXTERNAL ->
+                                    "有关受支持的模板命令行参数，请参阅外部版本控制帮助。注意：在 Android 环境下外部版本控制的能力受限。"
+                                existingFolder?.versioningSupported == false ->
+                                    "当前版本控制类型暂不支持编辑"
+                                else -> null
                             },
                             items = versioningOptions.map { it.displayName },
                             selectedIndex = versioningOptions.indexOf(versioning),
-                            enabled = !isSubmitting && existingFolder?.versioningSupported != false,
+                            enabled = !isSubmitting &&
+                                !isReceiveEncrypted &&
+                                existingFolder?.versioningSupported != false,
                             onSelectedIndexChange = { selectedIndex ->
                                 versioning = versioningOptions[selectedIndex]
                             },
@@ -759,6 +792,7 @@ internal fun AddFolderScreen(
                         if (isEditingFolder) {
                             ArrowPreference(
                                 title = "编辑忽略文件",
+                                enabled = !isReceiveEncrypted,
                                 onClick = {
                                     ignoreEditorController.setDocument(acceptedIgnoreText)
                                     showEditorBottomSheet = true
@@ -766,10 +800,10 @@ internal fun AddFolderScreen(
                             )
                         } else {
                             InfoSwitch(
-                                title = "使用忽略模式",
-                                summary = "启用 .stignore",
+                                title = "添加忽略文件",
+                                summary = "启用后，文件夹创建时将自动添加 .stignore",
                                 checked = ignorePatternsEnabled,
-                                enabled = !isSubmitting,
+                                enabled = !isSubmitting && !isReceiveEncrypted,
                                 onCheckedChange = { ignorePatternsEnabled = it },
                             )
                         }
@@ -811,11 +845,27 @@ internal fun AddFolderScreen(
 
                         WindowDropdownPreference(
                             title = "同步方向",
-                            items = listOf("双向", "单向下载", "单向上传"), // TODO: 先不做 "单向加密下载"
-                            selectedIndex = folderType.ordinal,
-                            enabled = !isSubmitting,
+                            summary = when {
+                                isEditingFolder && isReceiveEncrypted ->
+                                    "接收加密数据类型创建后不能更改"
+                                folderType == NewFolderConfiguration.Type.SEND_ONLY ->
+                                    "文件受到保护，不会在其他设备上进行更改，但在此设备上所做的更改将发送到集群的其他设备。"
+                                folderType == NewFolderConfiguration.Type.RECEIVE_ONLY ->
+                                    "文件从集群同步，但本地所做的任何更改都不会发送到其他设备。"
+                                folderType == NewFolderConfiguration.Type.RECEIVE_ENCRYPTED ->
+                                    "仅存储和同步加密数据。所有连接设备上的文件夹都需要使用相同的密码设置，或者也需要设置为“加密接收”类型。"
+                                else -> null
+                            },
+                            items = folderTypeOptions.map { type -> folderTypeNames.getValue(type) },
+                            selectedIndex = folderTypeOptions.indexOf(folderType),
+                            enabled = !isSubmitting && !(isEditingFolder && isReceiveEncrypted),
                             onSelectedIndexChange = { selectedIndex ->
-                                folderType = NewFolderConfiguration.Type.entries[selectedIndex]
+                                folderType = folderTypeOptions[selectedIndex]
+                                if (folderType == NewFolderConfiguration.Type.RECEIVE_ENCRYPTED) {
+                                    fsWatcherEnabled = false
+                                    versioning = NewFolderConfiguration.Versioning.NONE
+                                    ignorePatternsEnabled = false
+                                }
                             },
                         )
                     }
@@ -1061,7 +1111,7 @@ private fun AddFolderDevices(
     isSubmitting: Boolean,
     selected: Boolean,
     remoteFolderState: RemoteFolderState?,
-    encryptionPassword: String,
+    encryptionPassword: String?,
     onSelectedChange: (Boolean) -> Unit,
     onEncryptionPasswordChange: (String) -> Unit,
 ) {
@@ -1080,25 +1130,29 @@ private fun AddFolderDevices(
             },
             onCheckedChange = onSelectedChange,
         )
-        AnimatedVisibility(
-            visible = selected,
-            enter = expandVertically(
-                animationSpec = tween(durationMillis = 300)
-            ),
-            exit = shrinkVertically(
-                animationSpec = tween(durationMillis = 300)
-            ),
-        ) {
-            InputValueRow(
-                label = "共享密码",
-                value = encryptionPassword,
-                onValueChange = onEncryptionPasswordChange,
-                valueValidator = { !(device.untrusted && encryptionPassword.isBlank()) },
-                valueLabel = "无密码",
-                allowEdit = !isSubmitting,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = PasswordVisualTransformation(),
-            )
+        encryptionPassword?.let {
+            AnimatedVisibility(
+                visible = selected,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ),
+            ) {
+                InputValueRow(
+                    label = "共享密码",
+                    value = it,
+                    onValueChange = onEncryptionPasswordChange,
+                    valueValidator = {
+                        !(device.untrusted && encryptionPassword.isBlank())
+                    },
+                    valueLabel = "无密码",
+                    allowEdit = !isSubmitting,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+            }
         }
     }
 }

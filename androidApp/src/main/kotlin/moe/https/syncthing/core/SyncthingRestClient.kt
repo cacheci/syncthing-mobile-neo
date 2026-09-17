@@ -180,6 +180,7 @@ internal class SyncthingRestClient(
                         paused = json.optBoolean("paused", false),
                         fsWatcherEnabled = json.optBoolean("fsWatcherEnabled", true),
                         rescanIntervalSeconds = json.optInt("rescanIntervalS", 3600),
+                        pullOrder = parsePullOrder(json.optString("order", "random")),
                         versioning = parseVersioning(json.optJSONObject("versioning")),
                         devices = parseFolderDevices(json.optJSONArray("devices")),
                     ),
@@ -787,6 +788,7 @@ internal class SyncthingRestClient(
         val paused: Boolean,
         val fsWatcherEnabled: Boolean,
         val rescanIntervalSeconds: Int,
+        val pullOrder: NewFolderConfiguration.PullOrder,
         val versioning: RestFolderVersioning,
         val devices: List<FolderDeviceConfiguration>,
     )
@@ -883,6 +885,15 @@ internal class SyncthingRestClient(
         }
     }
 
+    private fun parsePullOrder(value: String): NewFolderConfiguration.PullOrder = when (value) {
+        "alphabetic" -> NewFolderConfiguration.PullOrder.ALPHABETIC
+        "smallestFirst" -> NewFolderConfiguration.PullOrder.SMALLEST_FIRST
+        "largestFirst" -> NewFolderConfiguration.PullOrder.LARGEST_FIRST
+        "oldestFirst" -> NewFolderConfiguration.PullOrder.OLDEST_FIRST
+        "newestFirst" -> NewFolderConfiguration.PullOrder.NEWEST_FIRST
+        else -> NewFolderConfiguration.PullOrder.RANDOM
+    }
+
     private fun parseVersioning(json: JSONObject?): RestFolderVersioning {
         val params = json?.optJSONObject("params")
         val rawType = json?.optString("type").orEmpty()
@@ -938,6 +949,17 @@ internal class SyncthingRestClient(
         folder.put("group", configuration.group)
         folder.put("fsWatcherEnabled", configuration.fsWatcherEnabled)
         folder.put("rescanIntervalS", configuration.rescanIntervalSeconds)
+        folder.put(
+            "order",
+            when (configuration.pullOrder) {
+                NewFolderConfiguration.PullOrder.RANDOM -> "random"
+                NewFolderConfiguration.PullOrder.ALPHABETIC -> "alphabetic"
+                NewFolderConfiguration.PullOrder.SMALLEST_FIRST -> "smallestFirst"
+                NewFolderConfiguration.PullOrder.LARGEST_FIRST -> "largestFirst"
+                NewFolderConfiguration.PullOrder.OLDEST_FIRST -> "oldestFirst"
+                NewFolderConfiguration.PullOrder.NEWEST_FIRST -> "newestFirst"
+            },
+        )
         folder.put(
             "type",
             when (configuration.type) {

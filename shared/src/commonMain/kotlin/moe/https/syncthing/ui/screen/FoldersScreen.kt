@@ -424,6 +424,10 @@ internal fun AddFolderScreen(
     var rescanIntervalSeconds by remember(existingFolder) {
         mutableStateOf(existingFolder?.rescanIntervalSeconds?.toString() ?: "3600")
     }
+    var pullOrder by remember(existingFolder) {
+        mutableStateOf(existingFolder?.pullOrder ?: NewFolderConfiguration.PullOrder.RANDOM)
+    }
+    val pullOrderOptions = NewFolderConfiguration.PullOrder.entries
     var folderType by remember(existingFolder) {
         mutableStateOf(
             when (existingFolder?.type) {
@@ -541,6 +545,7 @@ internal fun AddFolderScreen(
                                 },
                                 fsWatcherEnabled = fsWatcherEnabled,
                                 rescanIntervalSeconds = rescanIntervalSeconds.toIntOrNull() ?: 3600,
+                                pullOrder = pullOrder,
                                 type = folderType,
                                 devices = remoteDevices
                                     .filter { it.id in selectedDeviceIds }
@@ -833,7 +838,6 @@ internal fun AddFolderScreen(
                 InfoSwitchCard(
                     title = "同步控制",
                     content = {
-
                         WindowDropdownPreference(
                             title = "文件变化检测",
                             items = listOf("监听并定期扫描", "定期扫描"),
@@ -879,6 +883,26 @@ internal fun AddFolderScreen(
                                 }
                             },
                         )
+
+                        AnimatedVisibility(
+                            visible = folderType != NewFolderConfiguration.Type.SEND_ONLY,
+                            enter = expandVertically(
+                                animationSpec = tween(durationMillis = 300)
+                            ),
+                            exit = shrinkVertically(
+                                animationSpec = tween(durationMillis = 300)
+                            ),
+                        ) {
+                            WindowDropdownPreference(
+                                title = "文件拉取顺序",
+                                items = pullOrderOptions.map { it.displayName },
+                                selectedIndex = pullOrderOptions.indexOf(pullOrder),
+                                enabled = !isSubmitting,
+                                onSelectedIndexChange = { selectedIndex ->
+                                    pullOrder = pullOrderOptions[selectedIndex]
+                                },
+                            )
+                        }
                     }
                 )
 

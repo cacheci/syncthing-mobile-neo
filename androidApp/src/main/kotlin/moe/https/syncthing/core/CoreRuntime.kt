@@ -281,6 +281,7 @@ class CoreRuntime(
                     paused = folder.paused,
                     fsWatcherEnabled = folder.fsWatcherEnabled,
                     rescanIntervalSeconds = folder.rescanIntervalSeconds,
+                    pullOrder = folder.pullOrder,
                     versioning = folder.versioning.type,
                     versioningSupported = folder.versioning.supported,
                     versioningFsPath = folder.versioning.fsPath,

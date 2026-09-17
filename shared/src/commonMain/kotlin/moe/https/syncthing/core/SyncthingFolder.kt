@@ -9,6 +9,7 @@ data class SyncthingFolder(
     val paused: Boolean,
     val fsWatcherEnabled: Boolean,
     val rescanIntervalSeconds: Int,
+    val pullOrder: NewFolderConfiguration.PullOrder,
     val versioning: NewFolderConfiguration.Versioning,
     val versioningSupported: Boolean,
     val versioningFsPath: String,
@@ -64,6 +65,7 @@ data class NewFolderConfiguration(
     val updateIgnorePatterns: Boolean,
     val fsWatcherEnabled: Boolean,
     val rescanIntervalSeconds: Int,
+    val pullOrder: PullOrder,
     val type: Type,
     val devices: List<FolderDeviceConfiguration>,
     val availableDeviceIds: Set<String>,
@@ -81,6 +83,15 @@ data class NewFolderConfiguration(
         RECEIVE_ONLY,
         SEND_ONLY,
         RECEIVE_ENCRYPTED,
+    }
+
+    enum class PullOrder(val displayName: String) {
+        RANDOM("随机"),
+        ALPHABETIC("字母顺序"),
+        SMALLEST_FIRST("从小到大"),
+        LARGEST_FIRST("从大到小"),
+        OLDEST_FIRST("从旧到新"),
+        NEWEST_FIRST("从新到旧"),
     }
 }
 

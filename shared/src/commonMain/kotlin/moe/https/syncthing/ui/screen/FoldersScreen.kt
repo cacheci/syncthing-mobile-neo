@@ -428,6 +428,9 @@ internal fun AddFolderScreen(
         mutableStateOf(existingFolder?.pullOrder ?: NewFolderConfiguration.PullOrder.RANDOM)
     }
     val pullOrderOptions = NewFolderConfiguration.PullOrder.entries
+    var blockIndexing by remember(existingFolder) {
+        mutableStateOf(existingFolder?.blockIndexing ?: true)
+    }
     var folderType by remember(existingFolder) {
         mutableStateOf(
             when (existingFolder?.type) {
@@ -546,6 +549,7 @@ internal fun AddFolderScreen(
                                 fsWatcherEnabled = fsWatcherEnabled,
                                 rescanIntervalSeconds = rescanIntervalSeconds.toIntOrNull() ?: 3600,
                                 pullOrder = pullOrder,
+                                blockIndexing = blockIndexing,
                                 type = folderType,
                                 devices = remoteDevices
                                     .filter { it.id in selectedDeviceIds }
@@ -903,6 +907,14 @@ internal fun AddFolderScreen(
                                 },
                             )
                         }
+
+                        InfoSwitch(
+                            title = "块索引",
+                            summary = "启用时可降低同步时流量消耗。禁用可减小数据库大小",
+                            checked = blockIndexing,
+                            enabled = !isSubmitting,
+                            onCheckedChange = { blockIndexing = it },
+                        )
                     }
                 )
 

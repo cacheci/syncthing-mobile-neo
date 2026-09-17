@@ -181,6 +181,7 @@ internal class SyncthingRestClient(
                         fsWatcherEnabled = json.optBoolean("fsWatcherEnabled", true),
                         rescanIntervalSeconds = json.optInt("rescanIntervalS", 3600),
                         pullOrder = parsePullOrder(json.optString("order", "random")),
+                        blockIndexing = json.optBoolean("blockIndexing", true),
                         versioning = parseVersioning(json.optJSONObject("versioning")),
                         devices = parseFolderDevices(json.optJSONArray("devices")),
                     ),
@@ -789,6 +790,7 @@ internal class SyncthingRestClient(
         val fsWatcherEnabled: Boolean,
         val rescanIntervalSeconds: Int,
         val pullOrder: NewFolderConfiguration.PullOrder,
+        val blockIndexing: Boolean,
         val versioning: RestFolderVersioning,
         val devices: List<FolderDeviceConfiguration>,
     )
@@ -949,6 +951,7 @@ internal class SyncthingRestClient(
         folder.put("group", configuration.group)
         folder.put("fsWatcherEnabled", configuration.fsWatcherEnabled)
         folder.put("rescanIntervalS", configuration.rescanIntervalSeconds)
+        folder.put("blockIndexing", configuration.blockIndexing)
         folder.put(
             "order",
             when (configuration.pullOrder) {

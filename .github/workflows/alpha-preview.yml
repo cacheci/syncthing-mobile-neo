@@ -52,6 +52,55 @@ jobs:
           echo "ANDROID_NDK_HOME=$ndk_path" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ndk_path" >> "$GITHUB_ENV"
 
+      - name: Calculate Syncthing Core cache fingerprint
+        id: syncthing-core-key
+        shell: bash
+        run: |
+          fingerprint="$(
+            {
+              git -C third_party/syncthing rev-parse HEAD
+              sha256sum \
+                androidApp/build-syncthing.py \
+                androidApp/build.gradle.kts \
+                gradle/libs.versions.toml
+            } | sha256sum | cut -d ' ' -f 1
+          )"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Syncthing Core
+        id: syncthing-core-cache
+        uses: actions/cache@v6
+        with:
+          path: androidApp/build/generated/syncthing/jniLibs
+          key: syncthing-core-${{ runner.os }}-${{ runner.arch }}-${{ steps.syncthing-core-key.outputs.fingerprint }}
+
+      - name: Cache Go toolchain and build state
+        if: steps.syncthing-core-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v6
+        with:
+          path: |
+            third_party/go
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: syncthing-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.syncthing-core-key.outputs.fingerprint }}
+          restore-keys: |
+            syncthing-go-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Build Syncthing Core
+        if: steps.syncthing-core-cache.outputs.cache-hit != 'true'
+        run: ./gradlew :androidApp:buildBuiltInSyncthing --stacktrace
+
+      - name: Verify Syncthing Core outputs
+        shell: bash
+        run: |
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            core="androidApp/build/generated/syncthing/jniLibs/$abi/libsyncthingnative.so"
+            if [[ ! -s "$core" ]]; then
+              echo "Missing or empty Syncthing Core output: $core" >&2
+              exit 1
+            fi
+          done
+
       - name: Prepare release signing
         env:
           ANDROID_KEYSTORE_BASE64_DBG: ${{ secrets.ANDROID_KEYSTORE_BASE64_DBG }}
@@ -81,7 +130,10 @@ jobs:
           KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS_DBG }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS_DBG }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD_DBG }}
-        run: ./gradlew :androidApp:assembleRelease --stacktrace
+        run: >-
+          ./gradlew :androidApp:assembleRelease
+          -x :androidApp:buildBuiltInSyncthing
+          --stacktrace
 
       - name: Locate release APK
         id: apk

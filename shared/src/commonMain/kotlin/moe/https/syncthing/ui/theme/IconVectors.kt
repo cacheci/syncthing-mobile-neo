@@ -1,4 +1,4 @@
-package moe.https.syncthing.ui.resources
+package moe.https.syncthing.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType

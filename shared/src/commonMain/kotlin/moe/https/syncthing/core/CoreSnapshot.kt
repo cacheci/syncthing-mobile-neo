@@ -1,5 +1,9 @@
 package moe.https.syncthing.core
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import moe.https.syncthing.ui.theme.AppTheme
+
 enum class CoreState {
     NOT_INSTALLED,
     STOPPED,
@@ -8,6 +12,26 @@ enum class CoreState {
     RUNNING,
     STOPPING,
     FAILED,
+}
+
+@Composable
+internal fun CoreState.displayColor(): Color = when (this) {
+    CoreState.RUNNING -> AppTheme.statusColors.ok
+    CoreState.FAILED -> AppTheme.statusColors.fail
+    CoreState.STARTING,
+    CoreState.STOPPING,
+    CoreState.INSTALLING -> AppTheme.statusColors.pending
+    else -> AppTheme.statusColors.down
+}
+
+@Composable
+internal fun CoreState.displayBackgroundColor(): Color = when (this) {
+    CoreState.RUNNING -> AppTheme.statusColors.okContainer
+    CoreState.FAILED -> AppTheme.statusColors.failContainer
+    CoreState.STARTING,
+    CoreState.STOPPING,
+    CoreState.INSTALLING -> AppTheme.statusColors.pendingContainer
+    else -> AppTheme.statusColors.downContainer
 }
 
 enum class CoreSource {

@@ -26,11 +26,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.https.syncthing.core.CoreState
+import moe.https.syncthing.core.displayBackgroundColor
+import moe.https.syncthing.core.displayColor
 import moe.https.syncthing.ui.component.MessageCard
 import moe.https.syncthing.ui.model.CoreUiState
-import moe.https.syncthing.ui.resources.Syncthing
-import moe.https.syncthing.ui.resources.displayBackgroundColor
-import moe.https.syncthing.ui.resources.displayColor
+import moe.https.syncthing.ui.theme.AppTheme
+import moe.https.syncthing.ui.theme.Syncthing
 import moe.https.syncthing.ui.util.displayName
 import moe.https.syncthing.ui.util.formatBitsPerSecond
 import moe.https.syncthing.ui.util.formatBytes
@@ -43,7 +44,6 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun CoreScreen(
@@ -155,8 +155,9 @@ private fun CoreCard (
         modifier = Modifier.fillMaxWidth(),
         colors = CardColors(
             color = uiState.state.displayBackgroundColor(),
-            contentColor = MiuixTheme.colorScheme.onBackground,
-        )
+            contentColor = AppTheme.colorScheme.onBackground,
+            borderColor = uiState.state.displayColor(),
+        ),
     ) {
         Row (
             modifier = Modifier.fillMaxWidth().clickable(
@@ -183,12 +184,12 @@ private fun CoreCard (
                 Text(
                     text = uiState.state.displayName(),
                     fontWeight = FontWeight.Medium,
-                    style = MiuixTheme.textStyles.title3,
+                    style = AppTheme.textStyles.title3,
                 )
                 Text(
                     uiState.version ?: "不可用",
                     fontWeight = FontWeight.Medium,
-                    style = MiuixTheme.textStyles.body1,
+                    style = AppTheme.textStyles.body1,
                     color = uiState.state.displayColor()
                 )
             }

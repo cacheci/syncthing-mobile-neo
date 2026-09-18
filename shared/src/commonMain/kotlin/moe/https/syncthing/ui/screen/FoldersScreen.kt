@@ -66,7 +66,7 @@ import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
 import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.FoldersUiState
-import moe.https.syncthing.ui.resources.StatusColor
+import moe.https.syncthing.ui.theme.AppTheme
 import moe.https.syncthing.ui.util.formatBytes
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -93,7 +93,6 @@ import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.scripta.editor.CodeEditor
 import top.yukonga.scripta.editor.EditorColors
@@ -231,7 +230,7 @@ private fun FolderCard(
                     )
                     Text(
                         text = folder.label?.takeIf(String::isNotBlank) ?: folder.id,
-                        style = MiuixTheme.textStyles.headline1,
+                        style = AppTheme.textStyles.headline1,
                     )
                 }
                 Text(
@@ -299,12 +298,12 @@ private fun FolderValueRow(
     ) {
         Text(
             text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = AppTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.weight(0.35f),
         )
         Text(
             text = value,
-            color = if (isError) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onBackground,
+            color = if (isError) AppTheme.colorScheme.error else AppTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(0.65f),
@@ -345,7 +344,7 @@ private fun NewFolderCard(
                     text = "黑名单",
                     enabled = enabled,
                     onClick = onIgnore,
-                    colors = ButtonDefaults.textButtonColors(textColor = MiuixTheme.colorScheme.error)
+                    colors = ButtonDefaults.textButtonColors(textColor = AppTheme.colorScheme.error)
                 )
                 TextButton(
                     modifier = Modifier.weight(0.3f),
@@ -507,6 +506,7 @@ internal fun AddFolderScreen(
     }
 
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = { BlurredSmallTopAppBar(
             title = if (isEditingFolder) "编辑文件夹" else "添加文件夹",
             scrollBehavior = scrollBehavior,
@@ -572,8 +572,8 @@ internal fun AddFolderScreen(
                             contentDescription = if (isEditingFolder) "保存" else "添加",
                             imageVector = MiuixIcons.Ok,
                             tint = if (canSubmit) {
-                                MiuixTheme.colorScheme.onSurface
-                            } else MiuixTheme.colorScheme.disabledOnSurface
+                                AppTheme.colorScheme.onSurface
+                            } else AppTheme.colorScheme.disabledOnSurface
                         )
                     },
                 )
@@ -643,7 +643,7 @@ internal fun AddFolderScreen(
                         if (remoteDevices.isEmpty()) {
                             Text(
                                 text = "无设备",
-                                color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                                color = AppTheme.colorScheme.disabledOnSecondaryVariant,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
                             )
@@ -829,9 +829,9 @@ internal fun AddFolderScreen(
                                         modifier = Modifier
                                             .size(26.dp)
                                             .clip(RoundedCornerShape(13.dp))
-                                            .background(MiuixTheme.colorScheme.error)
+                                            .background(AppTheme.colorScheme.error)
                                             .padding(4.dp),
-                                        tint = MiuixTheme.colorScheme.background
+                                        tint = AppTheme.colorScheme.background
                                     )
                                 }
                             )
@@ -927,7 +927,7 @@ internal fun AddFolderScreen(
                             deleteLocalFiles = false
                             showDeleteOverlay = true
                         },
-                        colors = ButtonDefaults.textButtonColors(textColor = MiuixTheme.colorScheme.error)
+                        colors = ButtonDefaults.textButtonColors(textColor = AppTheme.colorScheme.error)
                     )
                 }
             }
@@ -952,7 +952,7 @@ internal fun AddFolderScreen(
                         Icon(
                             imageVector = MiuixIcons.Close,
                             contentDescription = "取消",
-                            tint = MiuixTheme.colorScheme.onBackground,
+                            tint = AppTheme.colorScheme.onBackground,
                         )
                     }
                 },
@@ -967,7 +967,7 @@ internal fun AddFolderScreen(
                         Icon(
                             imageVector = MiuixIcons.Ok,
                             contentDescription = "确定",
-                            tint = MiuixTheme.colorScheme.onBackground,
+                            tint = AppTheme.colorScheme.onBackground,
                         )
                     }
                 },
@@ -997,7 +997,7 @@ internal fun AddFolderScreen(
                             Icon(
                                 imageVector = MiuixIcons.Help,
                                 contentDescription = "确定",
-                                tint = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                                tint = AppTheme.colorScheme.disabledOnSecondaryVariant,
                             )
                         }
                     }
@@ -1026,7 +1026,7 @@ internal fun AddFolderScreen(
                             textAlign = TextAlign.Center,
                             modifier= Modifier
                                 .fillMaxWidth()
-                                .background(MiuixTheme.colorScheme.secondaryContainer)
+                                .background(AppTheme.colorScheme.secondaryContainer)
                                 .padding(4.dp)
                         )
                         CodeEditor(
@@ -1070,7 +1070,7 @@ internal fun AddFolderScreen(
                 ) {
                     Text(
                         text = "确定要删除文件夹 “${folderId.toCharArray().joinToString("\u200B")}” 吗？",
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        color = AppTheme.colorScheme.onSurfaceVariantSummary,
                     )
 
                     Row(
@@ -1091,8 +1091,8 @@ internal fun AddFolderScreen(
                         )
                         Text(
                             "同时删除本地文件",
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onBackgroundVariant,
+                            style = AppTheme.textStyles.body2,
+                            color = AppTheme.colorScheme.onBackgroundVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(end = 34.dp).fillMaxWidth(),
                         )
@@ -1118,7 +1118,7 @@ internal fun AddFolderScreen(
                                 deleteLocalFiles = false
                                 onDeleteFolder(folderId, shouldDeleteLocalFiles)
                             },
-                            colors = ButtonDefaults.textButtonColors(textColor = MiuixTheme.colorScheme.error),
+                            colors = ButtonDefaults.textButtonColors(textColor = AppTheme.colorScheme.error),
                         )
                     }
                 }
@@ -1140,7 +1140,7 @@ private fun StIgnoreHelpItem(item: String, text: String) {
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .background(MiuixTheme.colorScheme.surface)
+                .background(AppTheme.colorScheme.surface)
                 .padding(4.dp)
         )
         Text(text)
@@ -1169,11 +1169,11 @@ private fun AddFolderDevices(
             checked = selected,
             enabled = !isSubmitting,
             statusColor = when (remoteFolderState) {
-                RemoteFolderState.VALID -> StatusColor.OK.color
-                RemoteFolderState.NOT_SHARING -> StatusColor.PENDING.color
-                RemoteFolderState.PAUSED -> StatusColor.PAUSED.color
-                RemoteFolderState.UNKNOWN -> StatusColor.FAIL.color
-                null -> StatusColor.DOWN.color
+                RemoteFolderState.VALID -> AppTheme.statusColors.ok
+                RemoteFolderState.NOT_SHARING -> AppTheme.statusColors.pending
+                RemoteFolderState.PAUSED -> AppTheme.statusColors.disconnected
+                RemoteFolderState.UNKNOWN -> AppTheme.statusColors.fail
+                null -> AppTheme.statusColors.down
             },
             onCheckedChange = onSelectedChange,
         )
@@ -1222,10 +1222,10 @@ private fun SyncthingFolder.statusName(): String = when {
 
 @Composable
 private fun SyncthingFolder.statusColor(): Color = when {
-    paused -> StatusColor.DOWN.color
-    pullErrors > 0 || state == "error" -> StatusColor.FAIL.color
-    state == "idle" && needFiles == 0L -> StatusColor.OK.color
-    else -> StatusColor.PENDING.color
+    paused -> AppTheme.statusColors.down
+    pullErrors > 0 || state == "error" -> AppTheme.statusColors.fail
+    state == "idle" && needFiles == 0L -> AppTheme.statusColors.ok
+    else -> AppTheme.statusColors.pending
 }
 
 private fun SyncthingFolder.typeName(): String = when (type) {

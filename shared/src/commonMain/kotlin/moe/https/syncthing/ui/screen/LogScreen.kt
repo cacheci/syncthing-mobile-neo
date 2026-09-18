@@ -21,6 +21,7 @@ import moe.https.syncthing.core.CoreLogSource
 import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
 import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.LogUiState
+import moe.https.syncthing.ui.theme.AppTheme
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -33,7 +34,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun LogScreen(
@@ -48,6 +48,7 @@ internal fun LogScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = { BlurredSmallTopAppBar(
             title = "DEBUG*",
             scrollBehavior = scrollBehavior,
@@ -92,8 +93,8 @@ internal fun LogScreen(
 
                 Text(
                     text = uiState.refreshedAt?.let { "最后刷新：$it" } ?: "尚未刷新",
-                    style = MiuixTheme.textStyles.footnote2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = AppTheme.textStyles.footnote2,
+                    color = AppTheme.colorScheme.onSurfaceVariantSummary,
                 )
 
                 Card(
@@ -105,7 +106,7 @@ internal fun LogScreen(
                         when {
                             uiState.error != null -> Text(
                                 text = uiState.error,
-                                color = MiuixTheme.colorScheme.error,
+                                color = AppTheme.colorScheme.error,
                                 modifier = Modifier
                                     .align(Alignment.Center)
                                     .padding(20.dp),
@@ -113,7 +114,7 @@ internal fun LogScreen(
 
                             uiState.content.isBlank() -> Text(
                                 text = "暂无日志",
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                color = AppTheme.colorScheme.onSurfaceVariantSummary,
                                 modifier = Modifier.align(Alignment.Center),
                             )
 
@@ -125,7 +126,7 @@ internal fun LogScreen(
                                         .verticalScroll(verticalScrollState)
                                         .horizontalScroll(horizontalScrollState)
                                         .padding(12.dp),
-                                    style = MiuixTheme.textStyles.body2,
+                                    style = AppTheme.textStyles.body2,
                                     fontFamily = FontFamily.Monospace,
                                 )
                             }

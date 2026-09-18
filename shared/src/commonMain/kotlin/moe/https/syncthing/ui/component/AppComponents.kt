@@ -67,6 +67,7 @@ import moe.https.syncthing.icon
 import moe.https.syncthing.platform.isSystem24HourFormat
 import moe.https.syncthing.platform.rememberClipboard
 import moe.https.syncthing.ui.model.AppPage
+import moe.https.syncthing.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -84,7 +85,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
@@ -105,7 +105,7 @@ fun ValueRow(
     ) {
         Text(
             text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = AppTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.weight(0.4f)
         )
         Text(
@@ -133,7 +133,7 @@ internal fun MultipleValueRow(
     values: List<String>,
     onClick: (() -> Unit)? = null,
     textAlign: TextAlign = TextAlign.End,
-    color: Color = MiuixTheme.colorScheme.onBackground
+    color: Color = AppTheme.colorScheme.onBackground
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -142,7 +142,7 @@ internal fun MultipleValueRow(
     ) {
         Text(
             text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = AppTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.weight(0.35f),
         )
         Column(
@@ -206,15 +206,15 @@ internal fun InputValueRow(
         Column (modifier = Modifier.weight(0.65f)) {
             Text(
                 text = label,
-                fontSize = MiuixTheme.textStyles.headline1.fontSize,
+                fontSize = AppTheme.textStyles.headline1.fontSize,
                 fontWeight = FontWeight.Medium,
-                color = if (valueValidator(value)) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.error,
+                color = if (valueValidator(value)) AppTheme.colorScheme.onBackground else AppTheme.colorScheme.error,
             )
             if (summary != null) {
                 Text(
                     text = summary,
-                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontSize = AppTheme.textStyles.body2.fontSize,
+                    color = AppTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
         }
@@ -224,9 +224,9 @@ internal fun InputValueRow(
             BasicTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = value,
-                textStyle = MiuixTheme.textStyles.main.copy(
+                textStyle = AppTheme.textStyles.main.copy(
                     textAlign = TextAlign.End,
-                    color = if (allowEdit) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
+                    color = if (allowEdit) AppTheme.colorScheme.onBackground else AppTheme.colorScheme.onSecondaryContainer
                 ),
                 onValueChange = onValueChange,
                 singleLine = singleLine,
@@ -242,7 +242,7 @@ internal fun InputValueRow(
                     text = valueLabel,
                     textAlign = TextAlign.End,
                     maxLines = if (singleLine) 1 else Int.MAX_VALUE,
-                    color = MiuixTheme.colorScheme.onSecondaryContainer,
+                    color = AppTheme.colorScheme.onSecondaryContainer,
                 )
             }
         }
@@ -277,8 +277,8 @@ internal fun MessageCard(
         modifier = modifier.fillMaxWidth(),
         colors = if (isError) {
             CardDefaults.defaultColors(
-                color = MiuixTheme.colorScheme.errorContainer,
-                contentColor = MiuixTheme.colorScheme.onErrorContainer,
+                color = AppTheme.colorScheme.errorContainer,
+                contentColor = AppTheme.colorScheme.onErrorContainer,
             )
         } else {
             CardDefaults.defaultColors()
@@ -289,12 +289,12 @@ internal fun MessageCard(
         ) {
             Text(
                 text = title,
-                style = MiuixTheme.textStyles.title4,
+                style = AppTheme.textStyles.title4,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
             )
             Text(
                 text = message,
-                color = MiuixTheme.colorScheme.onSecondaryContainer,
+                color = AppTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
             )
             content()
@@ -350,12 +350,12 @@ internal fun CoreNotReadyTakePlace(
     ) {
         Text(
             text = title,
-            style = MiuixTheme.textStyles.headline1,
+            style = AppTheme.textStyles.headline1,
             textAlign = TextAlign.Center,
         )
         Text(
             text = message,
-            color = if (isError) { MiuixTheme.colorScheme.error } else { MiuixTheme.colorScheme.onSurfaceVariantSummary },
+            color = if (isError) { AppTheme.colorScheme.error } else { AppTheme.colorScheme.onSurfaceVariantSummary },
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -472,10 +472,10 @@ internal fun CheckableInputValueRow(
                         isEditing = focusState.isFocused
                     },
                     value = value,
-                    textStyle = MiuixTheme.textStyles.main.copy(
+                    textStyle = AppTheme.textStyles.main.copy(
                         fontFamily = FontFamily.Monospace,
                         textAlign = TextAlign.Start,
-                        color = if (enabled) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
+                        color = if (enabled) AppTheme.colorScheme.onBackground else AppTheme.colorScheme.onSecondaryContainer
                     ),
                     onValueChange = onValueChange,
                     readOnly = readOnly || state,
@@ -489,7 +489,7 @@ internal fun CheckableInputValueRow(
                         modifier = Modifier.fillMaxWidth(),
                         text = valueLabel,
                         textAlign = TextAlign.Start,
-                        color = MiuixTheme.colorScheme.onSecondaryContainer,
+                        color = AppTheme.colorScheme.onSecondaryContainer,
                     )
                 }
             }
@@ -550,7 +550,7 @@ internal fun DeleteBox(
             )
             .clip(CircleShape)
             .background(
-                color = if ( enabled ) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.background,
+                color = if ( enabled ) AppTheme.colorScheme.error else AppTheme.colorScheme.background,
                 shape = CircleShape,
             )
             .triStateToggleable(
@@ -613,10 +613,10 @@ internal fun PendingCard(
                     ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("●", color = MiuixTheme.colorScheme.onPrimary)
+                Text("●", color = AppTheme.colorScheme.onPrimary)
                 Text(
                     text = title,
-                    color = MiuixTheme.colorScheme.onPrimary,
+                    color = AppTheme.colorScheme.onPrimary,
                 )
             }
 
@@ -683,7 +683,7 @@ internal fun TimePicker(
                 range = 0..1,
                 label = { if (it == 0) "AM" else "PM" },
                 wrapAround = false,
-                textStyle = MiuixTheme.textStyles.title3,
+                textStyle = AppTheme.textStyles.title3,
                 modifier = Modifier.weight(0.6f),
             )
         }
@@ -738,12 +738,12 @@ internal fun CheckableRow(
         Column ( modifier = Modifier.weight(1f) ) {
             Text(
                 text = title,
-                color = if (enabled) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.disabledOnSurface
+                color = if (enabled) AppTheme.colorScheme.onBackground else AppTheme.colorScheme.disabledOnSurface
             )
             summary?.let {
                 Text(
                     text = it,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    color = AppTheme.colorScheme.onSurfaceSecondary,
                 )
             }
         }
@@ -762,7 +762,7 @@ internal fun AppNavigationBar(
     currentPage: AppPage,
     floating: Boolean = false, //TODO
     onNavigationBarItemClick: (AppPage) -> Unit = {},
-    navbarColor: Color = MiuixTheme.colorScheme.background,
+    navbarColor: Color = AppTheme.colorScheme.background,
     defaultWindowInsetsPadding: Boolean = true,
     backdrop: LayerBackdrop? = null,
 ) {

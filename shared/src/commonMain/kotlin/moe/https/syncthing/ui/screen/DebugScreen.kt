@@ -17,6 +17,7 @@ import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
 import moe.https.syncthing.ui.component.InfoSwitchCard
 import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.AppPage
+import moe.https.syncthing.ui.theme.AppTheme
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -43,6 +44,7 @@ internal fun DevSettingPage(
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = { BlurredSmallTopAppBar(
             title = "DEBUG*",
             scrollBehavior = scrollBehavior,

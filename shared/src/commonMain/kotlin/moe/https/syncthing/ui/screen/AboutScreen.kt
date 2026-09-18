@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.https.syncthing.generated.resources.Res
 import moe.https.syncthing.generated.resources.logo_only
+import moe.https.syncthing.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
 import top.yukonga.miuix.kmp.basic.Card
@@ -35,7 +36,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun AboutScreen(
@@ -69,13 +69,13 @@ internal fun AboutScreen(
                 Text(
                     text = "Syncthing GUI",
                     modifier = Modifier.padding(top = 12.dp, bottom = 5.dp),
-                    color = MiuixTheme.colorScheme.onBackground,
+                    color = AppTheme.colorScheme.onBackground,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = "v$versionName",
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    color = AppTheme.colorScheme.onSurfaceVariantSummary,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
                 )
@@ -362,8 +362,8 @@ private fun AboutCard(
                 endActions = {
                     Text(
                         text = endText,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                        fontSize = MiuixTheme.textStyles.body2.fontSize,
+                        color = AppTheme.colorScheme.onSurfaceVariantActions,
+                        fontSize = AppTheme.textStyles.body2.fontSize,
                     )
                 },
                 startAction = {},
@@ -373,7 +373,7 @@ private fun AboutCard(
             ArrowPreference(
                 title = summary ?: "",
                 onClick = onShowLicence,
-                titleColor = BasicComponentColors(MiuixTheme.colorScheme.onSecondaryContainerVariant, MiuixTheme.colorScheme.onSecondaryContainerVariant),
+                titleColor = BasicComponentColors(AppTheme.colorScheme.onSecondaryContainerVariant, AppTheme.colorScheme.onSecondaryContainerVariant),
             )
             extraContent()
         }
@@ -391,7 +391,7 @@ private fun LicenceShowContent(
                 Text(
                     text = text,
                     textAlign = TextAlign.Center,
-                    style = MiuixTheme.textStyles.title3,
+                    style = AppTheme.textStyles.title3,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -399,7 +399,7 @@ private fun LicenceShowContent(
                 Text(
                     text = text,
                     textAlign = TextAlign.Start,
-                    style = MiuixTheme.textStyles.main,
+                    style = AppTheme.textStyles.main,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

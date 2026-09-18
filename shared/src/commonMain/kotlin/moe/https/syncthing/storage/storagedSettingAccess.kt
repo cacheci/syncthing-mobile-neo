@@ -34,5 +34,6 @@ interface AppSettingPrivateStorage {
         const val KEY_FLOATING_BOTTOM_BAR = "floating_bottom_bar"
         const val KEY_TOP_BAR_BLUR = "top_bar_blur"
         const val KEY_BOTTOM_BAR_BLUR = "bottom_bar_blur"
+        const val KEY_HIGH_CONTRAST_MODE = "high_contrast_mode"
     }
 }

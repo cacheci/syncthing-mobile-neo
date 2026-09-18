@@ -46,6 +46,7 @@ import moe.https.syncthing.core.SyncthingDiscoveryStatus
 import moe.https.syncthing.core.SyncthingListenAddress
 import moe.https.syncthing.core.SyncthingLocalInfo
 import moe.https.syncthing.core.SyncthingPendingDevice
+import moe.https.syncthing.core.displayColor
 import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.DeviceShareOverlayDialog
@@ -56,7 +57,7 @@ import moe.https.syncthing.ui.component.MultipleValueRow
 import moe.https.syncthing.ui.component.PendingCard
 import moe.https.syncthing.ui.component.barBackdropSource
 import moe.https.syncthing.ui.model.DevicesUiState
-import moe.https.syncthing.ui.resources.StatusColor
+import moe.https.syncthing.ui.theme.AppTheme
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -79,7 +80,6 @@ import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import kotlin.jvm.JvmName
 
@@ -203,10 +203,11 @@ private fun NewDeviceCard(
                     enabled = enabled,
                     onClick = onIgnore,
                     colors = TextButtonColors(
-                        color = MiuixTheme.colorScheme.secondaryContainer,
-                        disabledColor = MiuixTheme.colorScheme.surface,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                        color = AppTheme.colorScheme.secondaryContainer,
+                        disabledColor = AppTheme.colorScheme.surface,
+                        textColor = AppTheme.colorScheme.error,
+                        disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
+                        borderColor = AppTheme.colorScheme.error,
                     )
                 )
                 TextButton(
@@ -237,12 +238,6 @@ private fun RemoteDeviceCard(
     var showDeleteOverlay by rememberSaveable { mutableStateOf(false) }
     var foldContentStatus by rememberSaveable { mutableStateOf(false) }
 
-    val statusColor = if (device.connected) {
-        StatusColor.OK.color
-    } else {
-        StatusColor.DOWN.color
-    }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         pressFeedbackType = PressFeedbackType.Sink,
@@ -269,19 +264,19 @@ private fun RemoteDeviceCard(
                 ) {
                     Text(
                         text = "●",
-                        color = statusColor,
+                        color = device.displayColor(),
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
                         text = device.name ?: "未命名设备",
-                        style = MiuixTheme.textStyles.headline1,
+                        style = AppTheme.textStyles.headline1,
                         fontWeight = FontWeight.Medium,
                     )
                 }
 
                 Text(
                     text = if (device.connected) "已连接" else "未连接",
-                    color = statusColor,
+                    color = device.displayColor(),
                     textAlign = TextAlign.End,
                     modifier = Modifier.weight(0.3f),
                 )
@@ -301,7 +296,7 @@ private fun RemoteDeviceCard(
                     MultipleValueRow(
                         label = "设备 ID",
                         values = listOf(device.id.take(7)),
-                        color = MiuixTheme.colorScheme.primary,
+                        color = AppTheme.colorScheme.primary,
                         onClick = {showShareOverlay = true},
                     )
                     MultipleValueRow(
@@ -327,8 +322,8 @@ private fun RemoteDeviceCard(
                     if (device.paused) {
                         Text(
                             text = "此设备已暂停",
-                            color = MiuixTheme.colorScheme.error,
-                            style = MiuixTheme.textStyles.footnote2,
+                            color = AppTheme.colorScheme.error,
+                            style = AppTheme.textStyles.footnote2,
                         )
                     }
                     if (device.discoveredAddresses.isNotEmpty()) {
@@ -346,10 +341,11 @@ private fun RemoteDeviceCard(
                             text = "删除",
                             onClick = { showDeleteOverlay = true },
                             colors = TextButtonColors(
-                                color = MiuixTheme.colorScheme.secondaryContainer,
-                                disabledColor = MiuixTheme.colorScheme.surface,
-                                textColor = MiuixTheme.colorScheme.error,
-                                disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                                color = AppTheme.colorScheme.secondaryContainer,
+                                disabledColor = AppTheme.colorScheme.surface,
+                                textColor = AppTheme.colorScheme.error,
+                                disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
+                                borderColor = AppTheme.colorScheme.error,
                             )
                         )
                         Spacer(Modifier.width(10.dp))
@@ -382,7 +378,7 @@ private fun RemoteDeviceCard(
             Text(
                 text = "确定要删除设备 “${device.name?.toCharArray()?.joinToString("\u200B") ?: ""}” 吗？删除该设备不会删除从该设备同步的文件夹。",
                 fontSize = 16.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                color = AppTheme.colorScheme.onSurfaceVariantSummary
             )
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -402,10 +398,11 @@ private fun RemoteDeviceCard(
                         onDeleteDevice(device.id)
                     },
                     colors = TextButtonColors(
-                        color = MiuixTheme.colorScheme.secondaryContainer,
-                        disabledColor = MiuixTheme.colorScheme.surface,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+                        color = AppTheme.colorScheme.secondaryContainer,
+                        disabledColor = AppTheme.colorScheme.surface,
+                        textColor = AppTheme.colorScheme.error,
+                        disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
+                        borderColor = AppTheme.colorScheme.error,
                     ),
                 )
             }
@@ -453,11 +450,11 @@ private fun LocalDeviceCard(
                 ) {
                     Text(
                         text = "●",
-                        color = StatusColor.OK.color,
+                        color = AppTheme.statusColors.ok,
                     )
                     Text(
                         text = "本机",
-                        style = MiuixTheme.textStyles.headline1,
+                        style = AppTheme.textStyles.headline1,
                     )
                 }
             }
@@ -477,7 +474,7 @@ private fun LocalDeviceCard(
                     MultipleValueRow(
                         label = "设备 ID",
                         values = listOf(device.id.take(7)),
-                        color = MiuixTheme.colorScheme.primary,
+                        color = AppTheme.colorScheme.primary,
                         onClick = { showShareOverlay = true },
                     )
 
@@ -522,15 +519,15 @@ private fun LocalDeviceCard(
                     ) { item ->
                         if (item.error != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("●", color = MiuixTheme.colorScheme.error)
+                                Text("●", color = AppTheme.colorScheme.error)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(item.method)
-                                    Text(text = item.error.toCharArray().joinToString("\u200B"), color = MiuixTheme.colorScheme.onSecondaryContainer)
+                                    Text(text = item.error.toCharArray().joinToString("\u200B"), color = AppTheme.colorScheme.onSecondaryContainer)
                                 }
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("●", color = StatusColor.OK.color)
+                                Text("●", color = AppTheme.statusColors.ok)
                                 Text(item.method, modifier = Modifier.weight(1f))
                             }
                         }
@@ -570,15 +567,15 @@ private fun LocalDeviceCard(
                     ) { item ->
                         if (item.error != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("●", color = MiuixTheme.colorScheme.error)
+                                Text("●", color = AppTheme.colorScheme.error)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(item.address)
-                                    Text(text = item.error.toCharArray().joinToString("\u200B"), color = MiuixTheme.colorScheme.onSecondaryContainer)
+                                    Text(text = item.error.toCharArray().joinToString("\u200B"), color = AppTheme.colorScheme.onSecondaryContainer)
                                 }
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("●", color = StatusColor.OK.color)
+                                Text("●", color = AppTheme.statusColors.ok)
                                 Text(item.address, modifier = Modifier.weight(1f))
                             }
                         }
@@ -605,30 +602,30 @@ private fun LocalDeviceCard(
 @Composable
 @JvmName("countToColouredStringForDiscovery")
 private fun countToColouredString( status: List<SyncthingDiscoveryStatus>? ): Pair<String, Color> {
-    if (status == null) return "—" to MiuixTheme.colorScheme.onBackground
+    if (status == null) return "—" to AppTheme.colorScheme.onBackground
 
     val succeeded = status.count { it.error == null }
     val total = status.count()
 
     return "$succeeded/$total 在线" to when (succeeded) {
-        total -> StatusColor.OK.color
-        0 -> StatusColor.FAIL.color
-        else -> StatusColor.PENDING.color
+        total -> AppTheme.statusColors.ok
+        0 -> AppTheme.statusColors.fail
+        else -> AppTheme.statusColors.pending
     }
 }
 
 @Composable
 @JvmName("countToColouredStringForListen")
 private fun countToColouredString( status: List<SyncthingListenAddress>? ): Pair<String, Color> {
-    if (status == null) return "—" to MiuixTheme.colorScheme.onBackground
+    if (status == null) return "—" to AppTheme.colorScheme.onBackground
 
     val succeeded = status.count { it.error == null }
     val total = status.size
 
     return "$succeeded/$total 在线" to when (succeeded) {
-        total -> StatusColor.OK.color
-        0 -> StatusColor.FAIL.color
-        else -> StatusColor.PENDING.color
+        total -> AppTheme.statusColors.ok
+        0 -> AppTheme.statusColors.fail
+        else -> AppTheme.statusColors.pending
     }
 }
 
@@ -677,6 +674,7 @@ internal fun AddDeviceScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = { BlurredSmallTopAppBar(
             title = if ( existingDevice != null ) "添加设备" else "编辑设备",
             scrollBehavior = scrollBehavior,
@@ -710,8 +708,8 @@ internal fun AddDeviceScreen(
                             contentDescription = "保存",
                             imageVector = MiuixIcons.Ok,
                             tint = if (canSubmit) {
-                                MiuixTheme.colorScheme.disabledOnSurface
-                            } else MiuixTheme.colorScheme.onSurface
+                                AppTheme.colorScheme.disabledOnSurface
+                            } else AppTheme.colorScheme.onSurface
                         )
                     },
                     onClick = {

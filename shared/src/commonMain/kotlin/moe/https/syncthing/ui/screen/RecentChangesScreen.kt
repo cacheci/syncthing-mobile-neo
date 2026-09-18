@@ -20,7 +20,7 @@ import moe.https.syncthing.core.SyncthingRecentChange
 import moe.https.syncthing.ui.component.CoreNotReadyTakePlace
 import moe.https.syncthing.ui.component.ValueRow
 import moe.https.syncthing.ui.model.RecentChangesUiState
-import moe.https.syncthing.ui.resources.StatusColor
+import moe.https.syncthing.ui.theme.AppTheme
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
@@ -32,7 +32,6 @@ import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun RecentChangesScreen(
@@ -117,16 +116,16 @@ private fun RecentChangeCard(change: SyncthingRecentChange) {
                 Icon(
                     contentDescription = "",
                     imageVector = if (isFolder) MiuixIcons.Folder else MiuixIcons.File,
-                    tint = MiuixTheme.colorScheme.onBackground
+                    tint = AppTheme.colorScheme.onBackground
                 )
                 Text(
                     text = if (change.action == "deleted") "- " else "~ " + change.path,
                     color = if (change.action == "deleted") {
-                        StatusColor.FAIL.color
+                        AppTheme.statusColors.fail
                     } else {
-                        MiuixTheme.colorScheme.primary
+                        AppTheme.colorScheme.primary
                     },
-                    style = MiuixTheme.textStyles.headline1,
+                    style = AppTheme.textStyles.headline1,
                     fontWeight = FontWeight.Medium,
                 )
             }

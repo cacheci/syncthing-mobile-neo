@@ -75,7 +75,7 @@ import moe.https.syncthing.ui.model.CoreUiState
 import moe.https.syncthing.ui.model.MainUiState
 import moe.https.syncthing.ui.model.SettingFormState
 import moe.https.syncthing.ui.model.SettingUiState
-import moe.https.syncthing.ui.resources.StatusColor
+import moe.https.syncthing.ui.theme.AppTheme
 import moe.https.syncthing.ui.util.AutoStartModeType
 import moe.https.syncthing.ui.util.BatteryRunCondition
 import moe.https.syncthing.ui.util.CronTrigger
@@ -114,7 +114,6 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.preference.RangeSliderPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
@@ -707,7 +706,7 @@ internal fun SettingEditDiscoveryScreen(
                 "任何人都可以运行发现服务器，并将 Syncthing 实例指向该服务器。" +
                 "Syncthing 项目也维护着一个供公众使用的全球集群。" +
                 "请确保要同步的设备使用了相同的发现服务器，或它们能通过其他方式相互发现，例如设置固定的 IP 或使用局域网设备发现。",
-                style = MiuixTheme.textStyles.paragraph,
+                style = AppTheme.textStyles.paragraph,
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -790,8 +789,8 @@ internal fun SettingEditDiscoveryScreen(
                         ) {
                             Text(
                                 "延迟",
-                                style = MiuixTheme.textStyles.body2,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                style = AppTheme.textStyles.body2,
+                                color = AppTheme.colorScheme.onSurfaceVariantSummary,
                             )
                             Text(
                                 when (pingState) {
@@ -800,13 +799,13 @@ internal fun SettingEditDiscoveryScreen(
                                     is DiscoveryServerPingState.Failure -> "失败"
                                     null -> "—"
                                 },
-                                style = MiuixTheme.textStyles.body2,
+                                style = AppTheme.textStyles.body2,
                                 color = when (pingState) {
                                     is DiscoveryServerPingState.Success -> {
-                                        if (pingState.latencyMillis < 100) StatusColor.OK.color else StatusColor.PENDING.color
+                                        if (pingState.latencyMillis < 100) AppTheme.statusColors.ok else AppTheme.statusColors.pending
                                     }
-                                    is DiscoveryServerPingState.Failure -> MiuixTheme.colorScheme.error
-                                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    is DiscoveryServerPingState.Failure -> AppTheme.colorScheme.error
+                                    else -> AppTheme.colorScheme.onSurfaceVariantSummary
                                 },
                             )
                         }
@@ -859,6 +858,7 @@ internal fun SettingStoragePermissionPage(
     }
 
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = { BlurredSmallTopAppBar(
             title = "存储权限",
             scrollBehavior = scrollBehavior,
@@ -1011,6 +1011,7 @@ internal fun SettingBackgroundRunningPage(
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = {
             BlurredSmallTopAppBar(
                 title = "后台运行",
@@ -1099,10 +1100,11 @@ internal fun SettingBackgroundRunningPage(
                         text = "确定",
                         onClick = { showBackgroundLockOverlay = false },
                         colors = TextButtonColors(
-                            color = MiuixTheme.colorScheme.primary,
-                            textColor = MiuixTheme.colorScheme.onPrimary,
-                            disabledColor = MiuixTheme.colorScheme.primary,
-                            disabledTextColor = MiuixTheme.colorScheme.disabledOnPrimary,
+                            color = AppTheme.colorScheme.primary,
+                            textColor = AppTheme.colorScheme.onPrimary,
+                            disabledColor = AppTheme.colorScheme.primary,
+                            disabledTextColor = AppTheme.colorScheme.disabledOnPrimary,
+                            borderColor = AppTheme.colorScheme.dividerLine,
                         )
                     )
                 }
@@ -1779,6 +1781,7 @@ internal fun SettingBottomBarCustomPage(
     onFloatingBottomBarChange: (Boolean) -> Unit,
     onTopBarBlurChange: (Boolean) -> Unit,
     onBottomBarBlurChange: (Boolean) -> Unit,
+    onHighContrastModeChange: (Boolean) -> Unit,
     navigateBack: () -> Unit,
     scrollBehavior: ScrollBehavior,
     pagePaddingHorizontal: Dp,
@@ -1788,6 +1791,7 @@ internal fun SettingBottomBarCustomPage(
     val blurSupported = isBarBlurSupported()
 
     Scaffold(
+        containerColor = AppTheme.colorScheme.surface,
         topBar = {
             BlurredSmallTopAppBar(
                 title = "主题设置",
@@ -1841,7 +1845,6 @@ internal fun SettingBottomBarCustomPage(
 
             InfoSwitchCard (
                 title = "底栏设置",
-                modifier = Modifier.padding(top = 12.dp),
             ) {
                 Column {
                     OverlayDropdownPreference(
@@ -1869,7 +1872,7 @@ internal fun SettingBottomBarCustomPage(
                     }
                     Box (modifier = Modifier.padding(top = 8.dp)) {
                         AppNavigationBar(
-                            navbarColor = MiuixTheme.colorScheme.background,
+                            navbarColor = AppTheme.colorScheme.background,
                             entries = AppPage.entries,
                             visiblePages = uiState.bottomBarPages,
                             currentPage = uiState.defaultBottomBarPage,
@@ -1878,6 +1881,16 @@ internal fun SettingBottomBarCustomPage(
                         )
                     }
                 }
+            }
+
+            InfoSwitchCard (
+                title = "无障碍",
+            ) {
+                InfoSwitch(
+                    title = "高对比度模式",
+                    checked = uiState.highContrastMode,
+                    onCheckedChange = onHighContrastModeChange,
+                )
             }
         }
     }
@@ -2024,13 +2037,14 @@ internal fun SettingBackupPage(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 colors = TextFieldColors(
-                    backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
-                    labelColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                    backgroundColor = AppTheme.colorScheme.secondaryContainer,
+                    labelColor = AppTheme.colorScheme.onSecondaryContainer,
                     borderColor = if (exportPasswordConfirmation.text == exportPassword.text) {
-                        MiuixTheme.colorScheme.primary
+                        AppTheme.colorScheme.primary
                     } else {
-                        MiuixTheme.colorScheme.error
+                        AppTheme.colorScheme.error
                     },
+                    highContrastBorderColor = AppTheme.colorScheme.outline,
                 ),
             )
             Row(

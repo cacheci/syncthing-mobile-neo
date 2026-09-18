@@ -6,7 +6,6 @@ compose-multiplatform = "1.12.0"
 coroutines = "1.11.0"
 activity-compose = "1.13.0"
 lifecycle = "2.11.0"
-miuix = "0.9.4-rc01"
 qrose = "1.2.1"
 runtime = "1.12.0"
 ui = "1.12.0"
@@ -31,11 +30,11 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
-miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui", version.ref = "miuix" }
-miuix-blur = { module = "top.yukonga.miuix.kmp:miuix-blur", version.ref = "miuix" }
-miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miuix" }
-miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.ref = "miuix" }
-miuix-nav = { module = "top.yukonga.miuix.kmp:miuix-nav", version.ref = "miuix" }
+miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui" }
+miuix-blur = { module = "top.yukonga.miuix.kmp:miuix-blur" }
+miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons" }
+miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference" }
+miuix-nav = { module = "top.yukonga.miuix.kmp:miuix-nav" }
 qrose = { group = "io.github.alexzhirkevich", name = "qrose", version.ref = "qrose" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
 runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "runtime" }

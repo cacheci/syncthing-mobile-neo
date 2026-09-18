@@ -1,5 +1,9 @@
 package moe.https.syncthing.core
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import moe.https.syncthing.ui.theme.AppTheme
+
 data class SyncthingDevice(
     val id: String,
     val name: String?,
@@ -20,6 +24,11 @@ data class SyncthingDevice(
     val maxReceiveKiBPerSecond: Int = 0,
     val untrusted: Boolean = false,
 )
+
+@Composable
+internal fun SyncthingDevice.displayColor(): Color {
+    return if (this.connected) AppTheme.statusColors.ok else AppTheme.statusColors.down
+}
 
 data class SyncthingPendingDevice(
     val id: String,

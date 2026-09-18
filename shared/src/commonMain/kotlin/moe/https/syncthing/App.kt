@@ -65,6 +65,9 @@ import moe.https.syncthing.ui.screen.SettingScreen
 import moe.https.syncthing.ui.screen.SettingStoragePermissionPage
 import moe.https.syncthing.ui.screen.SettingWebuiAdvancedPage
 import moe.https.syncthing.ui.screen.WebviewScreen
+import moe.https.syncthing.ui.theme.AppTheme
+import moe.https.syncthing.ui.theme.AppThemeController
+import moe.https.syncthing.ui.theme.ColorSchemeMode
 import moe.https.syncthing.viewmodel.BackupViewModel
 import moe.https.syncthing.viewmodel.CoreViewModel
 import moe.https.syncthing.viewmodel.DevicesViewModel
@@ -96,9 +99,7 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavController
 import top.yukonga.miuix.kmp.nav.gesture.PredictiveBackHandler
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
-import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.ThemeController
 
 @Composable
 fun App(
@@ -159,8 +160,9 @@ fun App(
     val plainScrollBehavior = MiuixScrollBehavior()
 
     val controller = remember {
-        ThemeController(
-            ColorSchemeMode.System,
+        AppThemeController(
+            colorSchemeMode = ColorSchemeMode.System,
+            isHighContrast = mainUiState.highContrastMode,
         )
     }
 
@@ -264,7 +266,7 @@ fun App(
         }
     }
 
-    MiuixTheme(
+    AppTheme(
         controller = controller,
     ) {
         val swipeBackDirection = when (LocalLayoutDirection.current) {
@@ -330,7 +332,7 @@ fun App(
                                                 Icon(
                                                     contentDescription = "保存",
                                                     imageVector = MiuixIcons.Send,
-                                                    tint = if (settingUiState.isFormValid && !settingUiState.isSaving) MiuixTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
+                                                    tint = if (settingUiState.isFormValid && !settingUiState.isSaving) AppTheme.colorScheme.onBackground else MiuixTheme.colorScheme.onSecondaryContainer
                                                 )
                                             }
                                         )
@@ -699,6 +701,10 @@ fun App(
                             onFloatingBottomBarChange = mainViewModel::onFloatingBottomBarChanged,
                             onTopBarBlurChange = mainViewModel::onTopBarBlurChanged,
                             onBottomBarBlurChange = mainViewModel::onBottomBarBlurChanged,
+                            onHighContrastModeChange = { enabled ->
+                                controller.isHighContrast = enabled
+                                mainViewModel.onHighContrastModeChanged(enabled)
+                            },
                             navigateBack = navigateBack,
                             scrollBehavior = plainScrollBehavior,
                             pagePaddingHorizontal = pagePaddingHorizontal,
@@ -726,6 +732,7 @@ fun App(
                             snackbarHost = {
                                 SnackbarHost(state = plainPageSnackbarHostState)
                             },
+                            containerColor = AppTheme.colorScheme.surface,
                         ) { padding ->
                             Box (
                                 modifier = Modifier

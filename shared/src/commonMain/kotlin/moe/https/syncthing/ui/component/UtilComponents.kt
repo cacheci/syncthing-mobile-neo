@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import moe.https.syncthing.ui.theme.AppTheme
 import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.DropdownArrowEndAction
 import top.yukonga.miuix.kmp.basic.DropdownColors
@@ -92,7 +93,6 @@ import top.yukonga.miuix.kmp.popup.OverlayDropdownPopup
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.LocalContentColor
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.Platform
 import top.yukonga.miuix.kmp.utils.platform
 
@@ -102,7 +102,7 @@ fun isBarBlurSupported(): Boolean = isRuntimeShaderSupported()
 fun rememberBarBackdrop(enabled: Boolean = true): LayerBackdrop? {
     if (!enabled || !isBarBlurSupported()) return null
 
-    val backgroundColor = MiuixTheme.colorScheme.surface
+    val backgroundColor = AppTheme.colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(backgroundColor)
         drawContent()
@@ -139,7 +139,7 @@ fun BlurredSmallTopAppBar(
     backdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
     subtitle: String = "",
-    color: Color = MiuixTheme.colorScheme.surface,
+    color: Color = AppTheme.colorScheme.surface,
     defaultWindowInsetsPadding: Boolean = true,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
@@ -166,7 +166,7 @@ fun AdaptiveTopAppBar(
     scrollBehavior: ScrollBehavior,
     backdrop: LayerBackdrop? = null,
     subtitle: String = "",
-    color: Color = MiuixTheme.colorScheme.surface,
+    color: Color = AppTheme.colorScheme.surface,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     bottomContent: @Composable () -> Unit = {},
@@ -209,16 +209,17 @@ internal fun TextWithOptionField(
     modifier: Modifier = Modifier,
     insideMargin: DpSize = DpSize(16.dp, 16.dp),
     colors: TextFieldColors = TextFieldColors(
-        backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
-        labelColor = MiuixTheme.colorScheme.onSecondaryContainer,
-        borderColor = MiuixTheme.colorScheme.primary,
+        backgroundColor = AppTheme.colorScheme.secondaryContainer,
+        labelColor = AppTheme.colorScheme.onSecondaryContainer,
+        borderColor = AppTheme.colorScheme.primary,
+        highContrastBorderColor = AppTheme.colorScheme.outline,
     ),
     cornerRadius: Dp = 16.dp,
     label: String = "",
     useLabelAsPlaceholder: Boolean = false,
     enabled: Boolean = true,
     readOnly: Boolean = false,
-    textStyle: TextStyle = MiuixTheme.textStyles.main,
+    textStyle: TextStyle = AppTheme.textStyles.main,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     leadingIcon: @Composable (() -> Unit)? = null,
@@ -259,9 +260,9 @@ internal fun TextWithOptionField(
     val isDropdownExpanded = remember { mutableStateOf(false) }
     val actualDropdownEnabled = enabled && items.isNotEmpty()
     val actionColor = if (actualDropdownEnabled) {
-        MiuixTheme.colorScheme.onSurfaceVariantActions
+        AppTheme.colorScheme.onSurfaceVariantActions
     } else {
-        MiuixTheme.colorScheme.disabledOnSecondaryVariant
+        AppTheme.colorScheme.disabledOnSecondaryVariant
     }
     val currentOnExpandedChange = rememberUpdatedState(onExpandedChange)
     val setExpanded: (Boolean) -> Unit = remember {
@@ -337,8 +338,8 @@ internal fun TextWithOptionField(
                     Text(
                         text = title,
                         modifier = Modifier.padding(horizontal = 12.dp),
-                        style = MiuixTheme.textStyles.subtitle,
-                        color = MiuixTheme.colorScheme.onSecondaryContainer,
+                        style = AppTheme.textStyles.subtitle,
+                        color = AppTheme.colorScheme.onSecondaryContainer,
                     )
                 }
                 Box(
@@ -414,7 +415,7 @@ internal fun TextWithOptionField(
                                                 modifier = Modifier
                                                     .padding(end = 12.dp)
                                                     .weight(1f, fill = false),
-                                                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                                fontSize = AppTheme.textStyles.body2.fontSize,
                                                 color = actionColor,
                                                 textAlign = TextAlign.End,
                                             )
@@ -449,7 +450,7 @@ internal fun TextWithOptionField(
 @Composable
 fun FloatingNavigationBar(
     modifier: Modifier = Modifier,
-    color: Color = MiuixTheme.colorScheme.surfaceContainer,
+    color: Color = AppTheme.colorScheme.surfaceContainer,
     cornerRadius: Dp = FloatingToolbarDefaults.CornerRadius,
     horizontalAlignment: Alignment.Horizontal = CenterHorizontally,
     horizontalOutSidePadding: Dp = FloatingNavigationBarDefaults.HorizontalOutSidePadding,
@@ -499,7 +500,7 @@ fun FloatingNavigationBar(
                     if (showDivider) {
                         Modifier
                             .squircleBackground(
-                                color = MiuixTheme.colorScheme.dividerLine,
+                                color = AppTheme.colorScheme.dividerLine,
                                 cornerRadius = cornerRadius,
                             )
                             .padding(0.75.dp)
@@ -555,7 +556,7 @@ internal fun FloatingNavItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val onSurfaceContainerColor = MiuixTheme.colorScheme.onSurfaceContainer
+    val onSurfaceContainerColor = AppTheme.colorScheme.onSurfaceContainer
     val tint = when {
         isPressed -> if (selected) {
             onSurfaceContainerColor.copy(alpha = NavigationBarDefaults.SelectedPressedAlpha)

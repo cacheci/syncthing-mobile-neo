@@ -71,6 +71,16 @@ class MainViewModel(
         mutableUiState.value = currentState.copy(bottomBarBlurEnabled = enabled)
     }
 
+    fun onHighContrastModeChanged(enabled: Boolean) {
+        val currentState = mutableUiState.value
+        if (currentState.highContrastMode == enabled) return
+        appSettingsStorage.putBoolean(
+            AppSettingPrivateStorage.KEY_HIGH_CONTRAST_MODE,
+            enabled,
+        )
+        mutableUiState.value = currentState.copy(highContrastMode = enabled)
+    }
+
     private fun updateBottomBarPages(pages: Set<AppPage>) {
         val normalizedPages = normalizeBottomBarPages(pages)
         val normalizedDefaultPage = resolveDefaultBottomBarPage(
@@ -124,6 +134,10 @@ class MainViewModel(
             bottomBarBlurEnabled = appSettingsStorage.getBoolean(
                 AppSettingPrivateStorage.KEY_BOTTOM_BAR_BLUR,
                 true,
+            ),
+            highContrastMode = appSettingsStorage.getBoolean(
+                AppSettingPrivateStorage.KEY_HIGH_CONTRAST_MODE,
+                false,
             ),
         )
     }

@@ -676,7 +676,7 @@ internal fun AddDeviceScreen(
     Scaffold(
         containerColor = AppTheme.colorScheme.surface,
         topBar = { BlurredSmallTopAppBar(
-            title = if ( existingDevice != null ) "添加设备" else "编辑设备",
+            title = if ( existingDevice != null ) "编辑设备" else "添加设备",
             scrollBehavior = scrollBehavior,
             backdrop = barBackdrop,
             navigationIcon = {

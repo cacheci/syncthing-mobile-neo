@@ -54,6 +54,7 @@ kotlin {
             implementation(libs.ktor.http)
             implementation(libs.uri.kmp)
             implementation(libs.editor)
+            implementation(libs.aboutlibraries.compose.core)
         }
 
         androidMain.dependencies {

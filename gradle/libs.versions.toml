@@ -15,6 +15,7 @@ serialization = "1.11.0"
 ktor = "3.6.0"
 uri-kmp = "0.0.21"
 zip4j = "2.11.6"
+about-libraries = "15.2.0"
 ndk = "28.2.13676358"
 go = "1.27.1"
 #noinspection UnusedVersionCatalogEntry
@@ -46,6 +47,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
 uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uri-kmp" }
 zip4j = { module = "net.lingala.zip4j:zip4j", version.ref = "zip4j" }
+aboutlibraries-compose-core = { module = "com.mikepenz:aboutlibraries-compose-core", version.ref = "about-libraries" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -54,3 +56,4 @@ kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref 
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+aboutLibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "about-libraries" }

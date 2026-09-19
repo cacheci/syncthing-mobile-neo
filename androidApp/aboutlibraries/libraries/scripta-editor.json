@@ -1,0 +1,15 @@
+{
+  "uniqueId": "scripta:editor",
+  "artifactVersion": "9d014153986d83954c5e466483bdee1b14c138ff",
+  "name": "Scripta Editor",
+  "description": "A reusable Compose Multiplatform code editor.",
+  "website": "https://github.com/cacheci/scripta",
+  "developers": [
+    {
+      "name": "Scripta contributors"
+    }
+  ],
+  "licenses": [
+    "Apache-2.0"
+  ]
+}

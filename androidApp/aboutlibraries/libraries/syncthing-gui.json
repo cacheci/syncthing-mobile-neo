@@ -1,0 +1,15 @@
+{
+  "uniqueId": "app:syncthing-gui",
+  "artifactVersion": "0.1.0",
+  "name": "Syncthing GUI",
+  "description": "A Kotlin Multiplatform interface for Syncthing.",
+  "website": "https://github.com/cacheci/syncthing-mobile-neo",
+  "developers": [
+    {
+      "name": "CACHECI"
+    }
+  ],
+  "licenses": [
+    "syncthing-gui-mit"
+  ]
+}

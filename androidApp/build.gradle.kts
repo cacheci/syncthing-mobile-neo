@@ -18,6 +18,24 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.jetbrains.compose)
+    alias(libs.plugins.aboutLibraries)
+}
+
+aboutLibraries {
+    collect {
+        configPath = file("aboutlibraries")
+    }
+    export {
+        outputFile = file("../shared/src/commonMain/composeResources/files/aboutlibraries.json")
+        variant = "release"
+        prettyPrint = true
+    }
+    license {
+        additionalLicenses.addAll("Apache-2.0", "MIT", "MPL-2.0")
+    }
+    library {
+        mergePlatformArtifacts = true
+    }
 }
 
 val syncthingVersion = libs.versions.syncthing.version.get()

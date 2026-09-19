@@ -1,0 +1,15 @@
+{
+  "uniqueId": "top.yukonga.miuix.kmp:miuix-ui",
+  "artifactVersion": "0.9.4 (0021e292a76ebb98c91b1ff006c7f8788334d59e)",
+  "name": "Miuix",
+  "description": "A UI library for Compose Multiplatform.",
+  "website": "https://github.com/compose-miuix-ui/miuix",
+  "developers": [
+    {
+      "name": "compose-miuix-ui contributors"
+    }
+  ],
+  "licenses": [
+    "Apache-2.0"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "uniqueId": "native:syncthing",
+  "artifactVersion": "2.1.5 (2ca95cf1498104113fdfde46df4107f2450a0f71)",
+  "name": "Syncthing Core",
+  "description": "The Syncthing continuous file synchronization program embedded as the Android core.",
+  "website": "https://github.com/syncthing/syncthing/tree/2ca95cf1498104113fdfde46df4107f2450a0f71",
+  "developers": [
+    {
+      "name": "The Syncthing Authors"
+    }
+  ],
+  "licenses": [
+    "MPL-2.0"
+  ]
+}

@@ -372,27 +372,14 @@ fun App(
                         }
                     },
                     bottomBar = {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                            if (!mainUiState.floatingBottomBar) {
-                                AppNavigationBar(
-                                    entries = AppPage.entries,
-                                    visiblePages = mainUiState.bottomBarPages,
-                                    currentPage = currentPageMain,
-                                    onNavigationBarItemClick = ::requestSwitchToPageMain,
-                                    floating = false,
-                                    backdrop = mainBarBackdrop.takeIf { mainUiState.bottomBarBlurEnabled },
-                                )
-                            } else {
-                                AppNavigationBar(
-                                    entries = AppPage.entries,
-                                    visiblePages = mainUiState.bottomBarPages,
-                                    currentPage = currentPageMain,
-                                    onNavigationBarItemClick = ::requestSwitchToPageMain,
-                                    floating = true,
-                                    backdrop = mainBarBackdrop.takeIf { mainUiState.bottomBarBlurEnabled },
-                                )
-                            }
-                        }
+                        AppNavigationBar(
+                            entries = AppPage.entries,
+                            visiblePages = mainUiState.bottomBarPages,
+                            currentPage = currentPageMain,
+                            onNavigationBarItemClick = ::requestSwitchToPageMain,
+                            floating = mainUiState.floatingBottomBar,
+                            backdrop = mainBarBackdrop.takeIf { mainUiState.bottomBarBlurEnabled },
+                        )
                     },
                     snackbarHost = {
                         SnackbarHost(state = snackbarHostState)

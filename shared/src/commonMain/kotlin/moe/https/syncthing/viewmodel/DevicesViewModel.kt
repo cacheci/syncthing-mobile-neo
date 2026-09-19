@@ -92,6 +92,46 @@ class DevicesViewModel(
         }
     }
 
+    fun pauseDevice(deviceId: String) {
+        val normalizedDeviceId = deviceId.trim()
+        if (normalizedDeviceId.isBlank()) {
+            mutableUiState.update { it.copy(errorMessage = "设备 ID 不能为空") }
+            return
+        }
+
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                if (mutableUiState.value.isLoading) return@withLock
+
+                val device = mutableUiState.value.devices.firstOrNull {
+                    it.id == normalizedDeviceId
+                }
+                if (device == null) {
+                    mutableUiState.update { it.copy(errorMessage = "未找到设备") }
+                    return@withLock
+                }
+
+                mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+                try {
+                    controller.setDevicePaused(normalizedDeviceId, !device.paused)
+                    mutableUiState.value = mutableUiState.value.updateFrom(controller.loadDevices())
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    mutableUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error.message
+                                ?.takeIf(String::isNotBlank)
+                                ?: error::class.simpleName
+                                ?: "Throwable",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun dismissPendingDevice(deviceId: String) {
         updatePendingDevice {
             controller.dismissPendingDevice(deviceId)

@@ -259,6 +259,13 @@ class CoreRuntime(
         restClient.deleteDevice(deviceId)
     }
 
+    override suspend fun setDevicePaused(
+        deviceId: String,
+        paused: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        restClient.setDevicePaused(deviceId, paused)
+    }
+
     override suspend fun dismissPendingDevice(deviceId: String) = withContext(Dispatchers.IO) {
         restClient.dismissPendingDevice(deviceId)
     }

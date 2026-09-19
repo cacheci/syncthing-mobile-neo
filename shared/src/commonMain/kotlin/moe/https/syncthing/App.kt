@@ -436,7 +436,7 @@ fun App(
                                     },
                                     onDismissPendingDevice = devicesViewModel::dismissPendingDevice,
                                     onIgnorePendingDevice = devicesViewModel::ignorePendingDevice,
-                                    onDeleteDevice = devicesViewModel::deleteDevice,
+                                    onPauseDevice = devicesViewModel::pauseDevice,
                                     onEditDevice = { device ->
                                         editingDevice = device
                                         pendingDeviceToAdd = null
@@ -628,6 +628,7 @@ fun App(
                             },
                             navigateBack = navigateBack,
                             barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
+                            onDeleteDevice = devicesViewModel::deleteDevice,
                         )
                     }
 

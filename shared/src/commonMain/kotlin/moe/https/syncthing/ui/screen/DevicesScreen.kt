@@ -92,7 +92,7 @@ internal fun DevicesScreen(
     onAddPendingDevice: (SyncthingPendingDevice) -> Unit,
     onDismissPendingDevice: (String) -> Unit,
     onIgnorePendingDevice: (SyncthingPendingDevice) -> Unit,
-    onDeleteDevice: (String) -> Unit,
+    onPauseDevice: (String) -> Unit,
     onEditDevice: (SyncthingDevice) -> Unit,
     modifier: Modifier = Modifier,
     uiPadding: PaddingValues,
@@ -157,7 +157,7 @@ internal fun DevicesScreen(
                         } else {
                             RemoteDeviceCard(
                                 device = device,
-                                onDeleteDevice = onDeleteDevice,
+                                onPauseDevice = onPauseDevice,
                                 onEditDevice = onEditDevice,
                             )
                         }
@@ -230,12 +230,11 @@ private fun NewDeviceCard(
 @Composable
 private fun RemoteDeviceCard(
     device: SyncthingDevice,
-    onDeleteDevice: (String) -> Unit,
+    onPauseDevice: (String) -> Unit,
     onEditDevice: (SyncthingDevice) -> Unit,
 ) {
     var holdDown by rememberSaveable { mutableStateOf(false) }
     var showShareOverlay by rememberSaveable { mutableStateOf(false) }
-    var showDeleteOverlay by rememberSaveable { mutableStateOf(false) }
     var foldContentStatus by rememberSaveable { mutableStateOf(false) }
 
     Card(
@@ -318,14 +317,6 @@ private fun RemoteDeviceCard(
                             values = listOf(lastConnectionAt),
                         )
                     }
-
-                    if (device.paused) {
-                        Text(
-                            text = "此设备已暂停",
-                            color = AppTheme.colorScheme.error,
-                            style = AppTheme.textStyles.footnote2,
-                        )
-                    }
                     if (device.discoveredAddresses.isNotEmpty()) {
                         MultipleValueRow(
                             label = "发现地址",
@@ -338,15 +329,8 @@ private fun RemoteDeviceCard(
                     ) {
                         TextButton(
                             modifier = Modifier.weight(1f),
-                            text = "删除",
-                            onClick = { showDeleteOverlay = true },
-                            colors = TextButtonColors(
-                                color = AppTheme.colorScheme.secondaryContainer,
-                                disabledColor = AppTheme.colorScheme.surface,
-                                textColor = AppTheme.colorScheme.error,
-                                disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
-                                borderColor = AppTheme.colorScheme.error,
-                            )
+                            text = if (device.paused) "恢复" else "暂停",
+                            onClick = { onPauseDevice(device.id) },
                         )
                         Spacer(Modifier.width(10.dp))
                         TextButton(
@@ -367,47 +351,6 @@ private fun RemoteDeviceCard(
         onDismissFinished = { holdDown = false },
         deviceID = device.id,
     )
-
-    OverlayDialog(
-        show = showDeleteOverlay,
-        title = "删除设备",
-        onDismissRequest = { showDeleteOverlay = false },
-        onDismissFinished = { holdDown = false },
-    ) {
-        Column {
-            Text(
-                text = "确定要删除设备 “${device.name?.toCharArray()?.joinToString("\u200B") ?: ""}” 吗？删除该设备不会删除从该设备同步的文件夹。",
-                fontSize = 16.sp,
-                color = AppTheme.colorScheme.onSurfaceVariantSummary
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TextButton(
-                    modifier = Modifier.weight(1f),
-                    text = "取消",
-                    onClick = { showDeleteOverlay = false },
-                )
-                TextButton(
-                    modifier = Modifier.weight(1f),
-                    text = "删除",
-                    onClick = {
-                        showDeleteOverlay = false
-                        foldContentStatus = false
-                        onDeleteDevice(device.id)
-                    },
-                    colors = TextButtonColors(
-                        color = AppTheme.colorScheme.secondaryContainer,
-                        disabledColor = AppTheme.colorScheme.surface,
-                        textColor = AppTheme.colorScheme.error,
-                        disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
-                        borderColor = AppTheme.colorScheme.error,
-                    ),
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -641,6 +584,7 @@ internal fun AddDeviceScreen(
     navigateBack: () -> Unit,
     pagePaddingHorizontal: Dp,
     barBackdrop: LayerBackdrop?,
+    onDeleteDevice: (String) -> Unit,
 ) {
     var deviceId by remember(existingDevice, pendingDevice, scannedDeviceId) {
         mutableStateOf(
@@ -669,6 +613,8 @@ internal fun AddDeviceScreen(
         maxReceiveKiBPerSecond,
     ).all { value -> (value.toIntOrNull()?:0) >= 0 }
     val canSubmit = deviceId.trim().isNotBlank() && numericValuesValid && !isSubmitting
+    var holdDown by rememberSaveable { mutableStateOf(false) }
+    var showDeleteOverlay by rememberSaveable { mutableStateOf(false) }
 
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -760,6 +706,7 @@ internal fun AddDeviceScreen(
                             value = deviceId,
                             onValueChange = { deviceId = it },
                             label = "设备 ID",
+                            labelWeight = 0.3f,
                             valueLabel = "必填",
                             singleLine = false,
                             allowEdit = existingDevice == null && pendingDevice == null
@@ -769,6 +716,7 @@ internal fun AddDeviceScreen(
                             value = name,
                             onValueChange = { name = it },
                             label = "设备名",
+                            labelWeight = 0.3f,
                             valueLabel = "选填",
                             singleLine = true,
                         )
@@ -777,6 +725,7 @@ internal fun AddDeviceScreen(
                             value = group,
                             onValueChange = { group = it },
                             label = "设备组",
+                            labelWeight = 0.3f,
                             valueLabel = "选填",
                             singleLine = true,
                         )
@@ -859,6 +808,58 @@ internal fun AddDeviceScreen(
                         )
                     }
                 )
+
+                TextButton(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    text = "删除",
+                    onClick = { showDeleteOverlay = true },
+                    colors = TextButtonColors(
+                        color = AppTheme.colorScheme.secondaryContainer,
+                        disabledColor = AppTheme.colorScheme.surface,
+                        textColor = AppTheme.colorScheme.error,
+                        disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
+                        borderColor = AppTheme.colorScheme.error,
+                    )
+                )
+            }
+            OverlayDialog(
+                show = showDeleteOverlay,
+                title = "删除设备",
+                onDismissRequest = { showDeleteOverlay = false },
+                onDismissFinished = { holdDown = false },
+            ) {
+                Column {
+                    Text(
+                        text = "确定要删除设备 “${name.toCharArray().joinToString("\u200B")}” 吗？删除该设备不会删除从该设备同步的文件夹。",
+                        fontSize = 16.sp,
+                        color = AppTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "取消",
+                            onClick = { showDeleteOverlay = false },
+                        )
+                        TextButton(
+                            modifier = Modifier.weight(1f),
+                            text = "删除",
+                            onClick = {
+                                showDeleteOverlay = false
+                                onDeleteDevice(deviceId)
+                            },
+                            colors = TextButtonColors(
+                                color = AppTheme.colorScheme.secondaryContainer,
+                                disabledColor = AppTheme.colorScheme.surface,
+                                textColor = AppTheme.colorScheme.error,
+                                disabledTextColor = AppTheme.colorScheme.disabledOnSecondaryVariant,
+                                borderColor = AppTheme.colorScheme.error,
+                            ),
+                        )
+                    }
+                }
             }
         }
     }

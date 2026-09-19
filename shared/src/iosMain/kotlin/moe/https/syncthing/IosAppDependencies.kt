@@ -63,6 +63,8 @@ internal class IosUnavailablePlatformServices :
 
     override suspend fun deleteDevice(deviceId: String): Nothing = unavailable()
 
+    override suspend fun setDevicePaused(deviceId: String, paused: Boolean): Nothing = unavailable()
+
     override suspend fun dismissPendingDevice(deviceId: String): Nothing = unavailable()
 
     override suspend fun ignorePendingDevice(device: SyncthingPendingDevice): Nothing = unavailable()

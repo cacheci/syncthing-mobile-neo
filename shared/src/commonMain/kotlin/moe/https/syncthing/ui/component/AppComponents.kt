@@ -192,6 +192,7 @@ internal fun InputValueRow(
     valueLabel: String,
     value: String,
     onValueChange: ((String) -> Unit),
+    labelWeight: Float = 0.65f,
     summary: String? = null,
     valueValidator: (String) -> Boolean = { true },
     singleLine: Boolean = true,
@@ -203,7 +204,7 @@ internal fun InputValueRow(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column (modifier = Modifier.weight(0.65f)) {
+        Column (modifier = Modifier.weight(labelWeight)) {
             Text(
                 text = label,
                 fontSize = AppTheme.textStyles.headline1.fontSize,
@@ -219,7 +220,7 @@ internal fun InputValueRow(
             }
         }
         Box (
-            modifier = Modifier.weight(0.3f),
+            modifier = Modifier.weight(0.95f - labelWeight),
         ) {
             BasicTextField(
                 modifier = Modifier.fillMaxWidth(),

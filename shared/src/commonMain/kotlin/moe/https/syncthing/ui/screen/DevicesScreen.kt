@@ -708,8 +708,8 @@ internal fun AddDeviceScreen(
                             contentDescription = "保存",
                             imageVector = MiuixIcons.Ok,
                             tint = if (canSubmit) {
-                                AppTheme.colorScheme.disabledOnSurface
-                            } else AppTheme.colorScheme.onSurface
+                                AppTheme.colorScheme.onSurface
+                            } else AppTheme.colorScheme.disabledOnSurface
                         )
                     },
                     onClick = {

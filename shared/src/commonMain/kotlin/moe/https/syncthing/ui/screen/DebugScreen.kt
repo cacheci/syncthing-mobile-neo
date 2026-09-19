@@ -2,6 +2,7 @@ package moe.https.syncthing.ui.screen
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -11,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import moe.https.syncthing.AppSubPage
 import moe.https.syncthing.ui.component.BlurredSmallTopAppBar
@@ -39,6 +41,7 @@ internal fun DevSettingPage(
     requestSwitchToPageMain: ( targetPage: AppPage ) -> Unit,
     requestSwitchToPagePlain: ( targetPage: AppSubPage ) -> Unit,
     navigateBack: () -> Unit,
+    pagePaddingHorizontal: Dp,
     barBackdrop: LayerBackdrop?,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -66,12 +69,16 @@ internal fun DevSettingPage(
             modifier = Modifier
                 .fillMaxSize()
                 .barBackdropSource(barBackdrop)
-                .padding(padding)
-                .padding(horizontal = 20.dp)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,
-                ),
+                )
+                .padding(horizontal = pagePaddingHorizontal),
         ) {
+            item {
+                Spacer(
+                    modifier = Modifier.padding(top = padding.calculateTopPadding())
+                )
+            }
             item {
                 InfoSwitchCard(
                     title = "前往页面..."
@@ -119,6 +126,12 @@ internal fun DevSettingPage(
                         .fillMaxWidth()
                         .padding(top = 12.dp, bottom = 20.dp)
                         .height(320.dp)
+                )
+            }
+
+            item {
+                Spacer(
+                    modifier = Modifier.padding(top = padding.calculateBottomPadding())
                 )
             }
         }

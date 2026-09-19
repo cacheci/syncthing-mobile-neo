@@ -9,8 +9,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,7 +18,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -666,6 +663,7 @@ fun App(
                                 }
                             },
                             navigateBack = navigateBack,
+                            pagePaddingHorizontal = pagePaddingHorizontal,
                             barBackdrop = plainBarBackdrop.takeIf { mainUiState.topBarBlurEnabled },
                         )
                     }
@@ -725,7 +723,6 @@ fun App(
                             Box (
                                 modifier = Modifier
                                     .barBackdropSource(plainBarBackdrop)
-                                    .padding(padding)
                                     .nestedScroll(
                                         plainScrollBehavior.nestedScrollConnection,
                                     )
@@ -734,17 +731,23 @@ fun App(
                                     AppSubPage.ABOUT -> {
                                         AboutScreen(
                                             versionName = versionName,
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
                                     AppSubPage.LICENCE -> {
-                                        LicenceScreen()
+                                        LicenceScreen(
+                                            pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
+                                        )
                                     }
 
                                     AppSubPage.SETTINGS_LISTEN_EDIT -> {
                                         SettingEditListenScreen(
                                             settingViewModel = settingViewModel,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -752,6 +755,7 @@ fun App(
                                         SettingEditDiscoveryScreen(
                                             settingViewModel = settingViewModel,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -763,6 +767,7 @@ fun App(
                                             onImportCore = coreViewModel::onImportCoreClicked,
                                             onCoreDelete = coreViewModel::onCoreDelete,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -775,6 +780,7 @@ fun App(
                                             onRequestWifiNameAccess = onRequestWifiNameAccess,
                                             onOpenLocationSettings = onOpenLocationSettings,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -782,6 +788,7 @@ fun App(
                                         SettingBackgroundRunningBatteryPage(
                                             settingViewModel = settingViewModel,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -789,6 +796,7 @@ fun App(
                                         SettingBackgroundRunningDurationPage(
                                             settingViewModel = settingViewModel,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -796,6 +804,7 @@ fun App(
                                         SettingBackgroundRunningAdvancedPage(
                                             settingViewModel = settingViewModel,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -812,6 +821,7 @@ fun App(
                                                 navigateTo(AppSubPage.SETTINGS_POSITION_PERMISSION)
                                             },
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -821,6 +831,7 @@ fun App(
                                             onRequestWifiNameAccess = onRequestWifiNameAccess,
                                             onOpenLocationSettings = onOpenLocationSettings,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -834,6 +845,7 @@ fun App(
                                             onCancelImport = backupViewModel::cancelImport,
                                             onMessageShown = backupViewModel::clearMessage,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
 
@@ -842,6 +854,7 @@ fun App(
                                             uiState = settingUiState,
                                             settingViewModel = settingViewModel,
                                             pagePaddingHorizontal = pagePaddingHorizontal,
+                                            padding = padding,
                                         )
                                     }
                                 }

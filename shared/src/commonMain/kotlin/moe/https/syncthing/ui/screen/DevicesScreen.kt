@@ -688,7 +688,6 @@ internal fun AddDeviceScreen(
         Box (
             modifier = Modifier
                 .barBackdropSource(barBackdrop)
-                .padding(padding)
                 .padding(horizontal = pagePaddingHorizontal)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,
@@ -698,6 +697,7 @@ internal fun AddDeviceScreen(
                 modifier = modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(padding)
             ) {
                 InfoSwitchCard(
                     title = "设备",

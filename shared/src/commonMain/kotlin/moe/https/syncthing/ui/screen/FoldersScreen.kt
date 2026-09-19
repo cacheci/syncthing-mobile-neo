@@ -586,7 +586,6 @@ internal fun AddFolderScreen(
         Box (
             modifier = Modifier
                 .barBackdropSource(barBackdrop)
-                .padding(padding)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,
                 )
@@ -595,6 +594,7 @@ internal fun AddFolderScreen(
                 modifier = modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(padding)
                     .padding(horizontal = pagePaddingHorizontal),
             ) {
                 InfoSwitchCard(

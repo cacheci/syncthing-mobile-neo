@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.https.syncthing.generated.resources.Res
@@ -40,6 +41,8 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 @Composable
 internal fun AboutScreen(
     versionName: String,
+    pagePaddingHorizontal: Dp,
+    padding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -47,13 +50,10 @@ internal fun AboutScreen(
     var showLicenceType by rememberSaveable { mutableStateOf<LicenceText?>(null) }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            top = 40.dp,
-            end = 16.dp,
-            bottom = 20.dp,
-        ),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(padding),
+        contentPadding = PaddingValues(horizontal = pagePaddingHorizontal),
     ) {
         item {
             Column(
@@ -114,6 +114,8 @@ internal fun AboutScreen(
 
 @Composable
 internal fun LicenceScreen(
+    pagePaddingHorizontal: Dp,
+    padding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -121,13 +123,10 @@ internal fun LicenceScreen(
     var showLicenceType by rememberSaveable { mutableStateOf<LicenceText?>(null) }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            top = 40.dp,
-            end = 16.dp,
-            bottom = 20.dp,
-        ),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(padding),
+        contentPadding = PaddingValues(horizontal = pagePaddingHorizontal),
     ) {
         item {
             AboutCard(

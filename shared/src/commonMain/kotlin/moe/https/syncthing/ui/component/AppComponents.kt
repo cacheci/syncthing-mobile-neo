@@ -761,6 +761,7 @@ internal fun AppNavigationBar(
     entries: EnumEntries<AppPage>,
     visiblePages: Set<AppPage>,
     currentPage: AppPage,
+    modifier: Modifier = Modifier,
     floating: Boolean = false, //TODO
     onNavigationBarItemClick: (AppPage) -> Unit = {},
     navbarColor: Color = AppTheme.colorScheme.background,
@@ -769,7 +770,7 @@ internal fun AppNavigationBar(
 ) {
     if (!floating) {
         NavigationBar(
-            modifier = Modifier.barBackdropBlur(backdrop, RectangleShape, navbarColor),
+            modifier = modifier.barBackdropBlur(backdrop, RectangleShape, navbarColor),
             color = if (backdrop != null) Color.Transparent else navbarColor,
             defaultWindowInsetsPadding = defaultWindowInsetsPadding,
         ) {
@@ -786,7 +787,7 @@ internal fun AppNavigationBar(
         }
     } else {
         FloatingNavigationBar(
-            modifier = Modifier.barBackdropBlur(
+            modifier = modifier.barBackdropBlur(
                 backdrop = backdrop,
                 shape = RoundedCornerShape(FloatingToolbarDefaults.CornerRadius),
                 tint = navbarColor,

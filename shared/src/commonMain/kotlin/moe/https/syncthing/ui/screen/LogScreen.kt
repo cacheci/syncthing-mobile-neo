@@ -69,10 +69,10 @@ internal fun LogScreen(
         Box (
             modifier = Modifier
                 .barBackdropSource(barBackdrop)
-                .padding(padding)
                 .nestedScroll(
                     scrollBehavior.nestedScrollConnection,
                 )
+                .padding(padding)
         ) {
             Column(
                 modifier = modifier
